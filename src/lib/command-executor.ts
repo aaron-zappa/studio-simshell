@@ -51,7 +51,7 @@ export const executeCommand = async ({ // Added async keyword
   if (mode === 'internal') {
     // 1. Built-in commands
     if (commandLower.startsWith('help')) {
-      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add int_cmd <name> <description> <whatToDo>, export log\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
+      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <name> "<description>" <whatToDo>, export log\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
     } else if (commandLower === 'clear') {
       // Special case handled in handleCommandSubmit
       outputLines = [];
@@ -70,10 +70,10 @@ export const executeCommand = async ({ // Added async keyword
        outputLines = [{ id: `out-${timestamp}`, text: `Define command placeholder for: ${args.join(' ')}`, type: 'output', category: 'internal' }];
     } else if (commandLower.startsWith('refine ')) {
        outputLines = [{ id: `out-${timestamp}`, text: `Refine command placeholder for: ${args.join(' ')}`, type: 'output', category: 'internal' }];
-    } else if (commandLower.startsWith('add int_cmd ')) {
+    } else if (commandLower.startsWith('add_int_cmd ')) { // Updated command name
         // Regex to capture name, description (in quotes), and whatToDo
-        // Example: add int_cmd mycmd "This is my command" echo hello
-        const addCmdRegex = /^add int_cmd (\S+)\s+"([^"]+)"\s+(.+)$/i;
+        // Example: add_int_cmd mycmd "This is my command" echo hello
+        const addCmdRegex = /^add_int_cmd (\S+)\s+"([^"]+)"\s+(.+)$/i; // Updated regex
         const match = command.match(addCmdRegex); // Match against original command casing
 
         if (match && match[1] && match[2] && match[3]) {
@@ -102,7 +102,7 @@ export const executeCommand = async ({ // Added async keyword
             }
         } else {
             // Update error message for new syntax
-            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add int_cmd <name> "<description>" <whatToDo>`, type: 'error', category: 'internal' }];
+            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add_int_cmd <name> "<description>" <whatToDo>`, type: 'error', category: 'internal' }];
         }
     } else if (commandLower === 'export log') {
         // Client-side handled, this provides feedback
