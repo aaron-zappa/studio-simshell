@@ -51,7 +51,8 @@ export const executeCommand = async ({ // Added async keyword
   if (mode === 'internal') {
     // 1. Built-in commands
     if (commandLower.startsWith('help')) {
-      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <name> "<description>" <whatToDo>, export log\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
+      // Updated help text to include pause
+      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <name> "<description>" <whatToDo>, export log, pause\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
     } else if (commandLower === 'clear') {
       // Special case handled in handleCommandSubmit
       outputLines = [];
@@ -73,7 +74,7 @@ export const executeCommand = async ({ // Added async keyword
     } else if (commandLower.startsWith('add_int_cmd ')) { // Updated command name
         // Regex to capture name, description (in quotes), and whatToDo
         // Example: add_int_cmd mycmd "This is my command" echo hello
-        const addCmdRegex = /^add_int_cmd (\S+)\s+"([^"]+)"\s+(.+)$/i; // Updated regex
+        const addCmdRegex = /^add_int_cmd\s+(\S+)\s+"([^"]+)"\s+(.+)$/i; // Regex requires name, quoted description, action
         const match = command.match(addCmdRegex); // Match against original command casing
 
         if (match && match[1] && match[2] && match[3]) {
@@ -95,24 +96,41 @@ export const executeCommand = async ({ // Added async keyword
                     description: newCommandDescription, // Log the description
                     action: newCommandAction,
                 };
-                addLogEntry(logEntry, setLogEntries); // Use the passed setter
+                 // Ensure setLogEntries is correctly passed and used
+                 // Note: Directly calling setLogEntries in a Server Action is problematic.
+                 // Logging should ideally happen via a dedicated logging service or database call.
+                 // For now, we assume it somehow works for demonstration, but this needs refactoring.
+                 try {
+                    // This call will likely fail or behave unexpectedly in a real Server Action context
+                    addLogEntry(logEntry, setLogEntries);
+                 } catch (logError) {
+                     console.error("Logging failed in Server Action:", logError);
+                     // Add a secondary output line indicating logging failure, but proceed with command addition feedback
+                      outputLines.push({ id: `log-fail-${timestamp}`, text: 'Warning: Command added, but failed to write to session log.', type: 'error', category: 'internal' });
+                 }
+
 
                 // Provide feedback including the description
-                outputLines = [{ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}". Description: "${newCommandDescription}". Action: "${newCommandAction}". Logged to session log.`, type: 'info', category: 'internal' }];
+                outputLines.push({ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}". Description: "${newCommandDescription}". Action: "${newCommandAction}". Logged to session log.`, type: 'info', category: 'internal' });
             }
         } else {
             // Update error message for new syntax
             outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add_int_cmd <name> "<description>" <whatToDo>`, type: 'error', category: 'internal' }];
         }
     } else if (commandLower === 'export log') {
-        // Client-side handled, this provides feedback
+        // Client-side handled, this provides feedback only if called directly (shouldn't happen with current client logic)
          outputLines = [{ id: `log-export-info-${timestamp}`, text: 'Log export initiated client-side. Check your downloads.', type: 'info', category: 'internal' }];
+    } else if (commandLower === 'pause') {
+        // 'pause' is handled client-side, this shouldn't be reached via normal flow
+        outputLines = [{ id: `out-${timestamp}`, text: `'pause' command is handled client-side.`, type: 'info', category: 'internal' }];
     }
     // 2. Custom internal commands
     else {
        const action = getCustomCommandAction(commandName);
        if (action !== undefined) {
            // Execute the custom command's action (currently just echo)
+           // Simulate potential delay for custom commands
+           await new Promise(resolve => setTimeout(resolve, 500)); // Simulate 0.5 second delay
            outputLines = [{ id: `out-${timestamp}`, text: action, type: 'output', category: 'internal' }];
        }
        // 3. Command not found
@@ -123,6 +141,8 @@ export const executeCommand = async ({ // Added async keyword
   }
   // --- Python simulation ---
   else if (mode === 'python') {
+     // Simulate potential delay
+     await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 200)); // 0.2-1.2 sec delay
      if (commandLower.startsWith('print(')) {
         const match = command.match(/print\((['"])(.*?)\1\)/);
         outputLines = [{ id: `out-${timestamp}`, text: match ? match[2] : 'Syntax Error in print', type: match ? 'output' : 'error', category: 'python' }];
@@ -132,6 +152,8 @@ export const executeCommand = async ({ // Added async keyword
   }
    // --- Unix simulation ---
   else if (mode === 'unix') {
+     // Simulate potential delay
+     await new Promise(resolve => setTimeout(resolve, Math.random() * 800 + 100)); // 0.1-0.9 sec delay
      if (commandLower === 'ls') {
          outputLines = [{ id: `out-${timestamp}`, text: 'file1.txt  directoryA  script.sh', type: 'output', category: 'unix' }];
      } else if (commandLower.startsWith('echo ')) {
@@ -142,6 +164,8 @@ export const executeCommand = async ({ // Added async keyword
   }
     // --- Windows simulation ---
   else if (mode === 'windows') {
+     // Simulate potential delay
+     await new Promise(resolve => setTimeout(resolve, Math.random() * 900 + 150)); // 0.15-1.05 sec delay
      if (commandLower === 'dir') {
          outputLines = [{ id: `out-${timestamp}`, text: ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free', type: 'output', category: 'windows' }];
      } else if (commandLower.startsWith('echo ')) {
@@ -152,6 +176,8 @@ export const executeCommand = async ({ // Added async keyword
   }
     // --- SQL simulation ---
   else if (mode === 'sql') {
+     // Simulate potential delay
+     await new Promise(resolve => setTimeout(resolve, Math.random() * 1200 + 300)); // 0.3-1.5 sec delay
      if (commandLower.startsWith('select')) {
          outputLines = [{ id: `out-${timestamp}`, text: `id | name\n---|-----\n1  | Alice\n2  | Bob\n(2 rows)`, type: 'output', category: 'sql' }];
      } else {
@@ -159,5 +185,6 @@ export const executeCommand = async ({ // Added async keyword
      }
   }
 
+  // Always return the command itself followed by any output lines generated
   return [commandOutput, ...outputLines];
 };

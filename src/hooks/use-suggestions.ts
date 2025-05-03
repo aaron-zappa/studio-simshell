@@ -7,8 +7,8 @@ import type { CustomCommands } from './use-custom-commands'; // Import CustomCom
 
 // Initial suggestions, will be mutable
 const initialSuggestionsData: Record<string, string[]> = {
-  // Updated 'add internal command' suggestion format
-  internal: ['help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd <name> "<description>" <whatToDo>', 'export log'],
+  // Updated 'add internal command' suggestion format and added 'pause'
+  internal: ['help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd <name> <description> <whatToDo>', 'export log', 'pause'],
   python: ['print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield '],
   unix: ['ls', 'cd', 'pwd', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'grep', 'echo', 'man', 'sudo'],
   windows: ['dir', 'cd', 'cls', 'mkdir', 'rmdir', 'copy', 'move', 'type', 'findstr', 'echo', 'help'],
@@ -34,7 +34,7 @@ export const useSuggestions = () => {
             let suggestionToAdd = lowerCommand;
             if (lowerCommand.startsWith('add_int_cmd')) { // Updated check
                 // Specific format for the add command suggestion itself
-                suggestionToAdd = 'add_int_cmd <name> "<description>" <whatToDo>';
+                suggestionToAdd = 'add_int_cmd <name> <description> <whatToDo>';
             } else {
                  // For other commands added (like custom ones), use the actual command name
                  suggestionToAdd = lowerCommand;

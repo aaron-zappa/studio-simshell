@@ -15,9 +15,10 @@ interface CommandInputProps {
   suggestions: string[]; // List of possible commands/subcommands
   currentMode?: CommandMode; // Use imported CommandMode
   className?: string;
+  disabled?: boolean; // Add disabled prop
 }
 
-export function CommandInput({ onSubmit, suggestions, currentMode, className }: CommandInputProps) {
+export function CommandInput({ onSubmit, suggestions, currentMode, className, disabled = false }: CommandInputProps) {
   const [inputValue, setInputValue] = React.useState("");
   const [filteredSuggestions, setFilteredSuggestions] = React.useState<string[]>([]);
   const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);
@@ -27,7 +28,7 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
     const value = event.target.value;
     setInputValue(value);
 
-    if (value.trim().length > 0) {
+    if (value.trim().length > 0 && !disabled) { // Check disabled state
       const lowerCaseValue = value.toLowerCase();
       const filtered = suggestions.filter((suggestion) =>
         suggestion.toLowerCase().startsWith(lowerCaseValue) && suggestion.toLowerCase() !== lowerCaseValue
@@ -41,10 +42,11 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
   };
 
   const handleSuggestionClick = (suggestion: string) => {
+    if (disabled) return; // Prevent action if disabled
+
     // Handle specific suggestion format for 'add_int_cmd'
-    if (suggestion.startsWith('add_int_cmd <name>')) { // Updated check
-       // Set input to 'add_int_cmd ' with a space, allowing user to type name etc.
-       setInputValue('add_int_cmd '); // Updated value
+    if (suggestion.startsWith('add_int_cmd <name>')) {
+       setInputValue('add_int_cmd ');
     } else {
        setInputValue(suggestion + " "); // Add space after other suggestions
     }
@@ -54,6 +56,8 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
   };
 
    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return; // Prevent action if disabled
+
     if (event.key === 'Enter') {
         handleSubmit();
     } else if (event.key === 'Tab' && filteredSuggestions.length > 0) {
@@ -65,6 +69,8 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
    };
 
   const handleSubmit = () => {
+    if (disabled) return; // Prevent action if disabled
+
     if (inputValue.trim()) {
       onSubmit(inputValue);
       setInputValue(""); // Clear input after submit
@@ -92,13 +98,14 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
                  <Input
                     ref={inputRef}
                     type="text"
-                    placeholder="Enter command..."
+                    placeholder={disabled ? "Processing..." : "Enter command..."} // Change placeholder when disabled
                     value={inputValue}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     className="flex-1 font-mono" // Use monospace font
                     aria-autocomplete="list"
                     aria-controls="suggestion-list"
+                    disabled={disabled} // Pass disabled state to Input
                  />
             </PopoverAnchor>
            <PopoverContent
@@ -123,10 +130,14 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
                     value={suggestion} // value is needed for CommandItem
                     onSelect={() => handleSuggestionClick(suggestion)}
                     className="cursor-pointer font-mono"
+                    // Disable selection if input is disabled
+                    // Note: `disabled` is not a standard prop for CommandItem,
+                    // relies on `data-[disabled]` attribute and CSS for visual cue.
+                    // Actual click prevention is handled in `handleSuggestionClick`.
+                    data-disabled={disabled}
                   >
-                     {/* Display suggestion format for 'add_int_cmd' properly */}
-                     {suggestion === 'add_int_cmd <name> "<description>" <whatToDo>' // Updated format check
-                        ? 'add_int_cmd <name> "<description>" <whatToDo>' // Updated format display
+                     {suggestion === 'add_int_cmd <name> "<description>" <whatToDo>'
+                        ? 'add_int_cmd <name> "<description>" <whatToDo>'
                         : suggestion}
                   </CommandItem>
                 ))}
@@ -134,7 +145,7 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
             </CommandPrimitive>
           </PopoverContent>
        </Popover>
-      <Button onClick={handleSubmit} variant="default" size="icon">
+      <Button onClick={handleSubmit} variant="default" size="icon" disabled={disabled}> {/* Disable button */}
         <Terminal className="h-4 w-4" />
         <span className="sr-only">Execute Command</span>
       </Button>
