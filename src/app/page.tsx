@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -6,9 +7,9 @@ import { OutputDisplay, type OutputLine } from '@/components/output-display';
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { useCustomCommands, type CustomCommandAction, type CustomCommands } from '@/hooks/use-custom-commands'; // Import custom command hook
 
-// --- Mock Data & Logic (Replace with actual logic later) ---
-
+// --- Suggestions Logic ---
 // Initial suggestions, will be mutable
 const initialSuggestions: Record<string, string[]> = {
   internal: ['help', 'clear', 'mode', 'history', 'define', 'refine', 'add internal command'],
@@ -25,49 +26,70 @@ const useSuggestions = () => {
     const addSuggestion = (mode: CommandMode, command: string) => {
         setSuggestions(prev => {
             const modeSuggestions = prev[mode] || [];
-            if (!modeSuggestions.includes(command)) {
+            // Ensure command names are added in lowercase for consistency
+            const lowerCommand = command.toLowerCase();
+            if (!modeSuggestions.some(s => s.toLowerCase() === lowerCommand)) {
                 return {
                     ...prev,
-                    [mode]: [...modeSuggestions, command].sort(), // Add and sort
+                    [mode]: [...modeSuggestions, lowerCommand].sort(), // Add and sort
                 };
             }
             return prev;
         });
     };
 
-    return { suggestions, addSuggestion };
+     // Function to get suggestions for the current mode, including custom ones
+     const getCurrentSuggestions = (mode: CommandMode, customInternalCommands: string[]) => {
+        const baseSuggestions = suggestions[mode] || [];
+        if (mode === 'internal') {
+            // Combine base internal suggestions with custom command names
+            // Ensure no duplicates and sort
+            const combined = [...new Set([...baseSuggestions, ...customInternalCommands])].sort();
+            return combined;
+        }
+        return baseSuggestions;
+     };
+
+
+    return { suggestions, addSuggestion, getCurrentSuggestions };
 };
 
 
-// Mock command execution (replace with actual simulation engine)
+// --- Command Execution Logic ---
 const executeCommand = (
     command: string,
     mode: CommandMode,
-    addSuggestion: (mode: CommandMode, command: string) => void
+    addSuggestion: (mode: CommandMode, command: string) => void,
+    addCustomCommand: (name: string, action: CustomCommandAction) => void,
+    getCustomCommandAction: (name: string) => CustomCommandAction | undefined
 ): OutputLine[] => {
   const timestamp = new Date().toISOString(); // Simple unique ID
   const commandLower = command.toLowerCase().trim();
   const args = command.split(' ').slice(1);
+  const commandName = commandLower.split(' ')[0];
+
 
   const commandOutput: OutputLine = {
     id: `cmd-${timestamp}`,
-    text: command,
+    text: command, // Show the original command casing
     type: 'command',
     category: mode,
   };
 
   let outputLines: OutputLine[] = [];
 
-  // Internal commands
+  // --- Internal Commands Handling ---
   if (mode === 'internal') {
+    // 1. Built-in commands
     if (commandLower.startsWith('help')) {
-      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add internal command "<name>" <action>`, type: 'output', category: 'internal' }];
+      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add internal command "<name>" <action>\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
     } else if (commandLower === 'clear') {
       // Special case handled in handleCommandSubmit
       outputLines = [];
     } else if (commandLower.startsWith('mode ')) {
        const newMode = args[0] as CommandMode;
-       if (Object.keys(initialSuggestions).includes(newMode)) { // Check against initial static modes
+       // Check against the static list of supported modes
+       if (Object.keys(initialSuggestions).includes(newMode)) {
          // Mode change is handled in handleCommandSubmit
          outputLines = [{ id: `out-${timestamp}`, text: `Switched to ${newMode} mode.`, type: 'info', category: 'internal' }];
        } else {
@@ -82,32 +104,40 @@ const executeCommand = (
     } else if (commandLower.startsWith('add internal command ')) {
         // Regex to capture command name in quotes and the rest as action
         const addCmdRegex = /^add internal command "([^"]+)"\s+(.+)$/i;
-        const match = command.match(addCmdRegex);
+        const match = command.match(addCmdRegex); // Match against original command casing
 
         if (match && match[1] && match[2]) {
-            const newCommandName = match[1];
-            const newCommandAction = match[2]; // Placeholder for action definition
-            // Add to suggestions (in-memory for now)
-            addSuggestion('internal', newCommandName);
-            outputLines = [{ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}" (action: ${newCommandAction})`, type: 'info', category: 'internal' }];
-            // TODO: Store command definition persistently (e.g., SQLite)
+            const newCommandName = match[1]; // Keep original casing for display if needed, but store lowercase
+            const newCommandAction = match[2]; // Action is the rest of the string
+
+            // Check if name conflicts with built-in commands
+            if (initialSuggestions.internal.includes(newCommandName.toLowerCase())) {
+                 outputLines = [{ id: `out-${timestamp}`, text: `Error: Cannot redefine built-in command "${newCommandName}".`, type: 'error', category: 'internal' }];
+            } else {
+                addSuggestion('internal', newCommandName); // Add to suggestions
+                addCustomCommand(newCommandName, newCommandAction); // Add to custom command store
+                outputLines = [{ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}" (action will output: ${newCommandAction})`, type: 'info', category: 'internal' }];
+                 // TODO: Store command definition persistently (e.g., SQLite)
+            }
         } else {
             outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add internal command "<command_name>" <command_action>`, type: 'error', category: 'internal' }];
         }
     }
-     else {
-      // Check if it's a dynamically added command before showing error
-      // This part needs refinement once dynamic command execution is implemented
-      if (initialSuggestions.internal.includes(commandLower) || commandLower.split(' ')[0] in initialSuggestions.internal) {
-           outputLines = [{ id: `out-${timestamp}`, text: `Internal command not found or invalid arguments: ${command}`, type: 'error', category: 'internal' }];
-      } else {
-          // Assume it might be a custom added command - placeholder execution
-           outputLines = [{ id: `out-${timestamp}`, text: `Executing custom internal command: ${command} (placeholder)`, type: 'output', category: 'internal' }];
-           // TODO: Implement execution logic for dynamically added commands
-      }
+    // 2. Custom internal commands
+    else {
+       const action = getCustomCommandAction(commandName);
+       if (action !== undefined) {
+           // Execute the custom command's action (currently just echo)
+           // We might enhance this later to parse the action string
+           outputLines = [{ id: `out-${timestamp}`, text: action, type: 'output', category: 'internal' }];
+       }
+       // 3. Command not found
+       else {
+           outputLines = [{ id: `out-${timestamp}`, text: `Internal command not found: ${commandName}`, type: 'error', category: 'internal' }];
+       }
     }
   }
-  // Python simulation
+  // --- Python simulation ---
   else if (mode === 'python') {
      if (commandLower.startsWith('print(')) {
         const match = command.match(/print\((['"])(.*?)\1\)/);
@@ -116,7 +146,7 @@ const executeCommand = (
         outputLines = [{ id: `out-${timestamp}`, text: `Simulating Python: ${command} (output placeholder)`, type: 'output', category: 'python' }];
      }
   }
-   // Unix simulation
+   // --- Unix simulation ---
   else if (mode === 'unix') {
      if (commandLower === 'ls') {
          outputLines = [{ id: `out-${timestamp}`, text: 'file1.txt  directoryA  script.sh', type: 'output', category: 'unix' }];
@@ -126,7 +156,7 @@ const executeCommand = (
          outputLines = [{ id: `out-${timestamp}`, text: `Simulating Unix: ${command} (output placeholder)`, type: 'output', category: 'unix' }];
      }
   }
-    // Windows simulation
+    // --- Windows simulation ---
   else if (mode === 'windows') {
      if (commandLower === 'dir') {
          outputLines = [{ id: `out-${timestamp}`, text: ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free', type: 'output', category: 'windows' }];
@@ -136,7 +166,7 @@ const executeCommand = (
          outputLines = [{ id: `out-${timestamp}`, text: `Simulating Windows: ${command} (output placeholder)`, type: 'output', category: 'windows' }];
      }
   }
-    // SQL simulation
+    // --- SQL simulation ---
   else if (mode === 'sql') {
      if (commandLower.startsWith('select')) {
          outputLines = [{ id: `out-${timestamp}`, text: `id | name\n---|-----\n1  | Alice\n2  | Bob\n(2 rows)`, type: 'output', category: 'sql' }];
@@ -155,7 +185,8 @@ type CommandMode = 'internal' | 'python' | 'unix' | 'windows' | 'sql';
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
   const [currentMode, setCurrentMode] = React.useState<CommandMode>('internal');
-  const { suggestions, addSuggestion } = useSuggestions(); // Use the hook
+  const { suggestions, addSuggestion, getCurrentSuggestions } = useSuggestions(); // Suggestions hook
+  const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands(); // Custom commands hook
 
   const handleCommandSubmit = (command: string) => {
     const commandLower = command.toLowerCase().trim();
@@ -168,29 +199,28 @@ export default function Home() {
 
     // Handle internal 'mode' command locally to change state
     if (currentMode === 'internal' && commandLower.startsWith('mode ')) {
-        const newMode = command.split(' ')[1] as CommandMode;
-        if (Object.keys(suggestions).includes(newMode)) { // Check against current suggestions keys
+        const newMode = command.split(' ')[1]?.toLowerCase() as CommandMode | undefined;
+         // Check against static list of modes
+        if (newMode && Object.keys(initialSuggestions).includes(newMode)) {
              setCurrentMode(newMode);
              // Add confirmation to history *after* processing other output
-             const output = executeCommand(command, currentMode, addSuggestion); // Get potential error message
+             const output = executeCommand(command, currentMode, addSuggestion, addCustomCommand, getCustomCommandAction); // Get potential error message
              setHistory((prev) => [...prev, ...output]);
         } else {
             // Let executeCommand handle the error message
-            const output = executeCommand(command, currentMode, addSuggestion);
+            const output = executeCommand(command, currentMode, addSuggestion, addCustomCommand, getCustomCommandAction);
             setHistory((prev) => [...prev, ...output]);
         }
         return;
     }
 
-
-    // Execute other commands
-    const output = executeCommand(command, currentMode, addSuggestion);
+    // Execute other commands (including custom internal ones)
+    const output = executeCommand(command, currentMode, addSuggestion, addCustomCommand, getCustomCommandAction);
     setHistory((prev) => [...prev, ...output]);
 
     // TODO: Add command analysis, validation, real execution logic here
     // TODO: Store command history in SQLite
     // TODO: Implement define/refine mechanisms
-    // TODO: Implement execution for dynamically added commands
   };
 
   const handleModeChange = (value: string) => {
@@ -200,10 +230,17 @@ export default function Home() {
       setCurrentMode('internal'); // Temporarily switch to internal to process 'mode' command
       handleCommandSubmit(`mode ${newMode}`);
       // Note: handleCommandSubmit will set the mode back if successful
-      if (!Object.keys(suggestions).includes(newMode)) {
+      // Check if the mode actually changed (was valid)
+       if (!Object.keys(initialSuggestions).includes(newMode)) {
           setCurrentMode(previousMode); // Revert if mode change failed
       }
   }
+
+   // Get combined suggestions for the current mode
+   const currentSuggestions = getCurrentSuggestions(
+        currentMode,
+        Object.keys(customCommands)
+   );
 
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
@@ -216,7 +253,8 @@ export default function Home() {
                     <SelectValue placeholder="Select mode" />
                 </SelectTrigger>
                 <SelectContent>
-                    {(Object.keys(suggestions) as CommandMode[]).map(mode => (
+                     {/* Use static list of modes for the dropdown */}
+                    {(Object.keys(initialSuggestions) as CommandMode[]).map(mode => (
                          <SelectItem key={mode} value={mode}>
                             {mode.charAt(0).toUpperCase() + mode.slice(1)}
                         </SelectItem>
@@ -237,12 +275,10 @@ export default function Home() {
       <footer className="shrink-0">
         <CommandInput
             onSubmit={handleCommandSubmit}
-            suggestions={suggestions[currentMode] || []} // Use stateful suggestions
+            suggestions={currentSuggestions} // Use combined suggestions
             currentMode={currentMode}
          />
       </footer>
     </div>
   );
 }
-
-    
