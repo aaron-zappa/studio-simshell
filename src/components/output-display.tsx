@@ -26,6 +26,7 @@ const getCategoryStyle = (category?: OutputLine['category']): string => {
     case 'unix': return 'text-accent-yellow'; // Example: Yellow for Unix
     case 'windows': return 'text-blue-500'; // Example: Blue for Windows (using Tailwind directly for simplicity)
     case 'sql': return 'text-purple-500'; // Example: Purple for SQL
+    case 'excel': return 'text-green-700 dark:text-green-400'; // Example: Dark Green for Excel
     default: return '';
   }
 };
@@ -69,3 +70,4 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
     </Card>
   );
 }
+

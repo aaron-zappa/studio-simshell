@@ -45,7 +45,7 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className, di
     if (disabled) return; // Prevent action if disabled
 
     // Handle specific suggestion format for 'add_int_cmd'
-    if (suggestion.startsWith('add_int_cmd <short>')) { // Updated check
+    if (currentMode === 'internal' && suggestion.startsWith('add_int_cmd <short>')) { // Check mode too
        setInputValue('add_int_cmd ');
     } else {
        setInputValue(suggestion + " "); // Add space after other suggestions
@@ -86,6 +86,7 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className, di
       case 'unix': return '[Ux]';
       case 'windows': return '[Win]';
       case 'sql': return '[SQL]';
+      case 'excel': return '[Xl]'; // Added Excel display
       default: return '[Int]';
     }
   }
@@ -136,7 +137,7 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className, di
                     // Actual click prevention is handled in `handleSuggestionClick`.
                     data-disabled={disabled}
                   >
-                     {suggestion === 'add_int_cmd <short> <name> "<description>" <whatToDo>' // Updated suggestion display
+                    {currentMode === 'internal' && suggestion === 'add_int_cmd <short> <name> "<description>" <whatToDo>' // Check mode too
                         ? 'add_int_cmd <short> <name> "<description>" <whatToDo>'
                         : suggestion}
                   </CommandItem>
@@ -152,3 +153,4 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className, di
     </div>
   );
 }
+

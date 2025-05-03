@@ -52,7 +52,7 @@ export const executeCommand = async ({ // Added async keyword
     // 1. Built-in commands
     if (commandLower.startsWith('help')) {
       // Updated help text for add_int_cmd format
-      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
+      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: ${Object.keys(initialSuggestions).join(', ')}.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
     } else if (commandLower === 'clear') {
       // Special case handled in handleCommandSubmit
       outputLines = [];
@@ -187,7 +187,31 @@ export const executeCommand = async ({ // Added async keyword
          outputLines = [{ id: `out-${timestamp}`, text: `Simulating SQL: ${command} (output placeholder)`, type: 'output', category: 'sql' }];
      }
   }
+    // --- Excel simulation ---
+  else if (mode === 'excel') {
+     // Simulate potential delay
+     await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // 0.1-0.6 sec delay
+     if (commandLower.startsWith('sum(')) {
+         // Basic simulation: Try to extract numbers and sum them
+         const numbersMatch = command.match(/sum\(([\d\s,.]+)\)/i);
+         if (numbersMatch && numbersMatch[1]) {
+             try {
+                 const numbers = numbersMatch[1].split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
+                 const sum = numbers.reduce((acc, val) => acc + val, 0);
+                 outputLines = [{ id: `out-${timestamp}`, text: `${sum}`, type: 'output', category: 'excel' }];
+             } catch (e) {
+                 outputLines = [{ id: `out-${timestamp}`, text: '#VALUE!', type: 'error', category: 'excel' }];
+             }
+         } else {
+              outputLines = [{ id: `out-${timestamp}`, text: '#NAME?', type: 'error', category: 'excel' }];
+         }
+     } else {
+          outputLines = [{ id: `out-${timestamp}`, text: `Simulating Excel: ${command} (output placeholder)`, type: 'output', category: 'excel' }];
+     }
+  }
+
 
   // Always return the command itself followed by any output lines generated
   return [commandOutput, ...outputLines];
 };
+

@@ -13,6 +13,7 @@ const initialSuggestionsData: Record<string, string[]> = {
   unix: ['ls', 'cd', 'pwd', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'grep', 'echo', 'man', 'sudo'],
   windows: ['dir', 'cd', 'cls', 'mkdir', 'rmdir', 'copy', 'move', 'type', 'findstr', 'echo', 'help'],
   sql: ['SELECT', 'INSERT INTO', 'UPDATE', 'DELETE FROM', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'WHERE', 'FROM', 'JOIN', 'GROUP BY', 'ORDER BY'],
+  excel: ['SUM(', 'AVERAGE(', 'COUNT(', 'MAX(', 'MIN(', 'IF(', 'VLOOKUP(', 'HLOOKUP(', 'INDEX(', 'MATCH('], // Added Excel mode
 };
 
 
@@ -32,9 +33,9 @@ export const useSuggestions = () => {
 
             // Determine the correct suggestion format based on the command being added
             let suggestionToAdd = lowerCommand;
-            if (lowerCommand.startsWith('add_int_cmd')) { // Updated check
+            if (mode === 'internal' && lowerCommand.startsWith('add_int_cmd')) { // Check mode specifically for this format
                 // Specific format for the add command suggestion itself
-                suggestionToAdd = 'add_int_cmd <short> <name> "<description>" <whatToDo>'; // Updated format
+                suggestionToAdd = 'add_int_cmd <short> <name> "<description>" <whatToDo>';
             } else {
                  // For other commands added (like custom ones), use the actual command name
                  suggestionToAdd = lowerCommand;
@@ -69,3 +70,4 @@ export const useSuggestions = () => {
 
     return { suggestions, addSuggestion, getCurrentSuggestions, initialSuggestions }; // Export initialSuggestions too
 };
+
