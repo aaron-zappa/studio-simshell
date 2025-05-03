@@ -2,28 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    /* Light Theme */
+    --background: 0 0% 100%; /* White */
+    --foreground: 0 0% 3.9%;  /* Black */
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
+    --primary: 0 0% 9%; /* Black */
+    --primary-foreground: 0 0% 98%; /* White */
+    --secondary: 0 0% 96.1%; /* Light Gray */
+    --secondary-foreground: 0 0% 9%; /* Black */
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
+    --accent: 210 40% 96.1%; /* Default accent - subtle blue/gray */
+    --accent-foreground: 210 40% 9%;
+    --destructive: 0 84.2% 60.2%; /* Red */
     --destructive-foreground: 0 0% 98%;
+    --accent-green: 142 71% 45%;
+    --accent-yellow: 48 96% 53%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
@@ -43,22 +42,25 @@ body {
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    /* Dark Theme */
+    --background: 240 10% 3.9%; /* Dark Blue/Gray */
+    --foreground: 0 0% 98%; /* White */
+    --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
+    --primary: 0 0% 98%; /* White */
+    --primary-foreground: 0 0% 9%; /* Black */
+    --secondary: 0 0% 14.9%; /* Dark Gray */
+    --secondary-foreground: 0 0% 98%; /* White */
     --muted: 0 0% 14.9%;
     --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --accent: 210 40% 14.9%; /* Dark accent - subtle blue/gray */
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%; /* Dark Red */
     --destructive-foreground: 0 0% 98%;
+    --accent-green: 142 71% 35%;
+    --accent-yellow: 48 96% 43%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
@@ -84,5 +86,38 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    /* Apply Geist Sans as default, allow overriding with font-mono */
+    font-family: var(--font-geist-sans), sans-serif;
+  }
+  /* Ensure monospace font is easily available */
+  .font-mono {
+     font-family: var(--font-geist-mono), monospace;
+  }
+
+  /* Add custom accent colors utility classes */
+  .bg-accent-green {
+    background-color: hsl(var(--accent-green));
+  }
+  .text-accent-green {
+    color: hsl(var(--accent-green));
+  }
+  .border-accent-green {
+     border-color: hsl(var(--accent-green));
+  }
+  .ring-accent-green {
+    --tw-ring-color: hsl(var(--accent-green));
+  }
+
+  .bg-accent-yellow {
+    background-color: hsl(var(--accent-yellow));
+  }
+  .text-accent-yellow {
+    color: hsl(var(--accent-yellow));
+  }
+  .border-accent-yellow {
+     border-color: hsl(var(--accent-yellow));
+  }
+  .ring-accent-yellow {
+    --tw-ring-color: hsl(var(--accent-yellow));
   }
 }

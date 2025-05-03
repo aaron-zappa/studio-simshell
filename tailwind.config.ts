@@ -9,6 +9,10 @@ export default {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+        sans: ["var(--font-geist-sans)"],
+        mono: ["var(--font-geist-mono)"],
+      },
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
@@ -34,7 +38,10 @@ export default {
   			},
   			accent: {
   				DEFAULT: 'hsl(var(--accent))',
-  				foreground: 'hsl(var(--accent-foreground))'
+  				foreground: 'hsl(var(--accent-foreground))',
+          // Add specific accent colors based on globals.css
+          green: 'hsl(var(--accent-green))',
+          yellow: 'hsl(var(--accent-yellow))',
   			},
   			destructive: {
   				DEFAULT: 'hsl(var(--destructive))',
