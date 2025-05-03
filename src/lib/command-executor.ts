@@ -14,7 +14,7 @@ interface ExecuteCommandParams {
   addCustomCommand: (name: string, action: CustomCommandAction) => void;
   getCustomCommandAction: (name: string) => CustomCommandAction | undefined;
   logEntries: LogEntry[]; // Pass current log entries
-  setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>; // Pass setter for logging - Note: Direct state mutation from Server Action is complex.
+  setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>; // Pass setter for logging
   initialSuggestions: Record<string, string[]>; // Pass initial suggestions for mode checking etc.
 }
 
@@ -22,14 +22,14 @@ interface ExecuteCommandParams {
  * Executes a command based on the current mode and returns output lines.
  * This is intended to be used as a Server Action.
  */
-export const executeCommand = async ({
+export const executeCommand = async ({ // Added async keyword
     command,
     mode,
     addSuggestion,
     addCustomCommand,
     getCustomCommandAction,
     logEntries,
-    setLogEntries, // Be cautious using state setters directly in Server Actions
+    setLogEntries,
     initialSuggestions
 }: ExecuteCommandParams): Promise<OutputLine[]> => {
   const timestamp = new Date().toISOString(); // Simple unique ID
@@ -51,7 +51,7 @@ export const executeCommand = async ({
   if (mode === 'internal') {
     // 1. Built-in commands
     if (commandLower.startsWith('help')) {
-      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add int_cmd <name> <description_and_action>, export log\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
+      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add int_cmd <name> <description> <whatToDo>, export log\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
     } else if (commandLower === 'clear') {
       // Special case handled in handleCommandSubmit
       outputLines = [];
@@ -70,46 +70,43 @@ export const executeCommand = async ({
        outputLines = [{ id: `out-${timestamp}`, text: `Define command placeholder for: ${args.join(' ')}`, type: 'output', category: 'internal' }];
     } else if (commandLower.startsWith('refine ')) {
        outputLines = [{ id: `out-${timestamp}`, text: `Refine command placeholder for: ${args.join(' ')}`, type: 'output', category: 'internal' }];
-    // } else if (commandLower.startsWith('add internal command ')) { // OLD SYNTAX
-    } else if (commandLower.startsWith('add int_cmd ')) { // NEW SYNTAX
-        // Regex to capture command name and the rest as action/description
-        const addCmdRegex = /^add int_cmd (\S+)\s+(.+)$/i; // <name> <description_and_action>
+    } else if (commandLower.startsWith('add int_cmd ')) {
+        // Regex to capture name, description (in quotes), and whatToDo
+        // Example: add int_cmd mycmd "This is my command" echo hello
+        const addCmdRegex = /^add int_cmd (\S+)\s+"([^"]+)"\s+(.+)$/i;
         const match = command.match(addCmdRegex); // Match against original command casing
 
-        if (match && match[1] && match[2]) {
-            const newCommandName = match[1]; // Keep original casing for display if needed, but store lowercase
-            const newCommandAction = match[2].trim(); // Action is the rest of the string
+        if (match && match[1] && match[2] && match[3]) {
+            const newCommandName = match[1];
+            const newCommandDescription = match[2].trim(); // Description from quotes
+            const newCommandAction = match[3].trim(); // whatToDo is the rest
 
-            // Check if name conflicts with built-in commands (use lowercase for comparison)
-            if (initialSuggestions.internal.includes(newCommandName.toLowerCase()) || newCommandName.toLowerCase() === 'add int_cmd') {
+            // Check if name conflicts with built-in commands
+            if (initialSuggestions.internal.includes(newCommandName.toLowerCase())) {
                  outputLines = [{ id: `out-${timestamp}`, text: `Error: Cannot redefine built-in command "${newCommandName}".`, type: 'error', category: 'internal' }];
             } else {
                 addSuggestion('internal', newCommandName); // Add to suggestions
-                addCustomCommand(newCommandName, newCommandAction); // Add to custom command store
+                addCustomCommand(newCommandName, newCommandAction); // Add to custom command store (Action = whatToDo)
 
                 // Log the addition
                  const logEntry: LogEntry = {
                     timestamp: new Date().toISOString(),
                     commandName: newCommandName,
+                    description: newCommandDescription, // Log the description
                     action: newCommandAction,
                 };
-                // Use the passed setter - This might cause issues in Server Actions if setLogEntries modifies client state directly
-                // Consider returning the new log entry or handling state update differently on client.
-                addLogEntry(logEntry, setLogEntries);
+                addLogEntry(logEntry, setLogEntries); // Use the passed setter
 
-                // Provide feedback
-                outputLines = [{ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}". Action: "${newCommandAction}". Logged to session log.`, type: 'info', category: 'internal' }];
+                // Provide feedback including the description
+                outputLines = [{ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}". Description: "${newCommandDescription}". Action: "${newCommandAction}". Logged to session log.`, type: 'info', category: 'internal' }];
             }
         } else {
             // Update error message for new syntax
-            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add int_cmd <command_name> <description_and_action>`, type: 'error', category: 'internal' }];
+            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add int_cmd <name> "<description>" <whatToDo>`, type: 'error', category: 'internal' }];
         }
     } else if (commandLower === 'export log') {
-        // exportLogFile uses browser APIs and is best handled client-side.
-        // The main logic is in page.tsx, triggered by this command word.
-        // This branch in the server action can just confirm the action is recognized.
+        // Client-side handled, this provides feedback
          outputLines = [{ id: `log-export-info-${timestamp}`, text: 'Log export initiated client-side. Check your downloads.', type: 'info', category: 'internal' }];
-        // The actual file generation/download happens in the handleCommandSubmit function in page.tsx
     }
     // 2. Custom internal commands
     else {
@@ -161,10 +158,6 @@ export const executeCommand = async ({
          outputLines = [{ id: `out-${timestamp}`, text: `Simulating SQL: ${command} (output placeholder)`, type: 'output', category: 'sql' }];
      }
   }
-
-  // Important: Server Actions cannot directly modify client state like `setLogEntries`
-  // The state update for `logEntries` needs to be handled on the client side after the Server Action completes.
-  // The `addLogEntry` function call here relies on the client-side hook logic to eventually update state.
 
   return [commandOutput, ...outputLines];
 };

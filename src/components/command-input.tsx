@@ -125,7 +125,9 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
                     className="cursor-pointer font-mono"
                   >
                      {/* Display suggestion format for 'add int_cmd' properly */}
-                     {suggestion === 'add int_cmd <name> <description_and_action>' ? 'add int_cmd <name> <description_and_action>' : suggestion}
+                     {suggestion === 'add int_cmd <name> "<description>" <whatToDo>'
+                        ? 'add int_cmd <name> "<description>" <whatToDo>'
+                        : suggestion}
                   </CommandItem>
                 ))}
               </CommandList>

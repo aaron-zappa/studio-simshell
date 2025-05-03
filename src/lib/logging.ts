@@ -2,6 +2,7 @@
 'use client';
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
+import type { OutputLine } from '@/components/output-display'; // Import OutputLine
 
 /**
  * Represents a single log entry for a command addition.
@@ -9,6 +10,7 @@ import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 export type LogEntry = {
   timestamp: string;
   commandName: string;
+  description: string; // Added description field
   action: CustomCommandAction;
 };
 
@@ -33,12 +35,17 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
     }
 
     try {
-        // Define CSV header
-        const header = 'Timestamp,CommandName,Action\n';
+        // Define CSV header including Description
+        const header = 'Timestamp,CommandName,Description,Action\n';
 
-        // Convert log entries to CSV rows
+        // Convert log entries to CSV rows, quoting fields appropriately
         const rows = logEntries.map(entry =>
-            `${entry.timestamp},"${entry.commandName.replace(/"/g, '""')}","${entry.action.replace(/"/g, '""')}"`
+            [
+                entry.timestamp,
+                `"${entry.commandName.replace(/"/g, '""')}"`,
+                `"${entry.description.replace(/"/g, '""')}"`, // Add description field
+                `"${entry.action.replace(/"/g, '""')}"`
+            ].join(',')
         ).join('\n');
 
         const csvContent = header + rows;
@@ -67,14 +74,4 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
         console.error('Error exporting log file:', error);
         return { id: `log-export-error-${timestamp}`, text: `Error exporting log file: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error', category: 'internal' };
     }
-};
-
-
-// Define OutputLine type locally or import if defined globally
-// This is needed because exportLogFile returns an OutputLine
-export type OutputLine = {
-  id: string;
-  text: string;
-  type?: 'command' | 'output' | 'error' | 'info';
-  category?: 'python' | 'unix' | 'windows' | 'sql' | 'internal';
 };
