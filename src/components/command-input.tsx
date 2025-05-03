@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -7,11 +8,12 @@ import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover"
 import { Command as CommandPrimitive, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command"; // Use ShadCN Command
 import { cn } from "@/lib/utils";
 import { Terminal } from 'lucide-react';
+import type { CommandMode } from '@/types/command-types'; // Import shared type
 
 interface CommandInputProps {
   onSubmit: (command: string) => void;
   suggestions: string[]; // List of possible commands/subcommands
-  currentMode?: 'python' | 'unix' | 'windows' | 'sql' | 'internal'; // Added mode prop
+  currentMode?: CommandMode; // Use imported CommandMode
   className?: string;
 }
 
@@ -39,7 +41,12 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
   };
 
   const handleSuggestionClick = (suggestion: string) => {
-    setInputValue(suggestion + " "); // Add space after suggestion
+    // Handle specific suggestion format for 'add internal command'
+    if (suggestion.startsWith('add internal command "<name>"')) {
+       setInputValue('add internal command "" ');
+    } else {
+       setInputValue(suggestion + " "); // Add space after suggestion
+    }
     setIsPopoverOpen(false);
     setFilteredSuggestions([]);
     inputRef.current?.focus(); // Refocus input after selection
@@ -116,7 +123,8 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
                     onSelect={() => handleSuggestionClick(suggestion)}
                     className="cursor-pointer font-mono"
                   >
-                    {suggestion}
+                     {/* Display suggestion format for 'add internal command' properly */}
+                     {suggestion === 'add internal command "<name>" <action>' ? 'add internal command "<name>" <action>' : suggestion}
                   </CommandItem>
                 ))}
               </CommandList>

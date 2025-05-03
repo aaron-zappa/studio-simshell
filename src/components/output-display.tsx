@@ -1,15 +1,17 @@
+
 "use client";
 
-import * as React from 'react'; // Added missing React import
+import * as React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import type { CommandMode } from '@/types/command-types'; // Import shared type
 
 export type OutputLine = {
   id: string; // For React key prop
   text: string;
   type?: 'command' | 'output' | 'error' | 'info'; // For potential styling
-  category?: 'python' | 'unix' | 'windows' | 'sql' | 'internal'; // For category styling
+  category?: CommandMode | 'internal'; // Use imported CommandMode
 };
 
 interface OutputDisplayProps {
