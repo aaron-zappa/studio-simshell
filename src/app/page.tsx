@@ -5,7 +5,7 @@ import * as React from 'react';
 import { CommandInput } from '@/components/command-input';
 import { OutputDisplay, type OutputLine } from '@/components/output-display';
 import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 import { Label } from "@/components/ui/label";
 import { useCustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions'; // Import suggestion hook
@@ -151,30 +151,27 @@ export default function Home() {
     // TODO: Implement define/refine mechanisms
   };
 
-  const handleModeChange = (value: string) => {
-     const newMode = value as CommandMode;
+  // Handler for Checkbox mode changes
+  const handleModeChange = (newMode: CommandMode) => {
      const previousMode = currentMode;
-
-     // Optimistically update UI for responsiveness, but rely on handleCommandSubmit for actual state change logic
-     // setCurrentMode(newMode); // Temporarily removed optimistic update for stricter logic
+     if (newMode === previousMode) return; // No change if clicking the already active mode
 
      // Simulate typing 'mode [newMode]' in internal mode
+     const tempOriginalMode = currentMode; // Store original mode before temporarily switching
      setCurrentMode('internal'); // Temporarily switch to internal to process 'mode' command via handleCommandSubmit
+
      handleCommandSubmit(`mode ${newMode}`).then(() => {
-        // After the async operation, check if the mode *actually* changed.
-        // This check is implicitly handled within handleCommandSubmit now.
-        // If the mode change failed (due to invalid mode), setCurrentMode(newMode) wouldn't have been called inside handleCommandSubmit.
-        // We need to ensure the dropdown reflects the *actual* state after the attempt.
-        // If the newMode submitted was invalid, the state might still be 'internal' or revert.
-        // A robust way is to check the `output` from handleCommandSubmit, but that's complex here.
-        // Let's read the state *after* the await. If it didn't become `newMode`, revert dropdown.
-        // Note: This still has potential race conditions if multiple changes happen quickly.
-        // Reading the state right after the async call might not be reliable.
-        // A safer approach might involve getting the final state from `handleCommandSubmit`.
-        // For now, we revert if the submitted mode was invalid.
-        if (!Object.keys(initialSuggestions).includes(newMode)) {
-            setCurrentMode(previousMode); // Revert dropdown/state if mode was invalid
-        }
+         // Check if the state actually updated to newMode after the async call
+         // Since setCurrentMode is called *inside* handleCommandSubmit on success,
+         // we don't need to explicitly check output here. The state should reflect the result.
+         // If it failed, the state should remain 'internal' or revert based on previous logic.
+         // Read the state *after* the await. If it didn't become `newMode`, revert.
+         // Note: Needs React.startTransition or similar for optimal UX in concurrent mode
+         if (!Object.keys(initialSuggestions).includes(newMode)) {
+            // If the mode submitted was invalid, revert the internal state change
+            setCurrentMode(tempOriginalMode);
+         }
+         // If successful, currentMode would have been set to newMode inside handleCommandSubmit
      }).catch(error => {
          console.error("Failed to handle mode change:", error);
          setCurrentMode(previousMode); // Revert on error
@@ -187,25 +184,37 @@ export default function Home() {
         customCommands // Pass customCommands directly
    );
 
+   const allModes = Object.keys(initialSuggestions) as CommandMode[];
+
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
-       <header className="flex items-center justify-between mb-4">
+       <header className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <h1 className="text-2xl font-semibold">SimuShell</h1>
-         <div className="flex items-center space-x-2">
-           <Label htmlFor="mode-select" className="text-sm font-medium">Mode:</Label>
-            <Select value={currentMode} onValueChange={handleModeChange}>
-                <SelectTrigger id="mode-select" className="w-[120px]">
-                    <SelectValue placeholder="Select mode" />
-                </SelectTrigger>
-                <SelectContent>
-                     {/* Use static list of modes for the dropdown */}
-                    {(Object.keys(initialSuggestions) as CommandMode[]).map(mode => (
-                         <SelectItem key={mode} value={mode}>
-                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+         <div className="flex items-center space-x-4">
+           <Label className="text-sm font-medium shrink-0">Mode:</Label>
+           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+             {allModes.map(mode => (
+               <div key={mode} className="flex items-center space-x-2">
+                 <Checkbox
+                   id={`mode-${mode}`}
+                   checked={currentMode === mode}
+                   onCheckedChange={(checked) => {
+                     // Only trigger change if checking the box
+                     if (checked) {
+                       handleModeChange(mode);
+                     }
+                     // Don't allow unchecking the active box directly, must select another
+                   }}
+                 />
+                 <Label
+                   htmlFor={`mode-${mode}`}
+                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                 >
+                   {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                 </Label>
+               </div>
+             ))}
+           </div>
          </div>
       </header>
 
