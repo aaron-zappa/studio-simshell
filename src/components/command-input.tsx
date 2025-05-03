@@ -45,7 +45,7 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className, di
     if (disabled) return; // Prevent action if disabled
 
     // Handle specific suggestion format for 'add_int_cmd'
-    if (suggestion.startsWith('add_int_cmd <name>')) {
+    if (suggestion.startsWith('add_int_cmd <short>')) { // Updated check
        setInputValue('add_int_cmd ');
     } else {
        setInputValue(suggestion + " "); // Add space after other suggestions
@@ -136,8 +136,8 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className, di
                     // Actual click prevention is handled in `handleSuggestionClick`.
                     data-disabled={disabled}
                   >
-                     {suggestion === 'add_int_cmd <name> "<description>" <whatToDo>'
-                        ? 'add_int_cmd <name> "<description>" <whatToDo>'
+                     {suggestion === 'add_int_cmd <short> <name> "<description>" <whatToDo>' // Updated suggestion display
+                        ? 'add_int_cmd <short> <name> "<description>" <whatToDo>'
                         : suggestion}
                   </CommandItem>
                 ))}

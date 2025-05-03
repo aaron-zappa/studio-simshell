@@ -3,7 +3,7 @@
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
-import { addLogEntry, exportLogFile, type LogEntry } from '@/lib/logging';
+import { addLogEntry, type LogEntry } from '@/lib/logging'; // Removed exportLogFile import, it's client-side only now
 import type { CommandMode } from '@/types/command-types';
 
 
@@ -13,8 +13,8 @@ interface ExecuteCommandParams {
   addSuggestion: (mode: CommandMode, command: string) => void;
   addCustomCommand: (name: string, action: CustomCommandAction) => void;
   getCustomCommandAction: (name: string) => CustomCommandAction | undefined;
-  logEntries: LogEntry[]; // Pass current log entries
-  setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>; // Pass setter for logging
+  logEntries: LogEntry[]; // Pass current log entries (though direct modification is problematic)
+  setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>; // Pass setter for logging (though direct modification is problematic)
   initialSuggestions: Record<string, string[]>; // Pass initial suggestions for mode checking etc.
 }
 
@@ -28,8 +28,8 @@ export const executeCommand = async ({ // Added async keyword
     addSuggestion,
     addCustomCommand,
     getCustomCommandAction,
-    logEntries,
-    setLogEntries,
+    logEntries, // Keep receiving, but avoid direct mutation if possible
+    setLogEntries, // Keep receiving, but avoid direct mutation if possible
     initialSuggestions
 }: ExecuteCommandParams): Promise<OutputLine[]> => {
   const timestamp = new Date().toISOString(); // Simple unique ID
@@ -51,8 +51,8 @@ export const executeCommand = async ({ // Added async keyword
   if (mode === 'internal') {
     // 1. Built-in commands
     if (commandLower.startsWith('help')) {
-      // Updated help text to include pause
-      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <name> "<description>" <whatToDo>, export log, pause\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
+      // Updated help text for add_int_cmd format
+      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: internal, python, unix, windows, sql.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
     } else if (commandLower === 'clear') {
       // Special case handled in handleCommandSubmit
       outputLines = [];
@@ -71,16 +71,17 @@ export const executeCommand = async ({ // Added async keyword
        outputLines = [{ id: `out-${timestamp}`, text: `Define command placeholder for: ${args.join(' ')}`, type: 'output', category: 'internal' }];
     } else if (commandLower.startsWith('refine ')) {
        outputLines = [{ id: `out-${timestamp}`, text: `Refine command placeholder for: ${args.join(' ')}`, type: 'output', category: 'internal' }];
-    } else if (commandLower.startsWith('add_int_cmd ')) { // Updated command name
-        // Regex to capture name, description (in quotes), and whatToDo
-        // Example: add_int_cmd mycmd "This is my command" echo hello
-        const addCmdRegex = /^add_int_cmd\s+(\S+)\s+"([^"]+)"\s+(.+)$/i; // Regex requires name, quoted description, action
+    } else if (commandLower.startsWith('add_int_cmd ')) { // Updated command name check
+        // Regex to capture short, name, description (in quotes), and whatToDo
+        // Example: add_int_cmd srt mycmd "This is my command" echo hello
+        const addCmdRegex = /^add_int_cmd\s+(\S+)\s+(\S+)\s+"([^"]+)"\s+(.+)$/i; // Added capture for <short>
         const match = command.match(addCmdRegex); // Match against original command casing
 
-        if (match && match[1] && match[2] && match[3]) {
-            const newCommandName = match[1];
-            const newCommandDescription = match[2].trim(); // Description from quotes
-            const newCommandAction = match[3].trim(); // whatToDo is the rest
+        if (match && match[1] && match[2] && match[3] && match[4]) { // Check for all 4 captured groups
+            const newCommandShort = match[1]; // <short>
+            const newCommandName = match[2]; // <name>
+            const newCommandDescription = match[3].trim(); // Description from quotes
+            const newCommandAction = match[4].trim(); // whatToDo is the rest
 
             // Check if name conflicts with built-in commands
             if (initialSuggestions.internal.includes(newCommandName.toLowerCase())) {
@@ -92,6 +93,7 @@ export const executeCommand = async ({ // Added async keyword
                 // Log the addition
                  const logEntry: LogEntry = {
                     timestamp: new Date().toISOString(),
+                    short: newCommandShort, // Log the short name
                     commandName: newCommandName,
                     description: newCommandDescription, // Log the description
                     action: newCommandAction,
@@ -102,6 +104,7 @@ export const executeCommand = async ({ // Added async keyword
                  // For now, we assume it somehow works for demonstration, but this needs refactoring.
                  try {
                     // This call will likely fail or behave unexpectedly in a real Server Action context
+                    // A better approach would be to return the log entry or trigger a separate logging action.
                     addLogEntry(logEntry, setLogEntries);
                  } catch (logError) {
                      console.error("Logging failed in Server Action:", logError);
@@ -110,12 +113,12 @@ export const executeCommand = async ({ // Added async keyword
                  }
 
 
-                // Provide feedback including the description
-                outputLines.push({ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}". Description: "${newCommandDescription}". Action: "${newCommandAction}". Logged to session log.`, type: 'info', category: 'internal' });
+                // Provide feedback including the short name and description
+                outputLines.push({ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}" (short: ${newCommandShort}). Description: "${newCommandDescription}". Action: "${newCommandAction}". Logged to session log.`, type: 'info', category: 'internal' });
             }
         } else {
             // Update error message for new syntax
-            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add_int_cmd <name> "<description>" <whatToDo>`, type: 'error', category: 'internal' }];
+            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`, type: 'error', category: 'internal' }];
         }
     } else if (commandLower === 'export log') {
         // Client-side handled, this provides feedback only if called directly (shouldn't happen with current client logic)
