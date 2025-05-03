@@ -41,11 +41,12 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
   };
 
   const handleSuggestionClick = (suggestion: string) => {
-    // Handle specific suggestion format for 'add internal command'
-    if (suggestion.startsWith('add internal command "<name>"')) {
-       setInputValue('add internal command "" ');
+    // Handle specific suggestion format for 'add int_cmd'
+    if (suggestion.startsWith('add int_cmd <name>')) {
+       // Set input to 'add int_cmd ' with a space, allowing user to type name etc.
+       setInputValue('add int_cmd ');
     } else {
-       setInputValue(suggestion + " "); // Add space after suggestion
+       setInputValue(suggestion + " "); // Add space after other suggestions
     }
     setIsPopoverOpen(false);
     setFilteredSuggestions([]);
@@ -123,8 +124,8 @@ export function CommandInput({ onSubmit, suggestions, currentMode, className }: 
                     onSelect={() => handleSuggestionClick(suggestion)}
                     className="cursor-pointer font-mono"
                   >
-                     {/* Display suggestion format for 'add internal command' properly */}
-                     {suggestion === 'add internal command "<name>" <action>' ? 'add internal command "<name>" <action>' : suggestion}
+                     {/* Display suggestion format for 'add int_cmd' properly */}
+                     {suggestion === 'add int_cmd <name> <description_and_action>' ? 'add int_cmd <name> <description_and_action>' : suggestion}
                   </CommandItem>
                 ))}
               </CommandList>
