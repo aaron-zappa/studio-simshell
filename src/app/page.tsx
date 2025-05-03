@@ -70,12 +70,13 @@ export default function Home() {
           // Simulate stopping the task. In a real scenario, you'd use AbortController or similar.
           pauseOutput = {
             id: `pause-${timestamp}`,
-            text: 'Stop task requested. (Simulation)', // Feedback that the stop was attempted
+            text: 'task stopped', // Changed feedback message
             type: 'info',
             category: 'internal',
           };
           // Here you would signal the actual task cancellation if possible
           // For now, we just provide feedback and prevent further execution *of this command*
+          setIsRunning(false); // Immediately set isRunning to false to reflect the stop
        } else {
           pauseOutput = {
             id: `pause-${timestamp}`,
@@ -140,7 +141,10 @@ export default function Home() {
         };
         setHistory((prev) => [...prev, errorOutput]);
     } finally {
-      setIsRunning(false); // Ensure running state is reset
+      // Only set isRunning false here if it wasn't already set by 'pause'
+      if (commandLower !== 'pause') {
+          setIsRunning(false);
+      }
     }
 
     // TODO: Store command history in SQLite
