@@ -15,7 +15,8 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'history',
       'define',
       'refine',
-      'add_int_cmd <short> <name> "<description>" <whatToDo>',
+      'add int_cmd <short> <name> "<description>" <whatToDo>', // Updated old command suggestion
+      'add ai_tool <toolname> "<description>" "<args_description>"', // Added new AI tool suggestion
       'export log',
       'pause',
       'create sqlite <filename.db>',
@@ -49,10 +50,14 @@ export const useSuggestions = () => {
             const lowerCommand = command.toLowerCase();
             let suggestionToAdd = lowerCommand;
 
-            // Special format for add_int_cmd suggestion itself - adjust if needed
-            if (mode === 'internal' && lowerCommand.startsWith('add_int_cmd')) {
-                suggestionToAdd = 'add_int_cmd <short> <name> "<description>" <whatToDo>';
+            // Special format for add_int_cmd suggestion itself
+            if (mode === 'internal' && lowerCommand.startsWith('add int_cmd')) {
+                suggestionToAdd = 'add int_cmd <short> <name> "<description>" <whatToDo>';
             }
+            // Special format for add_ai_tool suggestion
+             if (mode === 'internal' && lowerCommand.startsWith('add ai_tool')) {
+                 suggestionToAdd = 'add ai_tool <toolname> "<description>" "<args_description>"';
+             }
             // Add format for persist memory db to
             if (mode === 'internal' && lowerCommand.startsWith('persist memory db to')) {
                  suggestionToAdd = 'persist memory db to <filename.db>';

@@ -14,6 +14,7 @@ import { handleHistory } from './handle-history';
 import { handleDefine } from './handle-define';
 import { handleRefine } from './handle-refine';
 import { handleAddCommand } from './handle-add-command';
+import { handleAddAiTool } from './handle-add-ai-tool'; // Import new handler
 import { handleExportLog } from './handle-export-log';
 import { handlePause } from './handle-pause';
 import { handleCreateSqlite } from './handle-create-sqlite';
@@ -68,8 +69,13 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleDefine(params);
         case 'refine':
             return handleRefine(params);
-        case 'add_int_cmd':
-             return handleAddCommand(params); // This now returns HandlerResult
+        case 'add': // Check for 'add int_cmd' or 'add ai_tool'
+             if (commandLower.startsWith('add int_cmd ')) {
+                 return handleAddCommand(params); // Handles regular internal commands
+             } else if (commandLower.startsWith('add ai_tool ')) {
+                 return handleAddAiTool(params); // Handles defining AI tools
+             }
+             break; // Fall through if not 'add int_cmd' or 'add ai_tool'
         case 'export': // Check if it's 'export log'
              if (commandLower === 'export log') {
                  // Export is client-side, server handler is informational
@@ -110,7 +116,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleAiCommand(params); // Call the new AI handler
     }
 
-    // 2. Custom internal commands
+    // 2. Custom internal commands (defined via 'add int_cmd')
     const customAction = getCustomCommandAction(params.commandName);
     if (customAction !== undefined) {
         // handleCustomCommand now returns HandlerResult

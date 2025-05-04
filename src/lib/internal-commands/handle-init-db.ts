@@ -18,10 +18,10 @@ interface HandlerParams {
 
 /**
  * Handles the 'init db' command.
- * Creates the 'variables' table in the in-memory SQLite database.
+ * Creates the 'variables' and 'ai_tools' tables in the in-memory SQLite database.
  */
 export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
-    const createTableSql = `
+    const createVariablesTableSql = `
         CREATE TABLE IF NOT EXISTS variables (
             name VARCHAR(255) NOT NULL PRIMARY KEY,
             datatype VARCHAR(50) NOT NULL,
@@ -31,33 +31,44 @@ export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerPara
             default_value TEXT
         );
     `;
-    let logText: string;
+    const createAiToolsTableSql = `
+        CREATE TABLE IF NOT EXISTS ai_tools (
+            name VARCHAR(255) NOT NULL PRIMARY KEY,
+            description TEXT NOT NULL,
+            args_description TEXT NOT NULL
+        );
+    `;
+
+    let logText: string = '';
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
+    let outputLines: OutputLine[] = [];
 
     try {
         // runSql already ensures the DB is initialized via getDb()
-        await runSql(createTableSql);
-        logText = "Database initialized successfully. 'variables' table ensured.";
+        await runSql(createVariablesTableSql);
+        logText += "Ensured 'variables' table exists. ";
+        outputLines.push({ id: `init-vars-table-${timestamp}`, text: "Ensured 'variables' table exists.", type: 'info', category: 'internal', timestamp });
+
+        await runSql(createAiToolsTableSql);
+        logText += "Ensured 'ai_tools' table exists.";
+        outputLines.push({ id: `init-tools-table-${timestamp}`, text: "Ensured 'ai_tools' table exists.", type: 'info', category: 'internal', timestamp });
+
+        logText = "Database initialized successfully. " + logText;
         outputType = 'info';
     } catch (error) {
-        console.error("Error initializing database table:", error);
-        logText = `Error initializing database: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error("Error initializing database tables:", error);
+        logText = `Error initializing database tables: ${error instanceof Error ? error.message : 'Unknown error'}`;
         logType = 'E';
         outputType = 'error';
+        outputLines = [{ id: `init-db-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
     }
 
     const logEntry: LogEntry = { timestamp, type: logType, text: logText };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {
-        outputLines: [{
-            id: `init-db-${outputType === 'info' ? 'success' : 'error'}-${timestamp}`,
-            text: logText,
-            type: outputType,
-            category: 'internal',
-            timestamp: timestamp // Add timestamp here
-        }],
+        outputLines,
         newLogEntries
     };
 };
