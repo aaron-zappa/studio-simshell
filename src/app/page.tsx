@@ -58,6 +58,7 @@ export default function Home() {
     setIsRunning(true);
 
     let finalCommand = commandTrimmed; // Use this variable for execution
+    let finalCommandLower = finalCommand.toLowerCase(); // Define outside try block
     let clipboardReadError: string | null = null;
 
     // --- Client-side Pre-processing for Clipboard ---
@@ -69,12 +70,14 @@ export default function Home() {
          // Escape quotes within the clipboard content before inserting into the string
          const escapedContent = clipboardContent.replace(/"/g, '\\"');
          finalCommand = `clipboard = "${escapedContent}"`;
+         finalCommandLower = finalCommand.toLowerCase(); // Update finalCommandLower here
          console.log("Clipboard content read, command transformed:", finalCommand);
        } catch (error) {
          console.error("Clipboard read error:", error);
          clipboardReadError = error instanceof Error ? error.message : 'Unknown clipboard error';
          // Don't execute the command if clipboard read failed
          finalCommand = ''; // Prevent execution
+         finalCommandLower = ''; // Update finalCommandLower here too
        }
     }
     // --- End Client-side Pre-processing ---
@@ -144,8 +147,7 @@ export default function Home() {
       }
 
       let clientHandled = false;
-      // Use finalCommand's lower case for internal checks
-      const finalCommandLower = finalCommand.toLowerCase();
+      // Use finalCommand's lower case for internal checks (already defined outside try)
       if (category === 'internal') {
          if (finalCommandLower === 'clear') {
           setHistory([]);
@@ -182,6 +184,21 @@ export default function Home() {
             setLogEntries(prev => [...prev, pauseLog]);
            setIsRunning(false);
            clientHandled = true;
+         }
+         else if (finalCommandLower.startsWith('echo "hello simushell demo!"') && category === 'unix') {
+              const demoOutput: OutputLine = {
+                  id: `demo-${timestamp}`,
+                  text: 'Hello SimuShell Demo!',
+                  type: 'output',
+                  category: 'unix', // Explicitly unix for this demo
+                  timestamp: undefined, // No log format
+              };
+              if (commandLogOutput) {
+                  setHistory((prev) => [...prev, commandLogOutput, demoOutput]);
+              }
+               const demoLog: LogEntry = { timestamp, type: 'I', text: "Executed demo echo command." };
+               setLogEntries(prev => [...prev, demoLog]);
+              clientHandled = true;
          }
       }
 
@@ -239,7 +256,7 @@ export default function Home() {
 
 
     } finally {
-      // Use finalCommandLower for pause check
+      // Use finalCommandLower for pause check (it's now accessible here)
       if (finalCommandLower !== 'pause' && !errorOccurred) {
           setIsRunning(false);
       } else if (errorOccurred) {
