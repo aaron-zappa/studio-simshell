@@ -3,8 +3,9 @@
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
-import { addLogEntry, type LogEntry } from '@/lib/logging'; // Removed exportLogFile import, it's client-side only now
+import { addLogEntry, exportLogFile, type LogEntry } from '@/lib/logging';
 import type { CommandMode } from '@/types/command-types';
+import { runSql, formatResultsAsTable } from '@/lib/database'; // Import database functions
 
 
 interface ExecuteCommandParams {
@@ -13,8 +14,8 @@ interface ExecuteCommandParams {
   addSuggestion: (mode: CommandMode, command: string) => void;
   addCustomCommand: (name: string, action: CustomCommandAction) => void;
   getCustomCommandAction: (name: string) => CustomCommandAction | undefined;
-  logEntries: LogEntry[]; // Pass current log entries (though direct modification is problematic)
-  setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>; // Pass setter for logging (though direct modification is problematic)
+  logEntries: LogEntry[]; // Pass current log entries
+  setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>; // Pass setter for logging
   initialSuggestions: Record<string, string[]>; // Pass initial suggestions for mode checking etc.
 }
 
@@ -28,8 +29,8 @@ export const executeCommand = async ({ // Added async keyword
     addSuggestion,
     addCustomCommand,
     getCustomCommandAction,
-    logEntries, // Keep receiving, but avoid direct mutation if possible
-    setLogEntries, // Keep receiving, but avoid direct mutation if possible
+    logEntries,
+    setLogEntries,
     initialSuggestions
 }: ExecuteCommandParams): Promise<OutputLine[]> => {
   const timestamp = new Date().toISOString(); // Simple unique ID
@@ -128,13 +129,14 @@ export const executeCommand = async ({ // Added async keyword
         outputLines = [{ id: `out-${timestamp}`, text: `'pause' command is handled client-side.`, type: 'info', category: 'internal' }];
     } else if (commandLower.startsWith('create sqlite ')) {
         const filename = args[1]; // Get the second argument (index 1)
-        if (filename && filename.endsWith('.db')) {
-            // Simulate creating the database
-            await new Promise(resolve => setTimeout(resolve, 300)); // Simulate brief delay
-            outputLines = [{ id: `out-${timestamp}`, text: `Simulated creation of SQLite database: ${filename}`, type: 'info', category: 'internal' }];
-            // TODO: In a real implementation, use a SQLite library here
+        // Ignore filename for now as we always use :memory:
+        if (args.length > 0) {
+            // Just acknowledge the command, the DB is created on first SQL use
+            await new Promise(resolve => setTimeout(resolve, 100)); // Simulate brief action
+            outputLines = [{ id: `out-${timestamp}`, text: `Internal SQLite in-memory database is ready. Use 'mode sql' to interact.`, type: 'info', category: 'internal' }];
+            // Actual DB initialization is deferred until the first `runSql` call.
         } else {
-            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax or filename. Use: create sqlite <filename.db>`, type: 'error', category: 'internal' }];
+            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: create sqlite <filename.db> (filename is ignored, uses in-memory DB)`, type: 'error', category: 'internal' }];
         }
     }
     // 2. Custom internal commands
@@ -187,14 +189,31 @@ export const executeCommand = async ({ // Added async keyword
          outputLines = [{ id: `out-${timestamp}`, text: `Simulating Windows: ${command} (output placeholder)`, type: 'output', category: 'windows' }];
      }
   }
-    // --- SQL simulation ---
+    // --- SQL execution ---
   else if (mode === 'sql') {
-     // Simulate potential delay
-     await new Promise(resolve => setTimeout(resolve, Math.random() * 1200 + 300)); // 0.3-1.5 sec delay
-     if (commandLower.startsWith('select')) {
-         outputLines = [{ id: `out-${timestamp}`, text: `id | name\n---|-----\n1  | Alice\n2  | Bob\n(2 rows)`, type: 'output', category: 'sql' }];
-     } else {
-         outputLines = [{ id: `out-${timestamp}`, text: `Simulating SQL: ${command} (output placeholder)`, type: 'output', category: 'sql' }];
+     await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50)); // Shorter delay for DB query
+     try {
+       // Execute the SQL command using the database service
+       const { results, changes, lastInsertRowid } = runSql(command); // Pass the raw SQL command
+
+       if (results) {
+         // Format results as a table
+         const formattedTable = formatResultsAsTable(results);
+         outputLines = [{ id: `out-${timestamp}`, text: formattedTable || "Query executed successfully, no results returned.", type: 'output', category: 'sql' }];
+       } else if (changes !== null) {
+         // Output info for INSERT, UPDATE, DELETE
+         let infoText = `Query executed successfully. ${changes} row${changes === 1 ? '' : 's'} affected.`;
+         if (lastInsertRowid !== null && lastInsertRowid > 0) { // Check if lastInsertRowid is valid
+            infoText += ` Last inserted row ID: ${lastInsertRowid}`;
+         }
+         outputLines = [{ id: `out-${timestamp}`, text: infoText, type: 'info', category: 'sql' }];
+       } else {
+          // For commands like CREATE TABLE, etc., that don't return rows or changes directly
+          outputLines = [{ id: `out-${timestamp}`, text: "Query executed successfully.", type: 'info', category: 'sql' }];
+       }
+     } catch (error) {
+       console.error("SQL execution error:", error);
+       outputLines = [{ id: `err-${timestamp}`, text: error instanceof Error ? error.message : 'Unknown SQL execution error', type: 'error', category: 'sql' }];
      }
   }
     // --- Excel simulation ---
