@@ -56,7 +56,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         case 'refine':
             return handleRefine(params);
         case 'add_int_cmd':
-            return handleAddCommand(params);
+             return handleAddCommand(params);
         case 'export': // Check if it's 'export log'
              if (commandLower === 'export log') {
                 return handleExportLog(params);
@@ -66,12 +66,12 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handlePause(params);
         case 'create': // Check if it's 'create sqlite'
             if (commandLower.startsWith('create sqlite')) {
-                return handleCreateSqlite(params);
+                return await handleCreateSqlite(params);
             }
             break; // Fall through if not 'create sqlite'
         case 'show': // Check if it's 'show requirements'
             if (commandLower.startsWith('show requirements')) {
-                return handleShowRequirements(params);
+                 return await handleShowRequirements(params); // Added await
             }
             break; // Fall through if not 'show requirements'
     }
@@ -79,7 +79,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
     // 2. Custom internal commands
     const customAction = getCustomCommandAction(commandName);
     if (customAction !== undefined) {
-        return handleCustomCommand(params, customAction);
+        return await handleCustomCommand(params, customAction); // Added await
     }
 
     // 3. Command not found
