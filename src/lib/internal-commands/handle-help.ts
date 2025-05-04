@@ -1,5 +1,4 @@
 // src/lib/internal-commands/handle-help.ts
-// src/lib/internal-commands/handle-help.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
 import type { CommandMode } from '@/types/command-types';
@@ -20,16 +19,40 @@ interface HandlerParams {
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
+/**
+ * Handles the 'help' command.
+ * Displays available categories, internal commands, and usage notes.
+ */
 // Update function signature to return Promise<HandlerResult> and make it async
 export const handleHelp = async ({ timestamp, initialSuggestions, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
     // No specific permission needed for help
-    // Correct the help text for add ai_tool to <toolname> "<args_description>" "<description>"
-    // Add the new 'set ai_tool active' command
-    const helpText = `Command category is automatically detected. \n @bat:<filename><.bat/.sh/.sim>(experimental).
+    // Format the internal commands list with a bold heading
+    const internalCommandsList = [
+        'help', 'clear', 'history', 'define', 'refine',
+        'add int_cmd <short> <name> "<description>" <whatToDo>',
+        'add ai_tool <toolname> "<args_description>" "<description>"',
+        'set ai_tool <name> active <0|1>',
+        'export log', 'export db', 'pause',
+        'create sqlite <filename.db>', 'init', 'init db',
+        'list py vars', 'show requirements',
+        'persist memory db to <filename.db>',
+        'ai <inputtext> (use {varname} for variable substitution)'
+    ].join(', ');
+
+    // Note: The help text currently focuses on internal commands. If other categories
+    // need detailed command lists in help, they should follow the same \n**Category**\n format.
+    const helpText = `Command category is automatically detected.
+@bat:<filename><.bat/.sh/.sim> (experimental - not implemented).
+
 Available categories: ${Object.keys(initialSuggestions).join(', ')}.
-Available internal commands: help, clear, history, define, refine, add int_cmd <short> <name> "<description>" <whatToDo>, add ai_tool <toolname> "<args_description>" "<description>", set ai_tool <name> active <0|1>, export log, export db, pause, create sqlite <filename.db>, init, init db, list py vars, show requirements, persist memory db to <filename.db>, ai <inputtext> (use {varname} for variable substitution)
+
+**Internal**
+${internalCommandsList}
+
 Run custom commands by typing their name.
+Assign variables using \`var_name = value\`.
 Note: 'mode' command is informational only.`;
+
     const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp: undefined }]; // Remove timestamp for non-log output
 
     // Create log entry
