@@ -4,11 +4,12 @@
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
-import { addLogEntry, type LogEntry } from '@/lib/logging';
+import { type LogEntry } from '@/lib/logging';
 import type { CommandMode } from '@/types/command-types'; // CommandMode now represents the classified category
 import { runSql } from '@/lib/database';
 import { formatResultsAsTable } from '@/lib/formatting';
 import { handleInternalCommand } from '@/lib/internal-commands'; // Import the central internal command handler
+import { storeVariableInDb } from '@/lib/variables'; // Import variable storing function
 
 interface ExecuteCommandParams {
   command: string;
@@ -16,7 +17,7 @@ interface ExecuteCommandParams {
   addSuggestion: (mode: CommandMode, command: string) => void; // Potentially problematic in Server Action
   addCustomCommand: (name: string, action: CustomCommandAction) => void; // Potentially problematic in Server Action
   getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Potentially problematic in Server Action
-  currentLogEntries: LogEntry[]; // Pass current logs for modification
+  currentLogEntries: LogEntry[]; // Pass current log entries for modification
   initialSuggestions: Record<string, string[]>; // Passed for 'help' and validation
 }
 
@@ -79,12 +80,55 @@ export async function executeCommand ({
      potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
   }
   else if (mode === 'python') {
-     // Simulate potential delay
-     await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 200));
-     if (commandLower.startsWith('print(')) {
-        const match = command.match(/print\((['"])(.*?)\1\)/);
+     // --- Python Variable Assignment Handling ---
+     const assignmentRegex = /^\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$/;
+     const assignmentMatch = command.match(assignmentRegex);
+
+     if (assignmentMatch) {
+         const variableName = assignmentMatch[1];
+         const valueString = assignmentMatch[2].trim();
+         let dataType = 'unknown';
+         let actualValue: any = valueString; // Store the string representation by default
+
+         // Infer data type
+         if (/^\d+$/.test(valueString)) {
+             dataType = 'integer';
+             actualValue = parseInt(valueString, 10);
+         } else if (/^\d+\.\d+$/.test(valueString)) {
+             dataType = 'real';
+              actualValue = parseFloat(valueString);
+         } else if (valueString === 'True' || valueString === 'False') {
+             dataType = 'boolean';
+              actualValue = valueString === 'True';
+         } else if ((valueString.startsWith('"') && valueString.endsWith('"')) || (valueString.startsWith("'") && valueString.endsWith("'"))) {
+             dataType = 'string';
+             actualValue = valueString.slice(1, -1); // Remove quotes for storage
+         } else {
+            // Could be an expression, None, list, dict etc. - treat as string for now
+             dataType = 'string'; // Defaulting complex types to string for simplicity
+             actualValue = valueString;
+         }
+
+         try {
+            // Store in DB (pass the string representation for the DB)
+            await storeVariableInDb(variableName, String(actualValue), dataType);
+            // Simulate no direct output for assignment, similar to Python REPL
+            outputLines = [];
+             // Optionally add an info message if desired:
+             // outputLines = [{ id: `assign-${timestamp}`, text: `Variable '${variableName}' set.`, type: 'info', category: 'python' }];
+         } catch (error) {
+            console.error("Error storing Python variable:", error);
+            outputLines = [{ id: `assign-err-${timestamp}`, text: `Error storing variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error', category: 'python' }];
+         }
+     }
+     // --- Other Python Commands (Simulation) ---
+     else if (commandLower.startsWith('print(')) {
+        const match = command.match(/print\((['"]?)(.*?)\1\)/);
+         // Simple print handling (does not evaluate variables yet)
         outputLines = [{ id: `out-${timestamp}`, text: match ? match[2] : 'Syntax Error in print', type: match ? 'output' : 'error', category: 'python' }];
      } else {
+        // Simulate other Python commands
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
         outputLines = [{ id: `out-${timestamp}`, text: `Simulating Python: ${command} (output placeholder)`, type: 'output', category: 'python' }];
      }
   }

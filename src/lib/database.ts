@@ -14,6 +14,7 @@ let dbInstance: DB | null = null;
 
 /**
  * Gets the singleton in-memory SQLite database instance, creating it if it doesn't exist.
+ * Also ensures the necessary tables (like 'variables') are created.
  * @returns The better-sqlite3 Database instance.
  */
 function getDb(): DB {
@@ -25,11 +26,25 @@ function getDb(): DB {
       dbInstance.pragma('journal_mode = WAL');
       console.log('In-memory SQLite database initialized.');
 
+      // --- Ensure 'variables' table exists ---
+      dbInstance.exec(`
+        CREATE TABLE IF NOT EXISTS variables (
+            name VARCHAR(255) NOT NULL PRIMARY KEY,
+            datatype VARCHAR(50) NOT NULL,
+            value TEXT,
+            max REAL,
+            min REAL,
+            default_value TEXT
+        );
+      `);
+      console.log("Ensured 'variables' table exists.");
+      // -----------------------------------------
+
       // Optional: Add a cleanup hook for graceful shutdown if needed, though complex in serverless
       // process.on('exit', () => dbInstance?.close());
 
     } catch (error) {
-        console.error("Failed to initialize in-memory SQLite database:", error);
+        console.error("Failed to initialize in-memory SQLite database or create tables:", error);
         // If initialization fails, subsequent calls might also fail.
         // Re-throwing or handling this more gracefully might be needed.
         throw error; // Re-throw to indicate failure
@@ -99,9 +114,21 @@ export async function runSql(sql: string, params: any[] = []): Promise<{ results
 export async function persistDbToFile(targetFilename: string): Promise<boolean> {
     const currentDb = getCurrentDbInstance(); // Use the internal function
     if (!currentDb) {
-        throw new Error('In-memory database is not initialized. Cannot persist.');
+        // Automatically initialize if trying to persist but not yet created
+        getDb();
+        const newlyInitializedDb = getCurrentDbInstance();
+        if (!newlyInitializedDb) {
+             throw new Error('Failed to initialize in-memory database for persistence.');
+        }
+        // Use the newly initialized DB for the backup
+        return persistDb(newlyInitializedDb, targetFilename);
     }
+    // Use the existing DB instance
+    return persistDb(currentDb, targetFilename);
+}
 
+// Helper function for persistence logic
+async function persistDb(db: DB, targetFilename: string): Promise<boolean> {
     // Basic filename validation to prevent path traversal etc.
     // Allow alphanumeric, underscores, hyphens, and periods. Must end with .db
     if (!/^[a-zA-Z0-9_\-\.]+\.db$/.test(targetFilename) || targetFilename.includes('/') || targetFilename.includes('..')) {
@@ -121,15 +148,13 @@ export async function persistDbToFile(targetFilename: string): Promise<boolean> 
         throw new Error(`Failed to ensure data directory exists: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
-
     const targetPath = path.join(dataDir, targetFilename); // Securely join path
-
     console.log(`Attempting to persist in-memory DB to: ${targetPath}`);
 
     try {
         // Use the backup API to write the in-memory DB to the file
         // The 'main' argument refers to the source database name (default for the primary DB)
-        await currentDb.backup(targetPath);
+        await db.backup(targetPath);
         console.log(`Successfully persisted database to ${targetPath}`);
         return true;
     } catch (error) {
