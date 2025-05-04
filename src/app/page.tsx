@@ -23,7 +23,7 @@ export default function Home() {
   const [isRunning, setIsRunning] = React.useState<boolean>(false);
   const { toast } = useToast();
 
-  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['sql']);
+  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal', 'python']); // Changed initial categories
   const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
   const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
 
@@ -285,7 +285,7 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
        <header className="flex items-center justify-between mb-2 flex-wrap gap-4"> {/* Reduced bottom margin */}
-        <h1 className="text-xl font-semibold">SimuShell</h1>
+        <h1 className="text-lg font-semibold">SimuShell</h1> {/* Reduced text size */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className="text-sm font-medium mr-2">Active Categories:</span>
               {ALL_COMMAND_MODES.map(category => (
@@ -304,7 +304,7 @@ export default function Home() {
           </div>
       </header>
 
-       <main className="flex-grow-[0.8] flex-shrink overflow-hidden mb-4"> {/* No extra margin-bottom needed now */}
+       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2"> {/* Adjusted flex-grow */}
         <OutputDisplay history={history} className="h-full" />
       </main>
 
