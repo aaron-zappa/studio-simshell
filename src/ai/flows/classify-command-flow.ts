@@ -47,7 +47,7 @@ const classifyPrompt = ai.definePrompt({
 Consider the command syntax, keywords, and typical usage.
 
 Categories:
-- internal: SimuShell specific commands like 'help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', and any custom defined internal commands.
+- internal: SimuShell specific commands like 'help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'show requirements', and any custom defined internal commands.
 - python: Python code snippets or commands (e.g., 'print("hello")', 'import os', 'def my_func():').
 - unix: Common Unix/Linux shell commands (e.g., 'ls -la', 'cd /home', 'grep "pattern" file.txt', 'echo $PATH').
 - windows: Common Windows Command Prompt or PowerShell commands (e.g., 'dir C:\\', 'cd %USERPROFILE%', 'echo %VAR%', 'Copy-Item'). Note that 'echo' and 'cd' can also be Unix.
@@ -78,11 +78,15 @@ const classifyCommandFlow = ai.defineFlow<
   async (input) => {
     // Add simple pre-checks for common internal commands to potentially bypass AI call
     const commandLower = input.command.toLowerCase().trim();
-    const internalCommands = ['help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite'];
+    const internalCommands = ['help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'show requirements'];
     const commandName = commandLower.split(' ')[0];
+    const commandPrefix = commandLower.split(' ')[0] + (commandLower.includes(' ') ? ' ' : ''); // e.g. 'show ' or 'help'
 
     // Check if the command *exactly* matches or *starts with* a known internal command prefix
-    if (internalCommands.some(intCmd => commandLower === intCmd || commandLower.startsWith(intCmd + ' '))) {
+    if (internalCommands.some(intCmd => {
+        const cmdPrefix = intCmd.includes(' ') ? intCmd.split(' ')[0] + ' ' : intCmd;
+        return commandLower === intCmd || (intCmd.includes(' ') && commandPrefix === cmdPrefix);
+    })) {
         return { category: 'internal' };
     }
     // Add more specific checks if needed, e.g., for custom commands if provided in input

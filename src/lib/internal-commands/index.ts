@@ -16,6 +16,7 @@ import { handleAddCommand } from './handle-add-command';
 import { handleExportLog } from './handle-export-log';
 import { handlePause } from './handle-pause';
 import { handleCreateSqlite } from './handle-create-sqlite';
+import { handleShowRequirements } from './handle-show-requirements'; // Import new handler
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -68,6 +69,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                 return handleCreateSqlite(params);
             }
             break; // Fall through if not 'create sqlite'
+        case 'show': // Check if it's 'show requirements'
+            if (commandLower.startsWith('show requirements')) {
+                return handleShowRequirements(params);
+            }
+            break; // Fall through if not 'show requirements'
     }
 
     // 2. Custom internal commands
