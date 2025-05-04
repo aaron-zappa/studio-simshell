@@ -24,7 +24,7 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'init', // Added general init command
       'init db', // Keep specific init db as well
       'list py vars', // Added new command
-      'ai <inputtext>', // Added new AI command suggestion
+      'ai <inputtext with {varname}>', // Updated AI command suggestion
     ],
   python: [
       'print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield ',
@@ -75,7 +75,7 @@ export const useSuggestions = () => {
             }
             // Add format for ai command
             if (mode === 'internal' && lowerCommand.startsWith('ai')) {
-                 suggestionToAdd = 'ai <inputtext>';
+                 suggestionToAdd = 'ai <inputtext with {varname}>'; // Updated suggestion text
             }
              // Add format for clipboard get (though it's already in initial)
              if (mode === 'python' && lowerCommand === 'clipboard = get()') {
@@ -104,6 +104,6 @@ export const useSuggestions = () => {
  * This function is not exported to avoid being treated as a Server Action.
  * @returns The filename.
  */
-function getFilename(): string {
-    return 'use-suggestions.ts';
-}
+ function getFilename(): string {
+     return 'use-suggestions.ts';
+ }
