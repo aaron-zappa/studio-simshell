@@ -99,7 +99,7 @@ const classifyCommandFlow = ai.defineFlow<
     }
 
     // If not a clear internal command, proceed with AI classification
-    const {output} = await prompt(input);
+    const {output} = await classifyPrompt(input); // Fix: Use classifyPrompt instead of prompt
 
     // Basic validation or refinement can happen here if needed
     if (!output) {
