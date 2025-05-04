@@ -186,10 +186,11 @@ function useToast() {
     }
   }, [state])
 
-  /**
-   * Returns the name of the current file.
-   * @returns The filename.
-   */
+   /**
+    * Returns the name of the current file.
+    * This function is not exported to avoid being treated as a Server Action.
+    * @returns The filename.
+    */
    function getFilename(): string {
        return 'use-toast.ts';
    }
@@ -198,7 +199,7 @@ function useToast() {
     ...state,
     toast,
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
-    getFilename, // Exporting the function
+    // getFilename, // Do not export getFilename
   }
 }
 

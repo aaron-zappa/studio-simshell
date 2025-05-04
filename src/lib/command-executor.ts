@@ -152,7 +152,7 @@ export async function executeCommand ({
              }
              // Removed clipboard get() handling here - it's done client-side now
              else {
-                 // Attempt to treat as an identifier (another variable) or raw string if not quoted
+                 // Treat unquoted strings or other patterns as string by default
                   dataType = 'string'; // Default to string if not recognized type
                   actualValue = valueString;
                   console.warn(`Python variable assignment for '${variableName}' treated as string: ${valueString}`);

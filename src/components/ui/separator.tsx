@@ -31,9 +31,10 @@ Separator.displayName = SeparatorPrimitive.Root.displayName
 
 /**
  * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
  * @returns The filename.
  */
-export function getFilename(): string {
+function getFilename(): string {
     return 'separator.tsx';
 }
 

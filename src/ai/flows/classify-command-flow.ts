@@ -54,14 +54,14 @@ const classifyPrompt = ai.definePrompt({
   },
   // Updated Prompt: Stronger emphasis on active categories only and assignment rule.
   // Fixed backtick issue in 'internal' definition.
-  // Added 'list py vars' to internal definition.
+  // Explicitly added 'list py vars' to internal definition example.
   prompt: `You are an expert command line interpreter. Your task is to classify the given command STRICTLY based *only* on the following **active** command categories: {{#each activeCategories}}'{{{this}}}'{{#unless @last}}, {{/unless}}{{/each}}.
 
 Analyze the command based on its syntax, keywords, and typical usage patterns ONLY as they relate to these **ACTIVE** categories. Ignore any resemblance to patterns from categories that are NOT listed as active.
 
 **Classification Rules (CRITICAL - Follow these exactly):**
 
-1.  **Internal Override (if active):** If 'internal' is one of the **active** categories AND the command is a known SimuShell internal command (like 'help', 'clear', 'add_int_cmd', 'list py vars', etc., or a custom defined one), *always* classify it as 'internal', even if it might resemble another category.
+1.  **Internal Override (if active):** If 'internal' is one of the **active** categories AND the command is a known SimuShell internal command (like 'help', 'clear', 'add_int_cmd', 'list py vars', 'ai', etc., or a custom defined one), *always* classify it as 'internal', even if it might resemble another category.
 2.  **Internal Variable Assignment (if active):** If 'internal' is one of the **active** categories AND the command is a variable assignment in the format \`variable_name = value\` (e.g., 'x = 10', 'my_string = "hello"', 'is_active = True'), *always* classify it as 'internal'. This takes precedence over potential Python classification if 'internal' is active.
 3.  **Single Match (within active):** If the command *clearly* and *unambiguously* matches the patterns of exactly ONE **active** category (and isn't covered by rules 1 or 2), classify it as that category (e.g., if only 'sql' is active and the command is \`SELECT * FROM users\`, classify as 'sql').
 4.  **Ambiguous Match (between active):** If the command could *reasonably* match the patterns of **TWO OR MORE** **ACTIVE** categories (and isn't covered by rules 1 or 2), classify it as 'ambiguous'. Provide reasoning explaining which **active** categories it conflicts between (e.g., if 'unix' AND 'windows' are *both active* and the command is \`echo hello\`, classify as 'ambiguous', reason: "Matches both active Unix and Windows echo").
@@ -74,7 +74,7 @@ Analyze the command based on its syntax, keywords, and typical usage patterns ON
 {{/each}}
 
 **General Category Definitions (for context only, do NOT use inactive categories for classification):**
-- internal: SimuShell specific commands like 'help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'init', 'init db', 'list py vars', 'show requirements', 'persist memory db to', any custom defined internal commands, AND variable assignments (e.g., 'x = 5', 'name = "test"').
+- internal: SimuShell specific commands like 'help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'init', 'init db', 'list py vars', 'show requirements', 'persist memory db to', 'ai', any custom defined internal commands, AND variable assignments (e.g., 'x = 5', 'name = "test"').
 - python: Python code snippets or commands (e.g., 'print("hello")', 'import os', 'def my_func():'). *Excludes* simple variable assignments if 'internal' mode is active.
 - unix: Common Unix/Linux shell commands (e.g., 'ls -la', 'cd /home', 'grep "pattern" file.txt', 'echo $PATH').
 - windows: Common Windows Command Prompt or PowerShell commands (e.g., 'dir C:\\', 'cd %USERPROFILE%', 'echo %VAR%', 'Copy-Item'). Note that 'echo' and 'cd' can also be Unix.
@@ -109,7 +109,7 @@ const classifyCommandFlow = ai.defineFlow<
         const internalCommands = [
             'help', 'clear', 'mode', 'history', 'define', 'refine',
             'add_int_cmd', 'export log', 'pause', 'create sqlite',
-            'init', 'init db', 'list py vars', // Added 'list py vars' here
+            'init', 'init db', 'list py vars', // Ensure 'list py vars' is here
             'show requirements', 'persist memory db to', 'ai' // Added 'ai' here
         ];
         // Check for simple variable assignment pattern as well
@@ -129,11 +129,12 @@ const classifyCommandFlow = ai.defineFlow<
                  break;
              }
              // Check for commands requiring arguments that start with the base command + space
-             if (intCmd.includes(' ') && commandLower.startsWith(intCmd + ' ')) {
+             // Handle specific multi-word commands needing args like 'persist memory db to'
+             if (intCmd.includes(' ') && commandLower.startsWith(intCmd + ' ') && ['persist memory db to', 'create sqlite', 'add_int_cmd', 'ai'].includes(intCmd)) {
                  matchedInternal = true;
                  break;
              }
-             // Check for single-word commands that might take args (like help, mode, ai)
+             // Check for single-word commands that might take args (like help, mode, ai, define, refine)
              if (!intCmd.includes(' ') && commandLower.startsWith(intCmd + ' ')) {
                  // Limit which single-word commands accept args to avoid overly broad matches
                  if (['help', 'mode', 'define', 'refine', 'add_int_cmd', 'ai'].includes(intCmd)) { // Refined list including 'ai'
