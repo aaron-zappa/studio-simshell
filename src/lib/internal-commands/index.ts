@@ -126,6 +126,12 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleAiCommand(params); // Call the new AI handler
     }
 
+     // Check again for 'export db' specifically in case it wasn't caught by the switch (e.g., due to casing)
+     if (commandLower === 'export db') {
+         return handleExportDb(params);
+     }
+
+
     // 2. Custom internal commands (defined via 'add int_cmd')
     const customAction = getCustomCommandAction(params.commandName);
     if (customAction !== undefined) {
