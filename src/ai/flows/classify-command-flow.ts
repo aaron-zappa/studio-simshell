@@ -52,17 +52,20 @@ const classifyPrompt = ai.definePrompt({
   output: {
     schema: ClassifyCommandOutputSchema,
   },
-  // Updated Prompt: Stronger emphasis on active categories only.
+  // Updated Prompt: Stronger emphasis on active categories only and assignment rule.
+  // Fixed backtick issue in 'internal' definition.
   prompt: `You are an expert command line interpreter. Your task is to classify the given command STRICTLY based *only* on the following **active** command categories: {{#each activeCategories}}'{{{this}}}'{{#unless @last}}, {{/unless}}{{/each}}.
 
 Analyze the command based on its syntax, keywords, and typical usage patterns ONLY as they relate to these **ACTIVE** categories. Ignore any resemblance to patterns from categories that are NOT listed as active.
 
 **Classification Rules (CRITICAL - Follow these exactly):**
 
-1.  **Single Match (within active):** If the command *clearly* and *unambiguously* matches the patterns of exactly ONE **active** category, classify it as that category (e.g., if only 'sql' is active and the command is \`SELECT * FROM users\`, classify as 'sql').
-2.  **Ambiguous Match (between active):** If the command could *reasonably* match the patterns of **TWO OR MORE** **ACTIVE** categories, classify it as 'ambiguous'. Provide reasoning explaining which **active** categories it conflicts between (e.g., if 'unix' AND 'windows' are *both active* and the command is \`echo hello\`, classify as 'ambiguous', reason: "Matches both active Unix and Windows echo").
-3.  **Unknown Match (no match in active):** If the command does *not clearly* match the patterns of **ANY** of the **ACTIVE** categories, classify it as 'unknown'. Provide brief reasoning why it doesn't fit the active categories. Crucially, if the command resembles a category that is NOT currently active, it MUST be classified as 'unknown' relative to the active set (e.g., if only 'sql' is active and the command is \`ls\`, classify as 'unknown', reason: "'ls' is not a SQL command.").
-4.  **Internal Override (if active):** If 'internal' is one of the **active** categories AND the command is a known SimuShell internal command (like 'help', 'clear', 'add_int_cmd', etc., or a custom defined one), *always* classify it as 'internal', even if it might resemble another category.
+1.  **Internal Override (if active):** If 'internal' is one of the **active** categories AND the command is a known SimuShell internal command (like 'help', 'clear', 'add_int_cmd', etc., or a custom defined one), *always* classify it as 'internal', even if it might resemble another category.
+2.  **Internal Variable Assignment (if active):** If 'internal' is one of the **active** categories AND the command is a variable assignment in the format \`variable_name = value\` (e.g., 'x = 10', 'my_string = "hello"', 'is_active = True'), *always* classify it as 'internal'. This takes precedence over potential Python classification if 'internal' is active.
+3.  **Single Match (within active):** If the command *clearly* and *unambiguously* matches the patterns of exactly ONE **active** category (and isn't covered by rules 1 or 2), classify it as that category (e.g., if only 'sql' is active and the command is \`SELECT * FROM users\`, classify as 'sql').
+4.  **Ambiguous Match (between active):** If the command could *reasonably* match the patterns of **TWO OR MORE** **ACTIVE** categories (and isn't covered by rules 1 or 2), classify it as 'ambiguous'. Provide reasoning explaining which **active** categories it conflicts between (e.g., if 'unix' AND 'windows' are *both active* and the command is \`echo hello\`, classify as 'ambiguous', reason: "Matches both active Unix and Windows echo").
+5.  **Unknown Match (no match in active):** If the command does *not clearly* match the patterns of **ANY** of the **ACTIVE** categories (and isn't covered by rules 1 or 2), classify it as 'unknown'. Provide brief reasoning why it doesn't fit the active categories. Crucially, if the command resembles a category that is NOT currently active, it MUST be classified as 'unknown' relative to the active set (e.g., if only 'sql' is active and the command is \`ls\`, classify as 'unknown', reason: "'ls' is not a SQL command.").
+
 
 **Active Categories to Consider (ONLY THESE):**
 {{#each activeCategories}}
@@ -70,8 +73,8 @@ Analyze the command based on its syntax, keywords, and typical usage patterns ON
 {{/each}}
 
 **General Category Definitions (for context only, do NOT use inactive categories for classification):**
-- internal: SimuShell specific commands like 'help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'init db', 'show requirements', 'persist memory db to', and any custom defined internal commands.
-- python: Python code snippets or commands (e.g., 'print("hello")', 'import os', 'def my_func():').
+- internal: SimuShell specific commands like 'help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'init db', 'show requirements', 'persist memory db to', any custom defined internal commands, AND variable assignments (e.g., 'x = 5', 'name = "test"').
+- python: Python code snippets or commands (e.g., 'print("hello")', 'import os', 'def my_func():'). *Excludes* simple variable assignments if 'internal' mode is active.
 - unix: Common Unix/Linux shell commands (e.g., 'ls -la', 'cd /home', 'grep "pattern" file.txt', 'echo $PATH').
 - windows: Common Windows Command Prompt or PowerShell commands (e.g., 'dir C:\\', 'cd %USERPROFILE%', 'echo %VAR%', 'Copy-Item'). Note that 'echo' and 'cd' can also be Unix.
 - sql: SQL queries (e.g., 'SELECT * FROM users WHERE id = 1;', 'INSERT INTO products (...) VALUES (...)', 'CREATE TABLE ...', 'SELECT 1;').
@@ -107,7 +110,14 @@ const classifyCommandFlow = ai.defineFlow<
             'add_int_cmd', 'export log', 'pause', 'create sqlite', 'init db', 'show requirements',
             'persist memory db to' // Added new command prefix
         ];
-        const commandName = commandLower.split(' ')[0];
+        // Check for simple variable assignment pattern as well
+        const assignmentRegex = /^\s*([a-zA-Z_]\w*)\s*=\s*.+\s*$/;
+
+        if (assignmentRegex.test(input.command.trim())) {
+             return { category: 'internal' }; // Directly classify assignment as internal if active
+        }
+
+
          // Need to handle multi-word command names like 'show requirements' or 'persist memory db to'
          let matchedInternal = false;
          for (const intCmd of internalCommands) {
@@ -122,7 +132,8 @@ const classifyCommandFlow = ai.defineFlow<
              }
              // Check for single-word commands that might take args (like help, mode)
              if (!intCmd.includes(' ') && commandLower.startsWith(intCmd + ' ')) {
-                 if (['help', 'mode', 'define', 'refine'].includes(intCmd)) { // List commands that can take args
+                 // Limit which single-word commands accept args to avoid overly broad matches
+                 if (['help', 'mode', 'define', 'refine', 'add_int_cmd'].includes(intCmd)) { // Refined list
                     matchedInternal = true;
                     break;
                  }
@@ -131,13 +142,13 @@ const classifyCommandFlow = ai.defineFlow<
 
 
         if (matchedInternal) {
-            return { category: 'internal' }; // Directly classify as internal if active and matched
+            return { category: 'internal' }; // Directly classify known command as internal if active and matched
         }
     }
 
-    // If not a clear internal command (or internal wasn't active), proceed with AI classification
+    // If not a clear internal command or assignment (or internal wasn't active), proceed with AI classification
     // Pass the activeCategories to the prompt
-    const {output} = await classifyPrompt(input);
+    const {output} = await classifyPrompt(input); // Fixed: Use classifyPrompt here
 
     // Basic validation or refinement can happen here if needed
     if (!output) {
@@ -148,12 +159,18 @@ const classifyCommandFlow = ai.defineFlow<
     // Ensure 'ambiguous' or 'unknown' have reasoning if possible
     if ((output.category === 'ambiguous' || output.category === 'unknown') && !output.reasoning) {
        console.warn(`AI classified as ${output.category} but provided no reasoning. Command: ${input.command}, Active: ${input.activeCategories.join(', ')}`);
-       output.reasoning = `AI classified as ${output.category}. Command does not fit active categories: ${input.activeCategories.join(', ')}.`;
+       // Provide a default reasoning based on the classification and active categories
+       if (output.category === 'ambiguous') {
+           output.reasoning = `Command matches patterns of multiple active categories: ${input.activeCategories.join(', ')}.`;
+       } else { // unknown
+            output.reasoning = `Command does not match patterns of any active categories: ${input.activeCategories.join(', ')}.`;
+       }
     }
 
+
      // Ensure the returned category is valid or ambiguous/unknown
-     const isValidOutputCategory = [...ALL_COMMAND_MODES, 'ambiguous', 'unknown'].includes(output.category);
-     if (!isValidOutputCategory) {
+     const validOutputCategories = [...ALL_COMMAND_MODES, 'ambiguous', 'unknown'];
+     if (!validOutputCategories.includes(output.category)) {
         console.warn(`AI returned an unexpected category: ${output.category}. Defaulting to 'unknown'. Command: ${input.command}`);
         return { category: 'unknown', reasoning: `AI returned unexpected category '${output.category}'. Command: ${input.command}` };
      }
@@ -184,4 +201,3 @@ flows.push(classifyCommandFlow);
 function getFilename(): string {
     return 'classify-command-flow.ts';
 }
-

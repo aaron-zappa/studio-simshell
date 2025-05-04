@@ -30,6 +30,7 @@ interface ExecuteCommandResult {
 /**
  * Executes a command based on the *classified mode/category* and returns output lines.
  * Delegates internal command handling to a separate module.
+ * Handles variable assignments if classified as 'internal'.
  * This is intended to be used as a Server Action.
  */
 export async function executeCommand ({
@@ -42,8 +43,8 @@ export async function executeCommand ({
     initialSuggestions
 }: ExecuteCommandParams): Promise<ExecuteCommandResult> { // Return the result object
   const timestamp = new Date().toISOString();
-  const commandLower = command.toLowerCase().trim();
-  const commandName = commandLower.split(' ')[0];
+  const commandTrimmed = command.trim();
+  const commandLower = commandTrimmed.toLowerCase();
 
   // Command output line now uses the classified mode as its category
   const commandOutput: OutputLine = {
@@ -60,13 +61,57 @@ export async function executeCommand ({
 
   // --- Dispatch based on Classified Mode ---
   try {
-      if (mode === 'internal') {
+      // --- Internal Variable Assignment Handling ---
+      // If classified as internal and matches assignment pattern
+      const assignmentRegex = /^\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$/;
+      const assignmentMatch = commandTrimmed.match(assignmentRegex);
+
+      if (mode === 'internal' && assignmentMatch) {
+         const variableName = assignmentMatch[1];
+         const valueString = assignmentMatch[2].trim();
+         let dataType = 'unknown';
+         let actualValue: any = valueString;
+
+         // Infer data type (simple inference)
+         if (/^\d+$/.test(valueString)) {
+             dataType = 'integer';
+             actualValue = parseInt(valueString, 10);
+         } else if (/^\d+\.\d+$/.test(valueString)) {
+             dataType = 'real';
+             actualValue = parseFloat(valueString);
+         } else if (valueString === 'True' || valueString === 'False') {
+             dataType = 'boolean';
+             actualValue = valueString === 'True';
+         } else if ((valueString.startsWith('"') && valueString.endsWith('"')) || (valueString.startsWith("'") && valueString.endsWith("'"))) {
+             dataType = 'string';
+             actualValue = valueString.slice(1, -1);
+         } else {
+             // Treat unquoted strings or other patterns as string by default
+             dataType = 'string';
+             actualValue = valueString;
+         }
+
+         try {
+            // Store in DB (pass the string representation for the DB)
+            await storeVariableInDb(variableName, String(actualValue), dataType);
+            outputLines = []; // Simulate no direct output for assignment
+            logEntry = { timestamp, type: 'I', text: `Stored/Updated variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
+         } catch (error) {
+            console.error("Error storing variable:", error);
+            const errorMsg = `Error storing variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+            outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
+            logEntry = { timestamp, type: 'E', text: errorMsg };
+         }
+      }
+      // --- Other Internal Commands ---
+      else if (mode === 'internal') {
+        const commandName = commandLower.split(' ')[0];
         // Internal commands are handled by a dedicated module
         const internalResult = await handleInternalCommand({
-            command,
+            command: commandTrimmed,
             commandLower,
             commandName,
-            args: command.split(' ').slice(1),
+            args: commandTrimmed.split(' ').slice(1),
             timestamp,
             addSuggestion: addSuggestion,
             addCustomCommand: addCustomCommand,
@@ -77,69 +122,31 @@ export async function executeCommand ({
          outputLines = internalResult.outputLines;
          potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
       }
+      // --- Other Category Handlers ---
       else if (mode === 'python') {
-         // --- Python Variable Assignment Handling ---
-         const assignmentRegex = /^\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$/;
-         const assignmentMatch = command.match(assignmentRegex);
-
-         if (assignmentMatch) {
-             const variableName = assignmentMatch[1];
-             const valueString = assignmentMatch[2].trim();
-             let dataType = 'unknown';
-             let actualValue: any = valueString;
-
-             // Infer data type
-             if (/^\d+$/.test(valueString)) {
-                 dataType = 'integer';
-                 actualValue = parseInt(valueString, 10);
-             } else if (/^\d+\.\d+$/.test(valueString)) {
-                 dataType = 'real';
-                 actualValue = parseFloat(valueString);
-             } else if (valueString === 'True' || valueString === 'False') {
-                 dataType = 'boolean';
-                 actualValue = valueString === 'True';
-             } else if ((valueString.startsWith('"') && valueString.endsWith('"')) || (valueString.startsWith("'") && valueString.endsWith("'"))) {
-                 dataType = 'string';
-                 actualValue = valueString.slice(1, -1);
-             } else {
-                 dataType = 'string';
-                 actualValue = valueString;
-             }
-
-             try {
-                // Store in DB (pass the string representation for the DB)
-                await storeVariableInDb(variableName, String(actualValue), dataType);
-                outputLines = []; // Simulate no direct output for assignment
-                logEntry = { timestamp, type: 'I', text: `Stored/Updated Python variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
-             } catch (error) {
-                console.error("Error storing Python variable:", error);
-                const errorMsg = `Error storing variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
-                outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python', timestamp }];
-                logEntry = { timestamp, type: 'E', text: errorMsg };
-             }
-         }
+         // REMOVED variable assignment logic from here
          // --- Other Python Commands (Simulation) ---
-         else if (commandLower.startsWith('print(')) {
-            const match = command.match(/print\((['"]?)(.*?)\1\)/);
+         if (commandLower.startsWith('print(')) {
+            const match = commandTrimmed.match(/print\((['"]?)(.*?)\1\)/);
             const printOutput = match ? match[2] : 'Syntax Error in print';
             const type = match ? 'output' : 'error';
             outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined }];
             logEntry = { timestamp, type: match ? 'I' : 'E', text: `Python print: ${printOutput}` };
          } else {
             await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
-            const simOutput = `Simulating Python: ${command} (output placeholder)`;
+            const simOutput = `Simulating Python: ${commandTrimmed} (output placeholder)`;
             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'python', timestamp }];
             logEntry = { timestamp, type: 'I', text: simOutput };
          }
       }
       else if (mode === 'unix') {
          await new Promise(resolve => setTimeout(resolve, Math.random() * 800 + 100));
-         let simOutput = `Simulating Unix: ${command} (output placeholder)`;
+         let simOutput = `Simulating Unix: ${commandTrimmed} (output placeholder)`;
          if (commandLower === 'ls') {
              simOutput = 'file1.txt  directoryA  script.sh';
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
          } else if (commandLower.startsWith('echo ')) {
-             simOutput = command.substring(5);
+             simOutput = commandTrimmed.substring(5);
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
          } else {
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
@@ -148,12 +155,12 @@ export async function executeCommand ({
       }
       else if (mode === 'windows') {
          await new Promise(resolve => setTimeout(resolve, Math.random() * 900 + 150));
-         let simOutput = `Simulating Windows: ${command} (output placeholder)`;
+         let simOutput = `Simulating Windows: ${commandTrimmed} (output placeholder)`;
          if (commandLower === 'dir') {
              simOutput = ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free';
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
          } else if (commandLower.startsWith('echo ')) {
-             simOutput = command.substring(5);
+             simOutput = commandTrimmed.substring(5);
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
          } else {
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
@@ -163,10 +170,10 @@ export async function executeCommand ({
       else if (mode === 'sql') {
          await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50));
          try {
-           const { results, changes, lastInsertRowid } = await runSql(command);
+           const { results, changes, lastInsertRowid } = await runSql(commandTrimmed);
 
            if (results) {
-             const formattedTable = formatResultsAsTable(results);
+             const formattedTable = await formatResultsAsTable(results); // Await the async function
              const sqlOutput = formattedTable || "Query executed successfully, no results returned.";
              outputLines = [{ id: `out-${timestamp}`, text: sqlOutput, type: 'output', category: 'sql', timestamp }];
              logEntry = { timestamp, type: 'I', text: `SQL query result: ${sqlOutput}` };
@@ -191,11 +198,11 @@ export async function executeCommand ({
       }
       else if (mode === 'excel') {
          await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100));
-         let excelOutput = `Simulating Excel: ${command} (output placeholder)`;
+         let excelOutput = `Simulating Excel: ${commandTrimmed} (output placeholder)`;
          let excelLogType: 'I' | 'E' = 'I';
          let outputType: 'output' | 'error' = 'output';
          if (commandLower.startsWith('sum(')) {
-             const numbersMatch = command.match(/sum\(([\d\s,.]+)\)/i);
+             const numbersMatch = commandTrimmed.match(/sum\(([\d\s,.]+)\)/i);
              if (numbersMatch && numbersMatch[1]) {
                  try {
                      const numbers = numbersMatch[1].split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
@@ -236,8 +243,13 @@ export async function executeCommand ({
       finalLogEntries = [...currentLogEntries, logEntry];
   } else if (finalLogEntries && logEntry) {
        // If internal handler already updated logs, we might need to decide whether to add the generic log too.
-       // For now, let's assume internal handlers provide sufficient logging.
-       console.warn("Log entry generated but internal handler also modified logs. Generic log ignored.");
+       // For now, let's assume internal handlers provide sufficient logging unless it's an assignment log.
+        if (logEntry.text.startsWith('Stored/Updated variable')) {
+           // If it's a variable assignment log, add it even if internal handler modified logs.
+            finalLogEntries = [...finalLogEntries, logEntry];
+        } else {
+            console.warn("Log entry generated but internal handler also modified logs. Generic log ignored.");
+        }
   }
 
 
@@ -247,7 +259,7 @@ export async function executeCommand ({
     outputLines: [commandOutput, ...outputLines],
     newLogEntries: finalLogEntries, // Return updated logs if they changed
   };
-};
+}
 
 /**
  * Returns the name of the current file.
