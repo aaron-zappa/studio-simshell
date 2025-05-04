@@ -23,7 +23,7 @@ export const handleCustomCommand = async (params: HandlerParams, action: CustomC
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
 
     const outputText = action; // Action is the output for now
-    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal' }];
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
     // Create log entry
     const logEntry: LogEntry = {

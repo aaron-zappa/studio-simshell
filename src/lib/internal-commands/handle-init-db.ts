@@ -55,7 +55,8 @@ export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerPara
             id: `init-db-${outputType === 'info' ? 'success' : 'error'}-${timestamp}`,
             text: logText,
             type: outputType,
-            category: 'internal'
+            category: 'internal',
+            timestamp: timestamp // Add timestamp here
         }],
         newLogEntries
     };

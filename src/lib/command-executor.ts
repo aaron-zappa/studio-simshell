@@ -18,7 +18,7 @@ interface ExecuteCommandParams {
   addCustomCommand: (name: string, action: CustomCommandAction) => void; // Potentially problematic in Server Action
   getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Potentially problematic in Server Action
   currentLogEntries: LogEntry[]; // Pass current log entries (uses new LogEntry type)
-  initialSuggestions: Record<string, string[]>; // Passed for 'help' and validation
+  initialSuggestions: Record<string, string[]>;
 }
 
 // Define the return type to include potentially updated log entries
@@ -51,6 +51,7 @@ export async function executeCommand ({
     text: command,
     type: 'command',
     category: mode, // Use the classified mode here
+    timestamp: timestamp,
   };
 
   let outputLines: OutputLine[] = [];
@@ -113,7 +114,7 @@ export async function executeCommand ({
              } catch (error) {
                 console.error("Error storing Python variable:", error);
                 const errorMsg = `Error storing variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
-                outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python' }];
+                outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python', timestamp }];
                 logEntry = { timestamp, type: 'E', text: errorMsg };
              }
          }
@@ -121,12 +122,13 @@ export async function executeCommand ({
          else if (commandLower.startsWith('print(')) {
             const match = command.match(/print\((['"]?)(.*?)\1\)/);
             const printOutput = match ? match[2] : 'Syntax Error in print';
-            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: match ? 'output' : 'error', category: 'python' }];
+            const type = match ? 'output' : 'error';
+            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined }];
             logEntry = { timestamp, type: match ? 'I' : 'E', text: `Python print: ${printOutput}` };
          } else {
             await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
             const simOutput = `Simulating Python: ${command} (output placeholder)`;
-            outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'python' }];
+            outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'python', timestamp }];
             logEntry = { timestamp, type: 'I', text: simOutput };
          }
       }
@@ -135,12 +137,12 @@ export async function executeCommand ({
          let simOutput = `Simulating Unix: ${command} (output placeholder)`;
          if (commandLower === 'ls') {
              simOutput = 'file1.txt  directoryA  script.sh';
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix' }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
          } else if (commandLower.startsWith('echo ')) {
              simOutput = command.substring(5);
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix' }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
          } else {
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix' }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
          }
          logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
       }
@@ -149,12 +151,12 @@ export async function executeCommand ({
          let simOutput = `Simulating Windows: ${command} (output placeholder)`;
          if (commandLower === 'dir') {
              simOutput = ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free';
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows' }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
          } else if (commandLower.startsWith('echo ')) {
              simOutput = command.substring(5);
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows' }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
          } else {
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows' }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
          }
          logEntry = { timestamp, type: 'I', text: `Windows simulation output: ${simOutput}` };
       }
@@ -166,24 +168,24 @@ export async function executeCommand ({
            if (results) {
              const formattedTable = formatResultsAsTable(results);
              const sqlOutput = formattedTable || "Query executed successfully, no results returned.";
-             outputLines = [{ id: `out-${timestamp}`, text: sqlOutput, type: 'output', category: 'sql' }];
+             outputLines = [{ id: `out-${timestamp}`, text: sqlOutput, type: 'output', category: 'sql', timestamp }];
              logEntry = { timestamp, type: 'I', text: `SQL query result: ${sqlOutput}` };
            } else if (changes !== null) {
              let infoText = `Query executed successfully. ${changes} row${changes === 1 ? '' : 's'} affected.`;
              if (lastInsertRowid !== null && lastInsertRowid > 0) {
                 infoText += ` Last inserted row ID: ${lastInsertRowid}`;
              }
-             outputLines = [{ id: `out-${timestamp}`, text: infoText, type: 'info', category: 'sql' }];
+             outputLines = [{ id: `out-${timestamp}`, text: infoText, type: 'info', category: 'sql', timestamp }];
              logEntry = { timestamp, type: 'I', text: infoText };
            } else {
               const successMsg = "Query executed successfully.";
-              outputLines = [{ id: `out-${timestamp}`, text: successMsg, type: 'info', category: 'sql' }];
+              outputLines = [{ id: `out-${timestamp}`, text: successMsg, type: 'info', category: 'sql', timestamp }];
               logEntry = { timestamp, type: 'I', text: successMsg };
            }
          } catch (error) {
            console.error("SQL execution error:", error);
            const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
-           outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql' }];
+           outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp }];
            logEntry = { timestamp, type: 'E', text: `SQL Error: ${errorMsg}` };
          }
       }
@@ -191,6 +193,7 @@ export async function executeCommand ({
          await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100));
          let excelOutput = `Simulating Excel: ${command} (output placeholder)`;
          let excelLogType: 'I' | 'E' = 'I';
+         let outputType: 'output' | 'error' = 'output';
          if (commandLower.startsWith('sum(')) {
              const numbersMatch = command.match(/sum\(([\d\s,.]+)\)/i);
              if (numbersMatch && numbersMatch[1]) {
@@ -198,32 +201,31 @@ export async function executeCommand ({
                      const numbers = numbersMatch[1].split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
                      const sum = numbers.reduce((acc, val) => acc + val, 0);
                      excelOutput = `${sum}`;
-                     outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: 'output', category: 'excel' }];
+                     outputType = 'output';
                  } catch (e) {
                      excelOutput = '#VALUE!';
                      excelLogType = 'E';
-                     outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: 'error', category: 'excel' }];
+                     outputType = 'error';
                  }
              } else {
                   excelOutput = '#NAME?';
                   excelLogType = 'E';
-                  outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: 'error', category: 'excel' }];
+                  outputType = 'error';
              }
-         } else {
-              outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: 'output', category: 'excel' }];
          }
+         outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: outputType, category: 'excel', timestamp: outputType === 'error' ? timestamp : undefined }];
          logEntry = { timestamp, type: excelLogType, text: `Excel simulation output: ${excelOutput}` };
       }
        else {
          const errorMsg = `Error: Command execution logic not implemented for category '${mode}'.`;
-         outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: errorMsg, type: 'error', category: 'internal' }];
+         outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
          logEntry = { timestamp, type: 'E', text: errorMsg };
        }
 
   } catch (error) { // Catch errors from handlers themselves
       console.error("Unhandled error during command execution:", error);
       const errorMsg = `Internal Server Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal' }];
+      outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
       logEntry = { timestamp, type: 'E', text: errorMsg };
   }
 
@@ -240,6 +242,7 @@ export async function executeCommand ({
 
 
   // Return the result object
+  // Always include the command itself in the output
   return {
     outputLines: [commandOutput, ...outputLines],
     newLogEntries: finalLogEntries, // Return updated logs if they changed

@@ -77,7 +77,8 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
         id: `req-${outputType}-${timestamp}`,
         text: outputText,
         type: outputType,
-        category: 'internal'
+        category: 'internal',
+        timestamp: timestamp // Add timestamp here
     }];
 
     // Create log entry

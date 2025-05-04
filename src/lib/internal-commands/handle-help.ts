@@ -26,7 +26,7 @@ Available categories: ${Object.keys(initialSuggestions).join(', ')}.
 Available internal commands: help, clear, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause, create sqlite <filename.db>, init db, show requirements, persist memory db to <filename.db>
 Run custom commands by typing their name.
 Note: 'mode' command is informational only.`;
-    const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal' }];
+    const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp }];
 
     // Create log entry
     const logEntry: LogEntry = { timestamp, type: 'I', text: `Displayed help.` };

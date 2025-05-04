@@ -11,8 +11,9 @@ import type { CommandMode } from '@/types/command-types'; // Import shared type
 export type OutputLine = {
   id: string; // For React key prop
   text: string;
-  type?: 'command' | 'output' | 'error' | 'info'; // For potential styling
+  type?: 'command' | 'output' | 'error' | 'info' | 'warning'; // Added 'warning' type potentially
   category?: CommandMode | 'internal'; // Use imported CommandMode
+  timestamp?: string; // Added optional timestamp for log-like formatting
 };
 
 interface OutputDisplayProps {
@@ -31,6 +32,16 @@ const getCategoryStyle = (category?: OutputLine['category']): string => {
     default: return '';
   }
 };
+
+// Helper to get single letter type indicator
+const getTypeIndicator = (type?: OutputLine['type']): string | null => {
+    switch(type) {
+        case 'info': return 'I';
+        case 'warning': return 'W';
+        case 'error': return 'E';
+        default: return null;
+    }
+}
 
 export function OutputDisplay({ history, className }: OutputDisplayProps) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
@@ -51,20 +62,29 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
       <CardContent className="flex-1 p-4 overflow-hidden">
          <ScrollArea className="h-full w-full pr-4" ref={scrollAreaRef}>
           <div className="space-y-2 font-mono text-sm">
-            {history.map((line) => (
-              <div key={line.id} className="flex items-start space-x-2">
-                 <span className={cn(
-                   "whitespace-pre-wrap break-words",
-                   line.type === 'command' && 'text-foreground font-semibold',
-                   line.type === 'error' && 'text-destructive',
-                   line.type === 'info' && 'text-muted-foreground italic',
-                   getCategoryStyle(line.category) // Apply category style
-                 )}>
-                    {line.type === 'command' && '$ '} {/* Add prompt for commands */}
-                    {line.text}
-                  </span>
-              </div>
-            ))}
+            {history.map((line) => {
+                const typeIndicator = getTypeIndicator(line.type);
+                const showLogFormat = (line.type === 'info' || line.type === 'error' || line.type === 'warning') && line.timestamp && typeIndicator;
+
+                return (
+                  <div key={line.id} className="flex items-start space-x-2">
+                     <span className={cn(
+                       "whitespace-pre-wrap break-words",
+                       line.type === 'command' && 'text-foreground font-semibold',
+                       line.type === 'error' && 'text-destructive',
+                       (line.type === 'info' || line.type === 'warning') && 'text-muted-foreground italic',
+                       // Apply category style even for log-formatted lines if category exists
+                       getCategoryStyle(line.category)
+                     )}>
+                        {line.type === 'command' && '$ '}
+                        {showLogFormat
+                           ? `${line.timestamp},${typeIndicator},${line.text}`
+                           : line.text
+                        }
+                      </span>
+                  </div>
+                );
+            })}
           </div>
         </ScrollArea>
       </CardContent>
@@ -79,5 +99,3 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
 export function getFilename(): string {
     return 'output-display.tsx';
 }
-
-

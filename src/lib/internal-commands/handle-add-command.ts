@@ -39,7 +39,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
         const newCommandAction = match[4].trim();
 
         if (initialSuggestions.internal.includes(newCommandName.toLowerCase())) {
-            outputLines = [{ id: `out-${timestamp}`, text: `Error: Cannot redefine built-in command "${newCommandName}".`, type: 'error', category: 'internal' }];
+            outputLines = [{ id: `out-${timestamp}`, text: `Error: Cannot redefine built-in command "${newCommandName}".`, type: 'error', category: 'internal', timestamp }];
         } else {
             // Note: Calling these client-side functions from a server action is problematic.
             try {
@@ -61,10 +61,10 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
             updatedLogEntries.push(logEntry);
 
             // Provide feedback (same text as log entry for consistency)
-            outputLines.push({ id: `out-${timestamp}`, text: logText, type: 'info', category: 'internal' });
+            outputLines.push({ id: `out-${timestamp}`, text: logText, type: 'info', category: 'internal', timestamp });
         }
     } else {
-        outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`, type: 'error', category: 'internal' }];
+        outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`, type: 'error', category: 'internal', timestamp }];
     }
 
     // Return output and the potentially updated log entries

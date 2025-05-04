@@ -20,7 +20,7 @@ interface HandlerParams {
 export const handleRefine = async ({ args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     // TODO: Implement refine functionality
     const outputText = `Refine command placeholder for: ${args.join(' ')}`;
-    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal' }];
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
     // Create log entry
     const logEntry: LogEntry = { timestamp, type: 'W', text: `Refine command not yet implemented. Args: ${args.join(' ')}` };

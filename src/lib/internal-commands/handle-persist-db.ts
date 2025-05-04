@@ -58,7 +58,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries }: Ha
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {
-        outputLines: [{ id: `persist-db-${timestamp}`, text: outputText, type: outputType, category: 'internal' }],
+        outputLines: [{ id: `persist-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }],
         newLogEntries
     };
 };

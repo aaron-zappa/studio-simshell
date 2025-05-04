@@ -59,6 +59,7 @@ export default function Home() {
          type: 'command',
          // Assign category based on classification, default to 'internal' if ambiguous/unknown
          category: (category === 'ambiguous' || category === 'unknown') ? 'internal' : category,
+         timestamp: timestamp
       };
 
       // Handle ambiguous or unknown commands based on active categories
@@ -70,6 +71,7 @@ export default function Home() {
               : `Command not recognized within active categories (${selectedCategories.join(', ')}). ${classificationReasoning || 'Please try again or type "help".'}`,
           type: 'error',
           category: 'internal',
+          timestamp: timestamp, // Add timestamp
         };
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         // Log the classification error itself
@@ -102,6 +104,10 @@ export default function Home() {
           const exportLog: LogEntry = { timestamp, type: logType, text: logText };
           setLogEntries(prev => [...prev, exportLog]);
           if(commandLogOutput && exportResultLine){
+             // Add timestamp to export result line if it's an error/info type
+             if(exportResultLine.type === 'error' || exportResultLine.type === 'info'){
+                 exportResultLine.timestamp = timestamp;
+             }
              setHistory((prev) => [...prev, commandLogOutput, exportResultLine]);
           }
           clientHandled = true;
@@ -113,6 +119,7 @@ export default function Home() {
              text: 'task stopped',
              type: 'info',
              category: 'internal',
+             timestamp: timestamp, // Add timestamp
            };
             if(commandLogOutput){
                setHistory((prev) => [...prev, commandLogOutput, pauseOutput]);
@@ -172,6 +179,7 @@ export default function Home() {
             text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
             type: 'error',
             category: 'internal',
+            timestamp: timestamp, // Add timestamp
         };
          // Log the error
          const errorLog: LogEntry = { timestamp, type: 'E', text: errorMsg };
@@ -186,7 +194,7 @@ export default function Home() {
              setHistory((prev) => [...prev, commandLogOutput, errorOutput]);
          } else {
              // If classification failed before commandLogOutput was set
-             const genericCommandLog: OutputLine = { id: `cmd-err-${timestamp}`, text: command, type: 'command', category: 'internal' };
+             const genericCommandLog: OutputLine = { id: `cmd-err-${timestamp}`, text: command, type: 'command', category: 'internal', timestamp: timestamp };
              setHistory((prev) => [...prev, genericCommandLog, errorOutput]);
          }
 

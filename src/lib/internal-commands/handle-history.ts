@@ -19,7 +19,7 @@ interface HandlerParams {
 export const handleHistory = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     // TODO: Implement fetching history from SQLite database if needed
     const outputText = 'History command placeholder (currently only shows command history in output).';
-    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal' }];
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
     // Create log entry
     const logEntry: LogEntry = { timestamp, type: 'W', text: 'History command not fully implemented.' };

@@ -36,7 +36,7 @@ export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries }:
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {
-         outputLines: [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal' }],
+         outputLines: [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }],
          newLogEntries: newLogEntries
     };
 };
