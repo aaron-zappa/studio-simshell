@@ -7,7 +7,7 @@ import { classifyCommandFlow } from './flows/classify-command-flow';
 import { simpleTextGenFlow } from './flows/simple-text-gen-flow';
 
 // Import tools explicitly
-// Removed: import { getVariableValue } from './tools/get-variable-tool'; // Remove tool import
+// No static tools to import for now
 
 // Create the flows array by exporting the imported flow objects
 export const flows: Flow<any, any, any>[] = [
@@ -18,9 +18,9 @@ export const flows: Flow<any, any, any>[] = [
 ];
 
 // Create the tools array (optional for dev UI, but useful)
-// Remove the tool from the exported array
+// Remove the getVariableValue tool
 export const tools: Tool<any, any>[] = [
-    // Removed: getVariableValue,
+    // No static tools to list here currently
     // Add other imported tools here
 ];
 
