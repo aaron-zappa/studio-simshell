@@ -30,15 +30,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
     let outputLines: OutputLine[] = [];
     let updatedLogEntries = [...currentLogEntries]; // Start with a copy of current logs
 
-    // Check permission (example: manage_ai_tools)
-    // if (!userPermissions.includes('manage_ai_tools')) {
-    //     const errorMsg = "Permission denied: Cannot add internal commands.";
-    //     return {
-    //         outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }],
-    //     };
-    // }
-    // Permission check commented out for now as it relies on manage_ai_tools which might be too restrictive
+    // Permission check moved to central handler
 
     // Updated Regex for: add_int_cmd <short> <name> "<description>" <whatToDo>
     const addCmdRegex = /^add_int_cmd\s+(\S+)\s+(\S+)\s+"([^"]+)"\s+(.+)$/i;
@@ -60,7 +52,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
             outputText = `Error: Cannot redefine built-in command "${newCommandName}".`;
             outputType = 'error';
             logType = 'E';
-            logFlag = 1; // Set flag for error
+            logFlag = 0; // Set flag to 0 for error
             logText = outputText;
             outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
         } else {
@@ -84,7 +76,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
         outputText = `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 1; // Set flag for syntax error
+        logFlag = 0; // Set flag to 0 for error
         logText = outputText + ` (User: ${userId}, Command: ${command})`;
         outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     }

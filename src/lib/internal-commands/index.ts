@@ -63,8 +63,8 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         const errorMsg = `Permission denied: Requires '${requiredPermission}' permission.`;
         return {
             outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }],
-            // Include flag=1 for permission denied error log
-            newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }],
+            // Include flag=0 for permission denied error log
+            newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }],
         };
     };
 
@@ -97,15 +97,18 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         case 'refine':
              // Placeholder - Add permission check if implemented
             return handleRefine(params);
-        case 'add': // Check for 'add int_cmd' or 'add ai_tool'
-             if (commandLower.startsWith('add int_cmd ')) {
+        case 'add_int_cmd': // Changed from 'add'
+             if (commandLower.startsWith('add_int_cmd ')) {
                  if (!userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools'); // Assuming same permission for simplicity
                  return handleAddCommand(params); // Handles regular internal commands
-             } else if (commandLower.startsWith('add ai_tool ')) {
+             }
+             break;
+        case 'add_ai_tool': // Changed from 'add'
+             if (commandLower.startsWith('add_ai_tool ')) {
                  if (!userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
                  return handleAddAiTool(params); // Handles defining AI tools
              }
-             break; // Fall through if not 'add int_cmd' or 'add ai_tool'
+             break;
         case 'set': // Check for 'set ai_tool active'
              if (commandLower.startsWith('set ai_tool ')) { // Check if args[1] exists before accessing
                  if (!userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
@@ -174,7 +177,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
      }
 
 
-    // 2. Custom internal commands (defined via 'add int_cmd')
+    // 2. Custom internal commands (defined via 'add_int_cmd')
     const customAction = getCustomCommandAction(params.commandName);
     if (customAction !== undefined) {
         // Basic check - maybe custom commands require a general 'execute_custom' perm?

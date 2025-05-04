@@ -56,7 +56,7 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
         outputType = 'error';
         logText = outputText + ` (User: ${userId})`;
         logType = 'E';
-        logFlag = 1; // Set flag for error
+        logFlag = 0; // Set flag to 0 for error
     }
 
     const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };

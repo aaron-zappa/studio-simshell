@@ -70,7 +70,7 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
         outputType = 'error';
         logText = outputText + ` (User: ${userId})`;
         logType = 'E';
-        logFlag = 1; // Set flag for error
+        logFlag = 0; // Set flag to 0 for error
     }
 
     // TODO: Handle arguments if needed

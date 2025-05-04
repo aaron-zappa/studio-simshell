@@ -42,7 +42,7 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
         outputText = `Error: Invalid syntax. Use: set ai_tool <name> active <0|1>`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 1; // Set flag for error
+        logFlag = 0; // Set flag to 0 for error
         logText = outputText + ` (User: ${userId}, Command: set ai_tool ${args.join(' ')})`;
         outputLines = [{ id: `set-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     } else {
@@ -65,7 +65,7 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
                 outputText = `Error: AI tool '${toolName}' not found.`;
                 outputType = 'error'; // Changed to error as it's a failed operation
                 logType = 'W'; // Warning because the command was valid but target not found
-                logFlag = 1; // Set flag for warning/error
+                logFlag = 1; // Set flag for warning (target not found is a recoverable issue)
                 logText = outputText + ` (User: ${userId})`;
                 outputLines.push({ id: `set-tool-notfound-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
             }
@@ -75,7 +75,7 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
             outputType = 'error';
             logText = outputText + ` (User: ${userId})`;
             logType = 'E';
-            logFlag = 1; // Set flag for error
+            logFlag = 0; // Set flag to 0 for error
             outputLines.push({ id: `set-tool-db-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         }
     }

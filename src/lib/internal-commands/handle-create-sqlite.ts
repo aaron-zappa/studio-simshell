@@ -31,7 +31,7 @@ export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, u
         outputText = `Error: Invalid syntax. Use: create sqlite <filename.db> (filename is ignored, uses in-memory DB)`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 1;
+        logFlag = 0; // Set flag to 0 for error
         logText = outputText + ` (User: ${userId}, Command: create ${args.join(' ')})`;
     } else {
          // Simulate a brief action, actual DB init is deferred to first use or 'init db'.

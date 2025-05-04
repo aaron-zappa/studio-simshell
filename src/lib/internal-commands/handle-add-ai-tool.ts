@@ -36,18 +36,7 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
     let outputText = '';
     let logFlag: 0 | 1 = 0; // Default flag is 0
 
-    // Permission Check
-    // if (!userPermissions.includes('manage_ai_tools')) {
-    //     outputText = "Permission denied: Cannot manage AI tools.";
-    //     outputType = 'error';
-    //     logType = 'E';
-    //     logText = outputText + ` (User: ${userId})`;
-    //     logFlag = 1; // Set flag for permission error
-    //     outputLines.push({ id: `perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
-    //     updatedLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
-    //     return { outputLines, newLogEntries: updatedLogEntries };
-    // }
-    // Permission check moved to central handler
+    // Permission Check moved to central handler
 
     // Regex for: add ai_tool <toolname> "<args_description>" "<description>"
     const addToolRegex = /^add ai_tool\s+(\S+)\s+"([^"]+)"\s+"([^"]+)"$/i;
@@ -84,7 +73,7 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
             outputType = 'error';
             logText = outputText + ` (User: ${userId})`;
             logType = 'E';
-            logFlag = 1; // Set flag for DB error
+            logFlag = 0; // Set flag to 0 for error
             outputLines.push({ id: `add-tool-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         }
     } else {
@@ -93,7 +82,7 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
         outputType = 'error';
         logText = outputText + ` (User: ${userId}, Command: ${command})`;
         logType = 'E';
-        logFlag = 1; // Set flag for syntax error
+        logFlag = 0; // Set flag to 0 for error
         outputLines = [{ id: `add-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     }
 

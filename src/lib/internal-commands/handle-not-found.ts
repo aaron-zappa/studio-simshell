@@ -24,8 +24,8 @@ export const handleNotFound = async ({ commandName, timestamp, currentLogEntries
     const outputText = `Internal command not found: ${commandName}`;
     const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'error', category: 'internal', timestamp }];
 
-    // Create log entry with flag=1 for warning
-    const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `Attempted unknown internal command: ${commandName} (User: ${userId})` };
+    // Create log entry with flag=1 for warning (or 0 if error)
+    const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `Attempted unknown internal command: ${commandName} (User: ${userId})` }; // Keep flag 1 for Warning
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

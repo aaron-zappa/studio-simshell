@@ -46,7 +46,7 @@ export default function Home() {
             if (status.includes('nok')) {
                 statusType = 'error';
                 logType = 'E';
-                logFlag = 1; // Set flag for error
+                logFlag = 0; // Set flag to 0 for error
             }
 
             const statusLine: OutputLine = {
@@ -70,10 +70,10 @@ export default function Home() {
                 type: 'error',
                 category: 'internal',
                 timestamp: timestamp,
-                flag: 1, // Set flag for error
+                flag: 0, // Set flag to 0 for error
              };
              setHistory(prev => [...prev, errorLine]);
-             setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorLine.text }]);
+             setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorLine.text }]);
         }
     };
     // Run only once on component mount
@@ -192,13 +192,13 @@ export default function Home() {
           type: 'error',
           category: 'internal',
           timestamp: timestamp,
-          flag: 1, // Set flag for classification error
+          flag: 0, // Set flag to 0 for error
         };
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         const classificationLog: LogEntry = {
             timestamp,
             type: 'W', // Treat as warning log level
-            flag: 1, // Set flag
+            flag: 0, // Set flag to 0 for error
             text: ambiguousOutput.text
         };
         setLogEntries(prev => [...prev, classificationLog]);
@@ -219,7 +219,7 @@ export default function Home() {
           const exportResultLine = exportLogFile(logEntries);
           const logText = exportResultLine ? exportResultLine.text : "Attempted log export.";
           const logType = exportResultLine?.type === 'error' ? 'E' : 'I';
-          const logFlag: 0 | 1 = exportResultLine?.type === 'error' ? 1 : 0; // Add flag based on export result
+          const logFlag: 0 | 1 = exportResultLine?.type === 'error' ? 0 : 0; // Set flag to 0 for error
           const exportLog: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
           setLogEntries(prev => [...prev, exportLog]);
           if(commandLogOutput && exportResultLine){
@@ -302,9 +302,9 @@ export default function Home() {
             type: 'error',
             category: 'internal',
             timestamp: timestamp,
-            flag: 1, // Set flag=1 for error
+            flag: 0, // Set flag to 0 for error
         };
-         const errorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+         const errorLog: LogEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
          if (executionResult?.newLogEntries) {
              // If execution started and potentially updated logs, add error to those
              setLogEntries([...executionResult.newLogEntries, errorLog]);

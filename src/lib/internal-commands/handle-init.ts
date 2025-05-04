@@ -70,10 +70,10 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
             } catch (error) {
                 const errorMsg = `Error storing default variable '${variable.name}': ${error instanceof Error ? error.message : 'Unknown error'}`;
                 console.error(errorMsg);
-                logEntries.push({ timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` });
+                logEntries.push({ timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }); // Set flag to 0 for error
                 varErrors.push(errorMsg);
                 overallSuccess = false;
-                logFlag = 1; // Set overall flag if any var error occurs
+                // logFlag = 0; // Overall flag is set later based on overallSuccess
             }
         }
 
@@ -96,17 +96,18 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
         finalMessage = `Initialization complete. ${dbInitMsg} ${varInitMsg} ${clipboardInitMsg}`;
          if (!overallSuccess) {
              finalMessage += " Some errors occurred during variable initialization.";
+             logFlag = 0; // Set overall flag to 0 if any error occurred
          }
 
 
     } catch (error) {
         console.error("Error during initialization:", error);
         const errorMsg = `Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        logEntries.push({ timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` });
+        logEntries.push({ timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }); // Set flag to 0 for error
         outputLines.push({ id: `init-error-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
         overallSuccess = false;
         finalMessage = errorMsg;
-        logFlag = 1; // Set flag for critical init error
+        logFlag = 0; // Set flag to 0 for critical init error
     }
 
     const combinedLogEntries = [...currentLogEntries, ...logEntries];
@@ -115,7 +116,7 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
     combinedLogEntries.push({
       timestamp,
       type: overallSuccess ? 'I' : 'E',
-      flag: logFlag,
+      flag: logFlag, // Use the determined overall flag
       text: `Overall Initialization Status: ${overallSuccess ? 'Success' : 'Failed with errors'}. ${finalMessage} (User: ${userId})`
     });
 

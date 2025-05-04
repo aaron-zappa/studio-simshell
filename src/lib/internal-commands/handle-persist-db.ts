@@ -33,7 +33,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
         outputText = 'Error: Invalid syntax. Use: persist memory db to <filename.db>';
         outputType = 'error';
         logType = 'E';
-        logFlag = 1; // Set flag for error
+        logFlag = 0; // Set flag to 0 for error
         logText = outputText + ` (User: ${userId}, Command: persist ${args.join(' ')})`;
     } else {
         const targetFilename = args[3];
@@ -48,7 +48,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
                 outputText = 'Failed to persist database for an unknown reason.';
                 outputType = 'error';
                 logType = 'E';
-                logFlag = 1; // Set flag for error
+                logFlag = 0; // Set flag to 0 for error
                 logText = outputText + ` (User: ${userId})`;
             }
         } catch (error) {
@@ -56,7 +56,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
             outputText = `Error persisting database: ${error instanceof Error ? error.message : 'Unknown error'}`;
             outputType = 'error';
             logType = 'E';
-            logFlag = 1; // Set flag for error
+            logFlag = 0; // Set flag to 0 for error
             logText = outputText + ` (User: ${userId})`;
         }
     }

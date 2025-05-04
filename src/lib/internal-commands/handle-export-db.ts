@@ -48,7 +48,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
             outputText = `Failed to export database to ${targetFilename} for an unknown reason.`;
             outputType = 'error';
             logType = 'E';
-            logFlag = 1; // Set flag for error
+            logFlag = 0; // Set flag to 0 for error
             logText = outputText + ` (User: ${userId})`;
         }
     } catch (error) {
@@ -56,7 +56,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
         outputText = `Error exporting database to ${targetFilename}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 1; // Set flag for error
+        logFlag = 0; // Set flag to 0 for error
         logText = outputText + ` (User: ${userId})`;
     }
 

@@ -41,7 +41,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         outputText = 'Error: No input text provided for the "ai" command. Usage: ai <inputtext>';
         outputType = 'error';
         logType = 'E';
-        logFlag = 1;
+        logFlag = 0; // Set flag to 0 for error
         logText = outputText;
         outputLines.push({ id: `ai-err-input-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
@@ -63,7 +63,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
                  processedInputText = processedInputText.replace(match[0], `<variable '${variableName}' permission denied>`);
                  const permDeniedMsg = `Permission denied to read variable '${variableName}' for AI command.`;
                  if (!substitutionError) { // Log permission denial only once per command run if multiple vars lack perm
-                     logEntries.push({ timestamp, type: 'W', flag: 1, text: permDeniedMsg + ` (User: ${userId})` });
+                     newLogEntries.push({ timestamp, type: 'W', flag: 1, text: permDeniedMsg + ` (User: ${userId})` });
                  }
                  substitutionError = true; // Mark that an error occurred
                  continue; // Move to next match
@@ -76,13 +76,13 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
             } else {
                 // Variable not found - replace with a placeholder
                 processedInputText = processedInputText.replace(match[0], `<variable '${variableName}' not found>`);
-                logEntries.push({ timestamp, type: 'W', flag: 1, text: `Variable '{${variableName}}' not found during AI command preprocessing. (User: ${userId})` });
+                newLogEntries.push({ timestamp, type: 'W', flag: 1, text: `Variable '{${variableName}}' not found during AI command preprocessing. (User: ${userId})` });
                 substitutionError = true; // Mark that an error occurred
             }
         } catch (dbError) {
             console.error(`Error retrieving variable '${variableName}' for AI command:`, dbError);
             processedInputText = processedInputText.replace(match[0], `<variable '${variableName}' db_error>`);
-            logEntries.push({ timestamp, type: 'E', flag: 1, text: `DB error retrieving variable '{${variableName}}' for AI command: ${dbError instanceof Error ? dbError.message : 'Unknown DB error'}. (User: ${userId})` });
+            newLogEntries.push({ timestamp, type: 'E', flag: 0, text: `DB error retrieving variable '{${variableName}}' for AI command: ${dbError instanceof Error ? dbError.message : 'Unknown DB error'}. (User: ${userId})` }); // Set flag to 0 for error
             substitutionError = true; // Mark that an error occurred
             // Do not stop processing, just mark the error and continue with other substitutions
         }
@@ -117,7 +117,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
              }
         } catch (toolError) {
              console.error("Failed to fetch AI tools for context:", toolError);
-             logEntries.push({ timestamp, type: 'W', flag: 1, text: `Failed to fetch AI tools context for AI command: ${toolError instanceof Error ? toolError.message : 'Unknown error'}. (User: ${userId})` });
+             newLogEntries.push({ timestamp, type: 'W', flag: 1, text: `Failed to fetch AI tools context for AI command: ${toolError instanceof Error ? toolError.message : 'Unknown error'}. (User: ${userId})` });
         }
 
         // Call the AI flow with the processed input text, tool context, and permissions
@@ -154,7 +154,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
                 outputText = `AI generated a response, but failed to store it in variable 'ai_answer': ${dbError instanceof Error ? dbError.message : 'Unknown DB error'}`;
                 outputType = 'error';
                 logType = 'E';
-                logFlag = 1;
+                logFlag = 0; // Set flag to 0 for error
                 logText = outputText;
                 outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
                 newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
@@ -190,7 +190,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         outputText = `Error processing AI command: ${aiError instanceof Error ? aiError.message : 'Unknown AI error'}`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 1;
+        logFlag = 0; // Set flag to 0 for error
         logText = outputText;
         outputLines.push({ id: `ai-err-gen-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });

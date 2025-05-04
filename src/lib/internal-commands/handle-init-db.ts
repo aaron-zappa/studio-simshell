@@ -114,6 +114,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
     let outputLines: OutputLine[] = [];
     let successfulStatements: number = 0;
     let errors: string[] = [];
+    let logFlag: 0 | 1 = 0; // Default flag
 
     try {
         // runSql already ensures the DB is initialized via getDb()
@@ -135,6 +136,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
                  errors.push(errorMsg);
                  logType = 'E';
                  outputType = 'error';
+                 logFlag = 0; // Set flag to 0 for error
                  // Add specific error line to output
                  outputLines.push({ id: `init-err-${statementType}-${errors.length}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
             }
@@ -152,12 +154,13 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         logText = `Critical Error during DB initialization: ${error instanceof Error ? error.message : 'Unknown error'}`;
         logType = 'E';
         outputType = 'error';
+        logFlag = 0; // Set flag to 0 for error
         // Ensure outputLines has the critical error message
         outputLines = [{ id: `init-db-crit-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
     }
 
     // Add user ID and flag to the main log entry
-    const logEntry: LogEntry = { timestamp, type: logType, flag: errors.length > 0 ? 1 : 0, text: logText + ` (User: ${userId})` };
+    const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText + ` (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {

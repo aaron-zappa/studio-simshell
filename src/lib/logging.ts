@@ -16,7 +16,7 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
     const timestamp = new Date().toISOString();
     if (logEntries.length === 0) {
         // Return an OutputLine directly if there are no logs
-        return { id: `log-export-empty-${timestamp}`, text: 'No log entries to export.', type: 'info', category: 'internal' };
+        return { id: `log-export-empty-${timestamp}`, text: 'No log entries to export.', type: 'info', category: 'internal', flag: 0 }; // Added flag
     }
 
     try {
@@ -54,14 +54,14 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url); // Clean up the URL object
-             return { id: `log-export-success-${timestamp}`, text: 'Log file exported successfully as logfile.csv.', type: 'info', category: 'internal' };
+             return { id: `log-export-success-${timestamp}`, text: 'Log file exported successfully as logfile.csv.', type: 'info', category: 'internal', flag: 0 }; // Added flag
         } else {
              console.error('Browser does not support automatic downloading.');
-             return { id: `log-export-fail-${timestamp}`, text: 'Error: Browser does not support automatic download.', type: 'error', category: 'internal' };
+             return { id: `log-export-fail-${timestamp}`, text: 'Error: Browser does not support automatic download.', type: 'error', category: 'internal', flag: 0 }; // Added flag, set to 0 for error
         }
     } catch (error) {
         console.error('Error exporting log file:', error);
-        return { id: `log-export-error-${timestamp}`, text: `Error exporting log file: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error', category: 'internal' };
+        return { id: `log-export-error-${timestamp}`, text: `Error exporting log file: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error', category: 'internal', flag: 0 }; // Added flag, set to 0 for error
     }
 };
 

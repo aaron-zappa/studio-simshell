@@ -75,8 +75,8 @@ export async function executeCommand ({
   } catch (permError) {
        console.error("Error fetching user permissions:", permError);
        const errorMsg = `Error fetching user permissions: ${permError instanceof Error ? permError.message : 'Unknown error'}`;
-       outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Add flag=1 for error
-       logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+       outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }); // Set flag to 0 for error
+       logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
        potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
        // Return early if permissions couldn't be fetched, as they might be critical
        return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
@@ -89,8 +89,8 @@ export async function executeCommand ({
       // Example: Check if user can execute SQL modify commands
       if (mode === 'sql' && !userPermissions.includes('execute_sql_select') && !userPermissions.includes('execute_sql_modify')) {
           const errorMsg = "Permission denied: You do not have permission to execute SQL queries.";
-          outputLines = [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }]; // Add flag=1 for error
-          logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+          outputLines = [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
+          logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
           potentiallyUpdatedLogs = potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, logEntry] : [...currentLogEntries, logEntry];
           return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
       }
@@ -139,8 +139,8 @@ export async function executeCommand ({
          } catch (error) {
             console.error("Error storing variable:", error);
             const errorMsg = `Error storing internal variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
-            outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }]; // Add flag=1 for error
-            logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+            outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
+            logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
          }
       }
       // --- Other Internal Commands ---
@@ -211,8 +211,8 @@ export async function executeCommand ({
               } catch (error) {
                   console.error("Error storing Python variable:", error);
                   const errorMsg = `Error storing Python variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
-                  outputLines = [{ id: `py-assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python', timestamp, flag: 1 }]; // Add flag=1 for error
-                  logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+                  outputLines = [{ id: `py-assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python', timestamp, flag: 0 }]; // Set flag to 0 for error
+                  logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
               }
 
 
@@ -222,8 +222,8 @@ export async function executeCommand ({
             const match = commandTrimmed.match(/print\((['"]?)(.*?)\1\)/);
             const printOutput = match ? match[2] : 'Syntax Error in print';
             const type: OutputLine['type'] = match ? 'output' : 'error';
-            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: type === 'error' ? 1 : 0 }]; // Add flag
-            logEntry = { timestamp, type: match ? 'I' : 'E', flag: match ? 0 : 1, text: `Python print: ${printOutput}` };
+            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: type === 'error' ? 0 : 0 }]; // Set flag to 0 for error
+            logEntry = { timestamp, type: match ? 'I' : 'E', flag: match ? 0 : 0, text: `Python print: ${printOutput}` }; // Set flag to 0 for error
          } else {
             await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
             const simOutput = `Simulating Python: ${commandTrimmed} (output placeholder)`;
@@ -296,8 +296,8 @@ export async function executeCommand ({
          } catch (error) {
            console.error("SQL execution error:", error);
            const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
-           outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 1 }]; // Add flag=1 for error
-           logEntry = { timestamp, type: 'E', flag: 1, text: `SQL Error: ${errorMsg}` };
+           outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 0 }]; // Set flag to 0 for error
+           logEntry = { timestamp, type: 'E', flag: 0, text: `SQL Error: ${errorMsg}` }; // Set flag to 0 for error
          }
       }
       else if (mode === 'excel') {
@@ -318,13 +318,13 @@ export async function executeCommand ({
                      excelOutput = '#VALUE!';
                      excelLogType = 'E';
                      outputType = 'error';
-                     logFlag = 1; // Set flag for error
+                     logFlag = 0; // Set flag to 0 for error
                  }
              } else {
                   excelOutput = '#NAME?';
                   excelLogType = 'E';
                   outputType = 'error';
-                  logFlag = 1; // Set flag for error
+                  logFlag = 0; // Set flag to 0 for error
              }
          }
          outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: outputType, category: 'excel', timestamp: outputType === 'error' ? timestamp : undefined, flag: logFlag }]; // Add flag
@@ -332,16 +332,16 @@ export async function executeCommand ({
       }
        else {
          const errorMsg = `Error: Command execution logic not implemented for category '${mode}'.`;
-         outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }]; // Add flag=1 for error
-         logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+         outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
+         logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
        }
 
   } catch (error) // Catch errors from handlers themselves or permission denials
   {
       console.error("Unhandled error during command execution:", error);
       const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }]; // Add flag=1 for error
-      logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+      outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
+      logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
   }
 
 
