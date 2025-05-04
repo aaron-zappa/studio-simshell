@@ -180,7 +180,7 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
        <header className="flex items-center justify-between mb-4 flex-wrap gap-4">
-        <h1 className="text-2xl font-semibold">SimuShell</h1>
+        <h1 className="text-xl font-semibold">SimuShell</h1> {/* Reduced font size */}
           {/* Category Checkboxes */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className="text-sm font-medium mr-2">Active Categories:</span>

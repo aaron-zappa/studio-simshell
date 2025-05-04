@@ -3,7 +3,7 @@
 "use client";
 
 import * as React from "react";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea"; // Import Textarea instead of Input
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover";
 import { Command as CommandPrimitive, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command"; // Use ShadCN Command
@@ -21,16 +21,16 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
   const [inputValue, setInputValue] = React.useState("");
   const [filteredSuggestions, setFilteredSuggestions] = React.useState<string[]>([]);
   const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const inputRef = React.useRef<HTMLTextAreaElement>(null); // Change ref type to HTMLTextAreaElement
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Change event type to HTMLTextAreaElement
+  const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value;
     setInputValue(value);
 
     if (value.trim().length > 0 && !disabled) {
       const lowerCaseValue = value.toLowerCase();
       // Filter suggestions based on input, ignoring case
-      // Suggestions passed in are already filtered by active categories
       const filtered = suggestions.filter((suggestion) =>
         suggestion.toLowerCase().startsWith(lowerCaseValue) && suggestion.toLowerCase() !== lowerCaseValue
       );
@@ -45,17 +45,19 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
   const handleSuggestionClick = (suggestion: string) => {
     if (disabled) return;
 
-    // Simplified: just set the suggestion
     setInputValue(suggestion + " ");
     setIsPopoverOpen(false);
     setFilteredSuggestions([]);
     inputRef.current?.focus();
   };
 
-   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+   // Change event type to HTMLTextAreaElement
+   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (disabled) return;
 
-    if (event.key === 'Enter') {
+    // Submit on Enter unless Shift is held (for potential future multi-line input)
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault(); // Prevent default newline insertion
         handleSubmit();
     } else if (event.key === 'Tab' && filteredSuggestions.length > 0) {
         event.preventDefault();
@@ -69,7 +71,7 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
     if (disabled) return;
 
     if (inputValue.trim()) {
-      onSubmit(inputValue);
+      onSubmit(inputValue.trim()); // Trim the input before submitting
       setInputValue("");
       setIsPopoverOpen(false);
       setFilteredSuggestions([]);
@@ -78,18 +80,18 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
 
 
   return (
-    <div className={cn("flex items-center space-x-2", className)}>
-       <span className="text-muted-foreground font-mono text-sm shrink-0">$</span> {/* Default prompt */}
+    <div className={cn("flex items-start space-x-2", className)}> {/* items-start for multi-line */}
+       <span className="text-muted-foreground font-mono text-sm shrink-0 pt-2">$</span> {/* Align prompt with first line */}
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverAnchor asChild>
-                 <Input
+                 <Textarea // Use Textarea instead of Input
                     ref={inputRef}
-                    type="text"
-                    placeholder={disabled ? "Processing..." : "Enter command (suggestions based on active categories)..."} // Updated placeholder
+                    rows={3} // Set number of rows
+                    placeholder={disabled ? "Processing..." : "Enter command (suggestions based on active categories)..."}
                     value={inputValue}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
-                    className="flex-1 font-mono"
+                    className="flex-1 font-mono resize-none" // Add resize-none
                     aria-autocomplete="list"
                     aria-controls="suggestion-list"
                     disabled={disabled}
@@ -102,6 +104,7 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
             avoidCollisions={false}
             onOpenAutoFocus={(e) => e.preventDefault()}
             onInteractOutside={(e) => {
+               // Allow interaction if clicking inside the textarea itself
                if (e.target !== inputRef.current) {
                   setIsPopoverOpen(false);
                }
@@ -109,7 +112,7 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
             >
             <CommandPrimitive shouldFilter={false}>
               <CommandList id="suggestion-list">
-                <CommandEmpty>No matching commands in active categories.</CommandEmpty> {/* Updated empty text */}
+                <CommandEmpty>No matching commands in active categories.</CommandEmpty>
                 {filteredSuggestions.map((suggestion) => (
                   <CommandItem
                     key={suggestion}
@@ -125,7 +128,7 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
             </CommandPrimitive>
           </PopoverContent>
        </Popover>
-      <Button onClick={handleSubmit} variant="default" size="icon" disabled={disabled}>
+      <Button onClick={handleSubmit} variant="default" size="icon" disabled={disabled} className="self-end mb-1"> {/* Align button bottom right */}
         <Terminal className="h-4 w-4" />
         <span className="sr-only">Execute Command</span>
       </Button>
