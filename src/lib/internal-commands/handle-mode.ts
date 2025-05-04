@@ -1,4 +1,3 @@
-
 import type { OutputLine } from '@/components/output-display';
 import type { CommandMode } from '@/types/command-types';
 
@@ -8,13 +7,19 @@ interface HandlerParams {
     initialSuggestions: Record<string, string[]>;
 }
 
+// Mode switching is now handled by AI classification before executeCommand is called.
+// This handler becomes informational or could be removed.
 export const handleMode = ({ args, timestamp, initialSuggestions }: HandlerParams): OutputLine[] => {
-    const newMode = args[0] as CommandMode;
-    // Check against the static list of supported modes
-    if (Object.keys(initialSuggestions).includes(newMode)) {
-        // Mode change application is handled client-side after confirmation
-        return [{ id: `out-${timestamp}`, text: `Switched to ${newMode} mode.`, type: 'info', category: 'internal' }];
+    const requestedMode = args[0] as CommandMode;
+
+    if (args.length === 0) {
+       return [{ id: `mode-info-${timestamp}`, text: `Command category is automatically detected. Available categories: ${Object.keys(initialSuggestions).join(', ')}. Use 'help' for more info.`, type: 'info', category: 'internal' }];
+    }
+
+    // Check if the requested mode is valid just for info purposes
+    if (Object.keys(initialSuggestions).includes(requestedMode)) {
+        return [{ id: `mode-info-${timestamp}`, text: `Info: You requested mode '${requestedMode}'. Command category is automatically detected.`, type: 'info', category: 'internal' }];
     } else {
-        return [{ id: `out-${timestamp}`, text: `Error: Invalid mode '${args[0]}'. Available modes: ${Object.keys(initialSuggestions).join(', ')}`, type: 'error', category: 'internal' }];
+        return [{ id: `mode-error-${timestamp}`, text: `Info: '${requestedMode}' is not a recognized category. Categories are automatically detected. Valid categories: ${Object.keys(initialSuggestions).join(', ')}`, type: 'error', category: 'internal' }];
     }
 };

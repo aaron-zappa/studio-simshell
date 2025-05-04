@@ -1,221 +1,172 @@
-
 "use client";
 
 import * as React from 'react';
 import { CommandInput } from '@/components/command-input';
 import { OutputDisplay, type OutputLine } from '@/components/output-display';
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
-import { Label } from "@/components/ui/label";
+// Checkbox and Label are removed as mode selection is gone
+// import { Checkbox } from "@/components/ui/checkbox";
+// import { Label } from "@/components/ui/label";
 import { useCustomCommands } from '@/hooks/use-custom-commands';
-import { useSuggestions } from '@/hooks/use-suggestions'; // Import suggestion hook
-import { executeCommand } from '@/lib/command-executor'; // Import command executor
-import type { CommandMode } from '@/types/command-types'; // Import shared type
-import { exportLogFile, type LogEntry } from '@/lib/logging'; // Import LogEntry type and exportLogFile
+import { useSuggestions } from '@/hooks/use-suggestions';
+import { executeCommand } from '@/lib/command-executor';
+import type { CommandMode } from '@/types/command-types';
+import { exportLogFile, type LogEntry } from '@/lib/logging';
+import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-command-flow'; // Import classification flow
+import { useToast } from "@/hooks/use-toast"; // Import toast
 
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
-  const [currentMode, setCurrentMode] = React.useState<CommandMode>('internal');
-  const [logEntries, setLogEntries] = React.useState<LogEntry[]>([]); // State for logging
-  const [isRunning, setIsRunning] = React.useState<boolean>(false); // Track if a command is running
-  const { suggestions, addSuggestion, getCurrentSuggestions, initialSuggestions } = useSuggestions(); // Suggestions hook
-  const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands(); // Custom commands hook
+  // const [currentMode, setCurrentMode] = React.useState<CommandMode>('internal'); // Removed mode state
+  const [logEntries, setLogEntries] = React.useState<LogEntry[]>([]);
+  const [isRunning, setIsRunning] = React.useState<boolean>(false);
+  const { toast } = useToast(); // Toast hook for notifications
+
+  // Suggestions hook now returns all suggestions potentially
+  const { suggestions, addSuggestion, getAllSuggestions, initialSuggestions } = useSuggestions();
+  const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
 
   const handleCommandSubmit = async (command: string) => {
     const commandLower = command.toLowerCase().trim();
-    let output: OutputLine[] = []; // Initialize output array
-    const timestamp = Date.now(); // Timestamp for unique IDs
+    const timestamp = Date.now();
+    let output: OutputLine[] = [];
+    setIsRunning(true); // Set running state
 
-    // --- Client-Side Command Handling (before calling Server Action) ---
-
-    // Handle internal 'clear' command locally
-    if (currentMode === 'internal' && commandLower === 'clear') {
-      setHistory([]);
-      return;
-    }
-
-    // Handle 'export log' client-side due to browser API usage
-    if (currentMode === 'internal' && commandLower === 'export log') {
-      const exportResult = exportLogFile(logEntries); // Call client-side export
-      const commandOutput: OutputLine = {
-        id: `cmd-${timestamp}`,
-        text: command,
-        type: 'command',
-        category: 'internal',
-      };
-      if (exportResult) {
-        setHistory((prev) => [...prev, commandOutput, exportResult]);
-      } else {
-        const noLogOutput: OutputLine = {
-          id: `log-export-empty-${timestamp}`,
-          text: 'No log entries to export.',
-          type: 'info',
-          category: 'internal'
-        };
-        setHistory((prev) => [...prev, commandOutput, noLogOutput]);
-      }
-      return; // Stop further processing
-    }
-
-    // Handle 'pause' command client-side (simulation)
-    if (currentMode === 'internal' && commandLower === 'pause') {
-       const commandOutput: OutputLine = {
-         id: `cmd-${timestamp}`,
-         text: command,
-         type: 'command',
-         category: 'internal',
-       };
-       let pauseOutput: OutputLine;
-       if (isRunning) {
-          // Simulate stopping the task. In a real scenario, you'd use AbortController or similar.
-          pauseOutput = {
-            id: `pause-${timestamp}`,
-            text: 'task stopped', // Changed feedback message
-            type: 'info',
-            category: 'internal',
-          };
-          // Here you would signal the actual task cancellation if possible
-          // For now, we just provide feedback and prevent further execution *of this command*
-          setIsRunning(false); // Immediately set isRunning to false to reflect the stop
-       } else {
-          pauseOutput = {
-            id: `pause-${timestamp}`,
-            text: 'No task currently running to stop.',
-            type: 'info',
-            category: 'internal',
-          };
-       }
-       setHistory((prev) => [...prev, commandOutput, pauseOutput]);
-       return; // Stop processing, don't call executeCommand for 'pause'
-    }
-
-    // --- Server-Side Command Execution ---
-    setIsRunning(true); // Set running state before calling the potentially long action
     try {
-      // Handle internal 'mode' command locally to change state *after* confirmation
-      if (currentMode === 'internal' && commandLower.startsWith('mode ')) {
-        const newMode = command.split(' ')[1]?.toLowerCase() as CommandMode | undefined;
-        // Let executeCommand validate the mode and return feedback
-        output = await executeCommand({
-          command,
-          mode: currentMode,
-          addSuggestion,
-          addCustomCommand,
-          getCustomCommandAction,
-          logEntries,
-          setLogEntries,
-          initialSuggestions
-        });
+      // --- Classify Command (AI Call) ---
+      const classificationResult = await classifyCommand({ command });
+      const category: CommandCategory = classificationResult.category;
+      const classificationReasoning = classificationResult.reasoning;
 
-        // Check if the output indicates success (absence of 'Error:' might be a simple check)
-        const modeChangeSuccessful = !output.some(line => line.type === 'error' && line.text.includes('Invalid mode'));
+      const commandOutputBase: Omit<OutputLine, 'id' | 'text' | 'category'> = {
+         type: 'command',
+      };
 
-        if (newMode && modeChangeSuccessful && Object.keys(initialSuggestions).includes(newMode)) {
-            setCurrentMode(newMode); // Apply mode change only on success
-        }
-        // No need for an else block, the error message is already in 'output'
-      } else {
-        // Execute other commands (including custom internal ones) via Server Action
-        output = await executeCommand({
-          command,
-          mode: currentMode,
-          addSuggestion,
-          addCustomCommand,
-          getCustomCommandAction,
-          logEntries,
-          setLogEntries,
-          initialSuggestions
-        });
+      // Handle ambiguous or unknown commands
+      if (category === 'ambiguous' || category === 'unknown') {
+        const ambiguousOutput: OutputLine = {
+          id: `class-err-${timestamp}`,
+          text: category === 'ambiguous'
+              ? `Command is ambiguous. ${classificationReasoning || 'Please specify context or be more specific.'}`
+              : `Command not recognized. ${classificationReasoning || 'Please try again or type "help".'}`,
+          type: 'error',
+          category: 'internal', // Assign a default category for display
+        };
+         const commandLogOutput: OutputLine = {
+            ...commandOutputBase,
+            id: `cmd-${timestamp}`,
+            text: command,
+            category: 'internal', // Log ambiguous/unknown under internal for now
+         };
+        setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
+        setIsRunning(false);
+        return;
       }
 
-      // Update history with the output from the command execution
-      setHistory((prev) => [...prev, ...output]);
+      // --- Client-Side Internal Command Handling ---
+      // Handle specific internal commands directly on the client if classified correctly
+      let clientHandled = false;
+      if (category === 'internal') {
+        if (commandLower === 'clear') {
+          setHistory([]);
+          clientHandled = true;
+        } else if (commandLower === 'export log') {
+          const exportResult = exportLogFile(logEntries);
+          const cmdOut: OutputLine = { ...commandOutputBase, id: `cmd-${timestamp}`, text: command, category: 'internal'};
+          if (exportResult) {
+            setHistory((prev) => [...prev, cmdOut, exportResult]);
+          } else {
+            const noLogOutput: OutputLine = {
+              id: `log-export-empty-${timestamp}`,
+              text: 'No log entries to export.',
+              type: 'info',
+              category: 'internal'
+            };
+            setHistory((prev) => [...prev, cmdOut, noLogOutput]);
+          }
+          clientHandled = true;
+        } else if (commandLower === 'pause') {
+           const cmdOut: OutputLine = { ...commandOutputBase, id: `cmd-${timestamp}`, text: command, category: 'internal' };
+           let pauseOutput: OutputLine;
+           // Check some *client-side* indicator if a task is conceptually running
+           // For now, just acknowledge. Proper cancellation needs more state/logic.
+           pauseOutput = {
+             id: `pause-${timestamp}`,
+             text: 'task stopped', // Changed feedback message
+             type: 'info',
+             category: 'internal',
+           };
+           setHistory((prev) => [...prev, cmdOut, pauseOutput]);
+           // Consider if 'pause' should actually stop a server action in progress (needs AbortController etc.)
+           clientHandled = true;
+           setIsRunning(false); // Assuming pause stops things immediately
+        }
+      }
+
+      if (clientHandled) {
+        if (commandLower !== 'pause') setIsRunning(false); // Reset running state if handled unless it was pause
+        return; // Stop further processing if handled client-side
+      }
+
+      // --- Server-Side Command Execution ---
+      // If not handled client-side, execute via Server Action, passing the determined category
+      output = await executeCommand({
+        command,
+        mode: category as CommandMode, // Pass the classified category as the mode
+        addSuggestion,
+        addCustomCommand,
+        getCustomCommandAction,
+        logEntries,
+        setLogEntries, // Still passing, but aware of limitations
+        initialSuggestions
+      });
+
+      // Add classification info to history (optional)
+      // const classificationOutput: OutputLine = {
+      //    id: `classify-${timestamp}`,
+      //    text: `Classified as: ${category}${classificationReasoning ? ` (${classificationReasoning})` : ''}`,
+      //    type: 'info',
+      //    category: 'internal',
+      // };
+      // setHistory((prev) => [...prev, classificationOutput, ...output]);
+
+       // Update history with just the command output
+       setHistory((prev) => [...prev, ...output]);
+
 
     } catch (error) {
-        console.error("Error executing command:", error);
+        console.error("Error during command handling:", error);
+        toast({ // Use toast for user feedback on errors
+           title: "Command Error",
+           description: `Failed to process command: ${error instanceof Error ? error.message : 'Unknown error'}`,
+           variant: "destructive",
+        });
+        // Add basic error line to history as well
         const errorOutput: OutputLine = {
             id: `error-${timestamp}`,
-            text: `Failed to execute command: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
             type: 'error',
-            category: currentMode,
+            category: 'internal', // Default category for general errors
         };
         setHistory((prev) => [...prev, errorOutput]);
     } finally {
-      // Only set isRunning false here if it wasn't already set by 'pause'
+      // Reset running state unless handled by 'pause' earlier
       if (commandLower !== 'pause') {
           setIsRunning(false);
       }
     }
-
-    // TODO: Store command history in SQLite
-    // TODO: Implement define/refine mechanisms
   };
 
-  // Handler for Checkbox mode changes
-  const handleModeChange = (newMode: CommandMode) => {
-     const previousMode = currentMode;
-     if (newMode === previousMode) return; // No change if clicking the already active mode
+   // Get suggestions across all relevant modes
+   const allCurrentSuggestions = getAllSuggestions(customCommands);
 
-     // Simulate typing 'mode [newMode]' in internal mode
-     const tempOriginalMode = currentMode; // Store original mode before temporarily switching
-     setCurrentMode('internal'); // Temporarily switch to internal to process 'mode' command via handleCommandSubmit
-
-     handleCommandSubmit(`mode ${newMode}`).then(() => {
-         // Check if the state actually updated to newMode after the async call
-         // Since setCurrentMode is called *inside* handleCommandSubmit on success,
-         // we don't need to explicitly check output here. The state should reflect the result.
-         // If it failed, the state should remain 'internal' or revert based on previous logic.
-         // Read the state *after* the await. If it didn't become `newMode`, revert.
-         // Note: Needs React.startTransition or similar for optimal UX in concurrent mode
-         if (!Object.keys(initialSuggestions).includes(newMode)) {
-            // If the mode submitted was invalid, revert the internal state change
-            setCurrentMode(tempOriginalMode);
-         }
-         // If successful, currentMode would have been set to newMode inside handleCommandSubmit
-     }).catch(error => {
-         console.error("Failed to handle mode change:", error);
-         setCurrentMode(previousMode); // Revert on error
-     });
-  }
-
-   // Get combined suggestions for the current mode
-   const currentSuggestions = getCurrentSuggestions(
-        currentMode,
-        customCommands // Pass customCommands directly
-   );
-
-   const allModes = Object.keys(initialSuggestions) as CommandMode[];
 
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
        <header className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <h1 className="text-2xl font-semibold">SimuShell</h1>
-         <div className="flex items-center space-x-4">
-           <Label className="text-sm font-medium shrink-0">Mode:</Label>
-           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-             {allModes.map(mode => (
-               <div key={mode} className="flex items-center space-x-2">
-                 <Checkbox
-                   id={`mode-${mode}`}
-                   checked={currentMode === mode}
-                   onCheckedChange={(checked) => {
-                     // Only trigger change if checking the box
-                     if (checked) {
-                       handleModeChange(mode);
-                     }
-                     // Don't allow unchecking the active box directly, must select another
-                   }}
-                 />
-                 <Label
-                   htmlFor={`mode-${mode}`}
-                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                 >
-                   {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                 </Label>
-               </div>
-             ))}
-           </div>
-         </div>
+         {/* Mode selection Checkboxes removed */}
+         {/* <div className="flex items-center space-x-4"> ... </div> */}
       </header>
 
       <Separator className="mb-4" />
@@ -229,12 +180,11 @@ export default function Home() {
       <footer className="shrink-0">
         <CommandInput
             onSubmit={handleCommandSubmit}
-            suggestions={currentSuggestions} // Use combined suggestions
-            currentMode={currentMode}
-            disabled={isRunning} // Disable input while a command is running
+            suggestions={allCurrentSuggestions} // Provide all suggestions
+            // currentMode is removed as prop
+            disabled={isRunning}
          />
       </footer>
     </div>
   );
 }
-
