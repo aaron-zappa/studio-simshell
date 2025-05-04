@@ -22,9 +22,10 @@ interface HandlerParams {
 export const handleHelp = async ({ timestamp, initialSuggestions, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     // Correct the help text for add ai_tool to <toolname> "<args_description>" "<description>"
     // Add the new 'set ai_tool active' command
+    // Add 'export db' command
     const helpText = `Command category is automatically detected.
 Available categories: ${Object.keys(initialSuggestions).join(', ')}.
-Available internal commands: help, clear, history, define, refine, add int_cmd <short> <name> "<description>" <whatToDo>, add ai_tool <toolname> "<args_description>" "<description>", set ai_tool <name> active <0|1>, export log, pause, create sqlite <filename.db>, init, init db, list py vars, show requirements, persist memory db to <filename.db>, ai <inputtext> (use {varname} for variable substitution)
+Available internal commands: help, clear, history, define, refine, add int_cmd <short> <name> "<description>" <whatToDo>, add ai_tool <toolname> "<args_description>" "<description>", set ai_tool <name> active <0|1>, export log, export db, pause, create sqlite <filename.db>, init, init db, list py vars, show requirements, persist memory db to <filename.db>, ai <inputtext> (use {varname} for variable substitution)
 Run custom commands by typing their name.
 Note: 'mode' command is informational only.`;
     const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp: undefined }]; // Remove timestamp for non-log output

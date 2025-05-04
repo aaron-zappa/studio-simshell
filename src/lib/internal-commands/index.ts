@@ -16,6 +16,7 @@ import { handleRefine } from './handle-refine';
 import { handleAddCommand } from './handle-add-command';
 import { handleAddAiTool } from './handle-add-ai-tool'; // Import new handler
 import { handleExportLog } from './handle-export-log';
+import { handleExportDb } from './handle-export-db'; // Import new handler
 import { handlePause } from './handle-pause';
 import { handleCreateSqlite } from './handle-create-sqlite';
 import { handleShowRequirements } from './handle-show-requirements';
@@ -82,12 +83,15 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  return handleSetAiToolActive(params); // Handles setting tool active state
              }
              break; // Fall through if not the specific 'set' command
-        case 'export': // Check if it's 'export log'
+        case 'export': // Check if it's 'export log' or 'export db'
              if (commandLower === 'export log') {
-                 // Export is client-side, server handler is informational
+                 // Export log is client-side, server handler is informational
                 return handleExportLog(params);
+             } else if (commandLower === 'export db') {
+                // Export db triggers persistence with a default name
+                return handleExportDb(params);
              }
-             break; // Fall through if not 'export log'
+             break; // Fall through if not 'export log' or 'export db'
         case 'pause':
             // Pause is mostly client-side, server handler is informational
             return handlePause(params);

@@ -19,6 +19,7 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'add ai_tool <toolname> "<args_description>" "<description>"', // Corrected AI tool suggestion order
       'set ai_tool <name> active <0|1>', // Added new set command suggestion
       'export log',
+      'export db', // Added export db suggestion
       'pause',
       'create sqlite <filename.db>',
       'show requirements',
@@ -82,6 +83,10 @@ export const useSuggestions = () => {
              // Add format for list py vars
             if (mode === 'internal' && lowerCommand === 'list py vars') {
                  suggestionToAdd = 'list py vars';
+            }
+             // Add format for export db
+            if (mode === 'internal' && lowerCommand === 'export db') {
+                 suggestionToAdd = 'export db';
             }
             // Add format for ai command
             if (mode === 'internal' && lowerCommand.startsWith('ai')) {
