@@ -58,7 +58,8 @@ export default function Home() {
     setIsRunning(true);
 
     let finalCommand = commandTrimmed; // Use this variable for execution
-    let finalCommandLower = finalCommand.toLowerCase(); // Define outside try block
+    // Declare finalCommandLower outside the try block and initialize
+    let finalCommandLower: string = finalCommand.toLowerCase();
     let clipboardReadError: string | null = null;
 
     // --- Client-side Pre-processing for Clipboard ---
@@ -147,7 +148,7 @@ export default function Home() {
       }
 
       let clientHandled = false;
-      // Use finalCommand's lower case for internal checks (already defined outside try)
+      // Use finalCommandLower for internal checks (now declared outside try)
       if (category === 'internal') {
          if (finalCommandLower === 'clear') {
           setHistory([]);
