@@ -2,7 +2,7 @@
 'use server';
 
 import type { OutputLine } from '@/components/output-display';
-import * as fs from 'fs';
+import { getRequiArr } from '@/lib/logging'; // Import the function to get the requirements array
 import * as path from 'path';
 
 interface HandlerParams {
@@ -11,65 +11,39 @@ interface HandlerParams {
 }
 
 /**
- * Recursively finds all files with specified extensions in a directory.
- * @param dir - The directory to search in.
- * @param extensions - An array of file extensions to find (e.g., ['.ts', '.tsx']).
- * @param fileList - An array to accumulate the found file paths (used internally for recursion).
- * @returns An array of file paths relative to the project root.
- */
-const findFilesByExtension = (
-    dir: string,
-    extensions: string[],
-    fileList: string[] = []
-): string[] => {
-    const files = fs.readdirSync(dir);
-
-    files.forEach((file) => {
-        const filePath = path.join(dir, file);
-        const stat = fs.statSync(filePath);
-
-        if (stat.isDirectory()) {
-            // Exclude node_modules and .next directories
-            if (file !== 'node_modules' && file !== '.next') {
-                findFilesByExtension(filePath, extensions, fileList);
-            }
-        } else if (extensions.includes(path.extname(file))) {
-            // Store path relative to the project root (assuming execution from project root)
-            fileList.push(path.relative(process.cwd(), filePath));
-        }
-    });
-
-    return fileList;
-};
-
-
-/**
  * Handles the 'show requirements' command.
- * Displays all .ts and .tsx files within the 'src' directory in CSV format.
+ * Displays the structure required for log entries (from getRequiArr) in CSV format.
+ * The requi_code is prefixed with the filename where the structure is defined.
  * Ignores any arguments provided.
  */
 export const handleShowRequirements = async ({ timestamp, args }: HandlerParams): Promise<OutputLine[]> => {
     let outputText = '';
-    try {
-        const srcDir = path.join(process.cwd(), 'src');
-        const tsFiles = findFilesByExtension(srcDir, ['.ts', '.tsx']);
+    const definitionFilename = 'src/lib/logging.ts'; // Filename where LogEntry/RequiElement are defined
 
-        if (tsFiles.length === 0) {
-            outputText = 'No .ts or .tsx files found in the src directory.';
+    try {
+        const requirements = getRequiArr();
+
+        if (requirements.length === 0) {
+            outputText = 'No requirements defined.';
         } else {
              // Define CSV header
-            const header = 'filename,type';
+            const header = 'filename,requi_code,requirement';
              // Create CSV rows
-            const rows = tsFiles.map(file =>
-                // Basic CSV formatting, quoting filename if it contains commas
-                `${file.includes(',') ? `"${file}"` : file},typescript_file`
-            ).join('\n');
-            outputText = header + '\n' + rows + `\n(${tsFiles.length} files found)`;
+            const rows = requirements.map(req => {
+                // Prepend filename to requi_code
+                const formattedRequiCode = `${path.basename(definitionFilename)}:${req.requi_code}`;
+                // Basic CSV formatting, quoting fields if they contain commas
+                const filenameCsv = definitionFilename.includes(',') ? `"${definitionFilename}"` : definitionFilename;
+                const requiCodeCsv = formattedRequiCode.includes(',') ? `"${formattedRequiCode}"` : formattedRequiCode;
+                const requirementCsv = req.requirement.includes(',') ? `"${req.requirement.replace(/"/g, '""')}"` : req.requirement; // Also escape quotes within requirement
+                return `${filenameCsv},${requiCodeCsv},${requirementCsv}`;
+            }).join('\n');
+            outputText = header + '\n' + rows + `\n(${requirements.length} requirements found)`;
         }
 
     } catch (error) {
-        console.error("Error finding files for 'show requirements':", error);
-        outputText = `Error generating file list: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error("Error generating requirements CSV:", error);
+        outputText = `Error generating requirements list: ${error instanceof Error ? error.message : 'Unknown error'}`;
          return [{
             id: `req-error-${timestamp}`,
             text: outputText,
