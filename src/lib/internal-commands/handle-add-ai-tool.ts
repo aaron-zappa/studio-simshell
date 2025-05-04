@@ -21,7 +21,7 @@ interface HandlerParams {
  * Handles the 'add ai_tool' internal command.
  * Parses arguments and stores the tool's metadata (name, description, args_description)
  * in the 'ai_tools' SQLite table.
- * Syntax: add ai_tool <toolname> "<description>" "<args_description>"
+ * Syntax: add ai_tool <toolname> "<args_description>" "<description>"
  */
 export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerResult> => {
     const { command, timestamp, currentLogEntries } = params;
@@ -32,14 +32,15 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
     let outputType: 'info' | 'error' = 'info';
     let outputText = '';
 
-    // Corrected Regex for: add ai_tool <toolname> "<description>" "<args_description>"
+    // Corrected Regex for: add ai_tool <toolname> "<args_description>" "<description>"
     const addToolRegex = /^add ai_tool\s+(\S+)\s+"([^"]+)"\s+"([^"]+)"$/i;
     const match = command.match(addToolRegex);
 
     if (match && match[1] && match[2] && match[3]) {
         const toolName = match[1];
-        const toolDescription = match[2].trim(); // Correct: Description is the second quoted arg
-        const toolArgsDescription = match[3].trim(); // Correct: Args description is the third quoted arg
+        // Corrected order: Args Description is second, Description is third
+        const toolArgsDescription = match[2].trim();
+        const toolDescription = match[3].trim();
 
         const insertSql = `
             INSERT INTO ai_tools (name, description, args_description)
@@ -48,13 +49,13 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
                 description = excluded.description,
                 args_description = excluded.args_description;
         `;
-        // Ensure params match the SQL query order
+        // Ensure params match the *database column order*: name, description, args_description
         const insertParams = [toolName, toolDescription, toolArgsDescription];
 
         try {
             await runSql(insertSql, insertParams);
-            // Update feedback message to reflect correct order
-            outputText = `AI tool metadata stored/updated for: "${toolName}". Description: "${toolDescription}", Args Description: "${toolArgsDescription}"`;
+            // Update feedback message to reflect correct user input order
+            outputText = `AI tool metadata stored/updated for: "${toolName}". Args Description: "${toolArgsDescription}", Description: "${toolDescription}"`;
             outputType = 'info';
             logText = outputText;
             logType = 'I';
@@ -69,7 +70,7 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
         }
     } else {
         // Update syntax error message
-        outputText = `Error: Invalid syntax. Use: add ai_tool <toolname> "<description>" "<args_description>"`;
+        outputText = `Error: Invalid syntax. Use: add ai_tool <toolname> "<args_description>" "<description>"`;
         outputType = 'error';
         logText = outputText;
         logType = 'E';

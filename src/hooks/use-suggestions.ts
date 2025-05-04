@@ -16,7 +16,7 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'define',
       'refine',
       'add int_cmd <short> <name> "<description>" <whatToDo>', // Updated old command suggestion
-      'add ai_tool <toolname> "<description>" "<args_description>"', // Corrected AI tool suggestion order
+      'add ai_tool <toolname> "<args_description>" "<description>"', // Corrected AI tool suggestion order
       'export log',
       'pause',
       'create sqlite <filename.db>',
@@ -56,7 +56,7 @@ export const useSuggestions = () => {
             }
             // Corrected format for add_ai_tool suggestion
              if (mode === 'internal' && lowerCommand.startsWith('add ai_tool')) {
-                 suggestionToAdd = 'add ai_tool <toolname> "<description>" "<args_description>"';
+                 suggestionToAdd = 'add ai_tool <toolname> "<args_description>" "<description>"'; // Corrected order
              }
             // Add format for persist memory db to
             if (mode === 'internal' && lowerCommand.startsWith('persist memory db to')) {
