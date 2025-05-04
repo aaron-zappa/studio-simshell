@@ -7,8 +7,8 @@ import type { CustomCommands } from './use-custom-commands'; // Import CustomCom
 
 // Initial suggestions, will be mutable
 const initialSuggestionsData: Record<string, string[]> = {
-  // Updated 'add internal command' suggestion format to include <short>
-  internal: ['help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd <short> <name> "<description>" <whatToDo>', 'export log', 'pause'],
+  // Updated 'add internal command' suggestion format to include <short> and add 'create sqlite'
+  internal: ['help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd <short> <name> "<description>" <whatToDo>', 'export log', 'pause', 'create sqlite <filename.db>'],
   python: ['print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield '],
   unix: ['ls', 'cd', 'pwd', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'grep', 'echo', 'man', 'sudo'],
   windows: ['dir', 'cd', 'cls', 'mkdir', 'rmdir', 'copy', 'move', 'type', 'findstr', 'echo', 'help'],

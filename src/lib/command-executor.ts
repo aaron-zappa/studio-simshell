@@ -51,8 +51,8 @@ export const executeCommand = async ({ // Added async keyword
   if (mode === 'internal') {
     // 1. Built-in commands
     if (commandLower.startsWith('help')) {
-      // Updated help text for add_int_cmd format
-      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: ${Object.keys(initialSuggestions).join(', ')}.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
+      // Updated help text for add_int_cmd format and create sqlite
+      outputLines = [{ id: `out-${timestamp}`, text: `Available modes: ${Object.keys(initialSuggestions).join(', ')}.\nUse 'mode [mode_name]' to switch.\nAvailable internal commands: help, clear, mode, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause, create sqlite <filename.db>\nRun custom commands by typing their name.`, type: 'output', category: 'internal' }];
     } else if (commandLower === 'clear') {
       // Special case handled in handleCommandSubmit
       outputLines = [];
@@ -126,6 +126,16 @@ export const executeCommand = async ({ // Added async keyword
     } else if (commandLower === 'pause') {
         // 'pause' is handled client-side, this shouldn't be reached via normal flow
         outputLines = [{ id: `out-${timestamp}`, text: `'pause' command is handled client-side.`, type: 'info', category: 'internal' }];
+    } else if (commandLower.startsWith('create sqlite ')) {
+        const filename = args[1]; // Get the second argument (index 1)
+        if (filename && filename.endsWith('.db')) {
+            // Simulate creating the database
+            await new Promise(resolve => setTimeout(resolve, 300)); // Simulate brief delay
+            outputLines = [{ id: `out-${timestamp}`, text: `Simulated creation of SQLite database: ${filename}`, type: 'info', category: 'internal' }];
+            // TODO: In a real implementation, use a SQLite library here
+        } else {
+            outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax or filename. Use: create sqlite <filename.db>`, type: 'error', category: 'internal' }];
+        }
     }
     // 2. Custom internal commands
     else {
