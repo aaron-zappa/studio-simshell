@@ -21,8 +21,8 @@ interface HandlerParams {
 
 // Mode switching is now handled by AI classification before executeCommand is called.
 // This handler becomes informational or could be removed.
-// Update function signature to return HandlerResult
-export const handleMode = ({ args, timestamp, initialSuggestions }: HandlerParams): HandlerResult => {
+// Update function signature to return HandlerResult and make it async
+export const handleMode = async ({ args, timestamp, initialSuggestions }: HandlerParams): Promise<HandlerResult> => {
     const requestedMode = args[0] as CommandMode;
     let outputLines: OutputLine[];
 
@@ -48,3 +48,4 @@ export const handleMode = ({ args, timestamp, initialSuggestions }: HandlerParam
 function getFilename(): string {
     return 'handle-mode.ts';
 }
+

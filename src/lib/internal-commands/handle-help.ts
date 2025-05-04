@@ -18,8 +18,8 @@ interface HandlerParams {
     // Potentially add currentLogEntries if this command needs to log
 }
 
-// Update function signature to return HandlerResult
-export const handleHelp = ({ timestamp, initialSuggestions }: HandlerParams): HandlerResult => {
+// Update function signature to return HandlerResult and make it async
+export const handleHelp = async ({ timestamp, initialSuggestions }: HandlerParams): Promise<HandlerResult> => {
     // Update help text to reflect new 'add_int_cmd' format and 'create sqlite'
     const helpText = `Command category is automatically detected.
 Available categories: ${Object.keys(initialSuggestions).join(', ')}.
@@ -40,3 +40,4 @@ Note: 'mode' command is informational only.`;
 function getFilename(): string {
     return 'handle-help.ts';
 }
+

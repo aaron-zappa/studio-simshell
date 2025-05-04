@@ -16,8 +16,8 @@ interface HandlerParams {
     // Potentially add currentLogEntries if this needs to log
 }
 
-// Update function signature to return HandlerResult
-export const handleNotFound = ({ commandName, timestamp }: HandlerParams): HandlerResult => {
+// Update function signature to return HandlerResult and make it async
+export const handleNotFound = async ({ commandName, timestamp }: HandlerParams): Promise<HandlerResult> => {
     const outputLines = [{ id: `out-${timestamp}`, text: `Internal command not found: ${commandName}`, type: 'error', category: 'internal' }];
     // Return the result object (no log changes)
     return { outputLines: outputLines };
@@ -31,3 +31,4 @@ export const handleNotFound = ({ commandName, timestamp }: HandlerParams): Handl
 function getFilename(): string {
     return 'handle-not-found.ts';
 }
+

@@ -16,8 +16,8 @@ interface HandlerParams {
     // Potentially add currentLogEntries if this needs to log
 }
 
-// Update function signature to return HandlerResult
-export const handleRefine = ({ args, timestamp }: HandlerParams): HandlerResult => {
+// Update function signature to return HandlerResult and make it async
+export const handleRefine = async ({ args, timestamp }: HandlerParams): Promise<HandlerResult> => {
     // TODO: Implement refine functionality
     const outputLines = [{ id: `out-${timestamp}`, text: `Refine command placeholder for: ${args.join(' ')}`, type: 'output', category: 'internal' }];
     // Return the result object (no log changes)
@@ -32,3 +32,4 @@ export const handleRefine = ({ args, timestamp }: HandlerParams): HandlerResult 
 function getFilename(): string {
     return 'handle-refine.ts';
 }
+

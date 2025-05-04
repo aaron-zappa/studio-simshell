@@ -65,14 +65,22 @@ export const useSuggestions = () => {
         return Array.from(allSugs).sort(); // Return sorted array of unique suggestions
     }, [suggestions]);
 
-    /**
-     * Returns the name of the current file.
-     * @returns The filename.
-     */
-     export function getFilename(): string {
-         return 'use-suggestions.ts';
-     }
+    // This function was incorrectly placed and exported from within the hook.
+    // Removed as it causes a parsing error and is not usable outside the hook.
+    // /**
+    //  * Returns the name of the current file.
+    //  * @returns The filename.
+    //  */
+    // function getFilename(): string {
+    //     return 'use-suggestions.ts';
+    // }
 
 
     return { suggestions, addSuggestion, getAllSuggestions, initialSuggestions }; // Export getAllSuggestions
 };
+
+// Add getFilename at the module level if needed, but ensure it's not within the hook.
+// However, for hooks, this pattern might not be standard. Let's omit it for now.
+// export function getFilename(): string {
+//     return 'use-suggestions.ts';
+// }

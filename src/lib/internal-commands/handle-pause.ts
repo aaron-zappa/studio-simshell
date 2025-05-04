@@ -15,8 +15,8 @@ interface HandlerParams {
     // Potentially add currentLogEntries if this needs to log
 }
 
-// Update function signature to return HandlerResult
-export const handlePause = ({ timestamp }: HandlerParams): HandlerResult => {
+// Update function signature to return HandlerResult and make it async
+export const handlePause = async ({ timestamp }: HandlerParams): Promise<HandlerResult> => {
     // 'pause' logic is primarily client-side to interact with the running state.
     // This server-side handler might provide confirmation if needed, but the core stop logic is client-side.
     const outputLines = [{ id: `out-${timestamp}`, text: `'pause' command acknowledged server-side (actual stop is client-side).`, type: 'info', category: 'internal' }];
@@ -32,3 +32,4 @@ export const handlePause = ({ timestamp }: HandlerParams): HandlerResult => {
 function getFilename(): string {
     return 'handle-pause.ts';
 }
+

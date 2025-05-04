@@ -15,8 +15,8 @@ interface HandlerParams {
     // Potentially add currentLogEntries if this command needs to log or access history logs
 }
 
-// Update function signature to return HandlerResult
-export const handleHistory = ({ timestamp }: HandlerParams): HandlerResult => {
+// Update function signature to return HandlerResult and make it async
+export const handleHistory = async ({ timestamp }: HandlerParams): Promise<HandlerResult> => {
     // TODO: Implement fetching history from SQLite database if needed
     const outputLines = [{ id: `out-${timestamp}`, text: 'History command placeholder (currently only shows command history in output).', type: 'output', category: 'internal' }];
     // Return the result object (no log changes in this handler)
@@ -31,3 +31,4 @@ export const handleHistory = ({ timestamp }: HandlerParams): HandlerResult => {
 function getFilename(): string {
     return 'handle-history.ts';
 }
+
