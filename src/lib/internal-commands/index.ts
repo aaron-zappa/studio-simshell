@@ -56,6 +56,17 @@ interface HandlerResult {
 export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<HandlerResult> => {
     const { commandName, commandLower, args, getCustomCommandAction } = params; // Destructure args
 
+    // Experimental @bat command handling
+    if (commandName.startsWith('@bat:')) {
+        // TODO: Implement actual script execution logic here
+        console.warn("Experimental @bat command received, but execution is not yet implemented.");
+        return {
+            outputLines: [{ id: `bat-warn-${params.timestamp}`, text: `Experimental command @bat: not yet implemented.`, type: 'warning', category: 'internal', timestamp: params.timestamp }],
+            newLogEntries: [...params.currentLogEntries, { timestamp: params.timestamp, type: 'W', text: `Experimental @bat command not implemented: ${params.command}` }]
+        };
+    }
+
+
     // 1. Built-in commands (prioritized)
     switch (commandName) {
         case 'help':
@@ -143,6 +154,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
     return handleNotFound(params); // This now returns HandlerResult
 };
 
+async function executeScriptFile(): Promise<HandlerResult> {
+    return {
+        outputLines: [], newLogEntries: []
+    };
+}
 /**
  * Returns the name of the current file.
  * This function is not exported to avoid being treated as a Server Action.
