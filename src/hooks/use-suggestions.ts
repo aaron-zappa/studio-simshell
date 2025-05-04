@@ -1,4 +1,5 @@
 // src/hooks/use-suggestions.ts
+// src/hooks/use-suggestions.ts
 'use client';
 
 import * as React from 'react';
@@ -28,7 +29,7 @@ export const useSuggestions = () => {
             const lowerCommand = command.toLowerCase();
             let suggestionToAdd = lowerCommand;
 
-            // Special format for add_int_cmd suggestion itself
+            // Special format for add_int_cmd suggestion itself - adjust if needed
             if (mode === 'internal' && lowerCommand.startsWith('add_int_cmd')) {
                 suggestionToAdd = 'add_int_cmd <short> <name> "<description>" <whatToDo>';
             }
@@ -55,7 +56,7 @@ export const useSuggestions = () => {
         // Add custom internal command names
         Object.keys(customInternalCommands).forEach(cmdName => {
              // Ensure we add the actual command name, not a placeholder format
-             if (!cmdName.startsWith('add_int_cmd <short>')) {
+             if (!cmdName.startsWith('add_int_cmd <short>')) { // Adjust if needed based on how custom commands are stored/added
                 allSugs.add(cmdName);
              }
         });
@@ -63,6 +64,14 @@ export const useSuggestions = () => {
 
         return Array.from(allSugs).sort(); // Return sorted array of unique suggestions
     }, [suggestions]);
+
+    /**
+     * Returns the name of the current file.
+     * @returns The filename.
+     */
+     export function getFilename(): string {
+         return 'use-suggestions.ts';
+     }
 
 
     return { suggestions, addSuggestion, getAllSuggestions, initialSuggestions }; // Export getAllSuggestions

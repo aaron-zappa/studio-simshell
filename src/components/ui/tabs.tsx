@@ -1,3 +1,4 @@
+// src/components/ui/tabs.tsx
 "use client"
 
 import * as React from "react"
@@ -51,5 +52,13 @@ const TabsContent = React.forwardRef<
   />
 ))
 TabsContent.displayName = TabsPrimitive.Content.displayName
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'tabs.tsx';
+}
 
 export { Tabs, TabsList, TabsTrigger, TabsContent }

@@ -1,3 +1,4 @@
+// src/components/ui/dropdown-menu.tsx
 "use client"
 
 import * as React from "react"
@@ -180,6 +181,14 @@ const DropdownMenuShortcut = ({
   )
 }
 DropdownMenuShortcut.displayName = "DropdownMenuShortcut"
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'dropdown-menu.tsx';
+}
 
 export {
   DropdownMenu,

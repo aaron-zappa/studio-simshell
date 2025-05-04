@@ -1,3 +1,4 @@
+// src/components/ui/input.tsx
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -18,5 +19,13 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   }
 )
 Input.displayName = "Input"
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'input.tsx';
+}
 
 export { Input }

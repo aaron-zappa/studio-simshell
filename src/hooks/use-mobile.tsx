@@ -1,3 +1,4 @@
+// src/hooks/use-mobile.tsx
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
@@ -17,3 +18,11 @@ export function useIsMobile() {
 
   return !!isMobile
 }
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+ export function getFilename(): string {
+     return 'use-mobile.tsx';
+ }

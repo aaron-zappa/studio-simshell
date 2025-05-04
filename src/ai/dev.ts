@@ -1,4 +1,5 @@
 // src/ai/dev.ts
+// src/ai/dev.ts
 import type {Flow} from 'genkit';
 
 // Array to hold flows for registration in ai-instance or elsewhere
@@ -10,3 +11,12 @@ import './flows/classify-command-flow';
 
 // Add imports for other flows here as they are created
 // e.g., import './flows/another-flow';
+
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'dev.ts';
+}

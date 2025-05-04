@@ -1,4 +1,5 @@
 // src/lib/database.ts
+// src/lib/database.ts
 'use server';
 
 import Database from 'better-sqlite3';
@@ -37,7 +38,7 @@ function getDb(): DB {
 
 /**
  * Executes a SQL query against the in-memory database.
- * Note: better-sqlite3 is synchronous, but marked async to satisfy Next.js build.
+ * Marked async as it's used within Server Actions, although better-sqlite3 is synchronous.
  * @param sql The SQL query string to execute.
  * @param params Optional parameters for the SQL query.
  * @returns An object containing the results (for SELECT) or changes info (for others).
@@ -73,6 +74,15 @@ export async function runSql(sql: string, params: any[] = []): Promise<{ results
     }
     throw new Error('An unknown SQL error occurred.');
   }
+}
+
+/**
+ * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
+ * @returns The filename.
+ */
+function getFilename(): string {
+    return 'database.ts';
 }
 
 // formatResultsAsTable moved to src/lib/formatting.ts

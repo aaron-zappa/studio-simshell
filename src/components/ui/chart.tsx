@@ -1,3 +1,4 @@
+// src/components/ui/chart.tsx
 "use client"
 
 import * as React from "react"
@@ -353,6 +354,14 @@ function getPayloadConfigFromPayload(
   return configLabelKey in config
     ? config[configLabelKey]
     : config[key as keyof typeof config]
+}
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'chart.tsx';
 }
 
 export {

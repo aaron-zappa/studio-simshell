@@ -1,3 +1,4 @@
+// src/components/ui/label.tsx
 "use client"
 
 import * as React from "react"
@@ -22,5 +23,13 @@ const Label = React.forwardRef<
   />
 ))
 Label.displayName = LabelPrimitive.Root.displayName
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'label.tsx';
+}
 
 export { Label }

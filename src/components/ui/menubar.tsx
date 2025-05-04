@@ -1,3 +1,4 @@
+// src/components/ui/menubar.tsx
 "use client"
 
 import * as React from "react"
@@ -235,6 +236,14 @@ const MenubarShortcut = ({
   )
 }
 MenubarShortcut.displayname = "MenubarShortcut"
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'menubar.tsx';
+}
 
 export {
   Menubar,

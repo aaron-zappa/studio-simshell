@@ -1,12 +1,11 @@
+// src/app/page.tsx
+// src/app/page.tsx
 "use client";
 
 import * as React from 'react';
 import { CommandInput } from '@/components/command-input';
 import { OutputDisplay, type OutputLine } from '@/components/output-display';
 import { Separator } from "@/components/ui/separator";
-// Checkbox and Label are removed as mode selection is gone
-// import { Checkbox } from "@/components/ui/checkbox";
-// import { Label } from "@/components/ui/label";
 import { useCustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions';
 import { executeCommand } from '@/lib/command-executor';
@@ -17,7 +16,7 @@ import { useToast } from "@/hooks/use-toast"; // Import toast
 
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
-  // const [currentMode, setCurrentMode] = React.useState<CommandMode>('internal'); // Removed mode state
+  // Store log entries in state to pass to export function
   const [logEntries, setLogEntries] = React.useState<LogEntry[]>([]);
   const [isRunning, setIsRunning] = React.useState<boolean>(false);
   const { toast } = useToast(); // Toast hook for notifications
@@ -76,62 +75,54 @@ export default function Home() {
           if (exportResult) {
             setHistory((prev) => [...prev, cmdOut, exportResult]);
           } else {
-            const noLogOutput: OutputLine = {
-              id: `log-export-empty-${timestamp}`,
-              text: 'No log entries to export.',
-              type: 'info',
-              category: 'internal'
-            };
-            setHistory((prev) => [...prev, cmdOut, noLogOutput]);
+             // exportLogFile handles the "no log" case internally now
+            console.error("exportLogFile returned null unexpectedly when log should exist"); // Should not happen
+             const errOut: OutputLine = { id: `log-export-err-${timestamp}`, text: 'Error during log export.', type: 'error', category: 'internal' };
+            setHistory((prev) => [...prev, cmdOut, errOut]);
           }
           clientHandled = true;
         } else if (commandLower === 'pause') {
            const cmdOut: OutputLine = { ...commandOutputBase, id: `cmd-${timestamp}`, text: command, category: 'internal' };
-           let pauseOutput: OutputLine;
-           // Check some *client-side* indicator if a task is conceptually running
-           // For now, just acknowledge. Proper cancellation needs more state/logic.
-           pauseOutput = {
+           const pauseOutput: OutputLine = {
              id: `pause-${timestamp}`,
-             text: 'task stopped', // Changed feedback message
+             text: 'task stopped', // Updated feedback message
              type: 'info',
              category: 'internal',
            };
            setHistory((prev) => [...prev, cmdOut, pauseOutput]);
-           // Consider if 'pause' should actually stop a server action in progress (needs AbortController etc.)
+           // Assume 'pause' stops things immediately client-side
+           setIsRunning(false);
            clientHandled = true;
-           setIsRunning(false); // Assuming pause stops things immediately
         }
       }
 
       if (clientHandled) {
-        if (commandLower !== 'pause') setIsRunning(false); // Reset running state if handled unless it was pause
+         if (commandLower !== 'pause') { // Only reset if not pause
+            // No explicit state change needed if already set to false by pause logic
+         }
         return; // Stop further processing if handled client-side
       }
 
       // --- Server-Side Command Execution ---
       // If not handled client-side, execute via Server Action, passing the determined category
-      output = await executeCommand({
+      // Critical Change: We now update logEntries state based on the result from executeCommand
+      const { outputLines, newLogEntries } = await executeCommand({
         command,
         mode: category as CommandMode, // Pass the classified category as the mode
         addSuggestion,
         addCustomCommand,
         getCustomCommandAction,
-        logEntries,
-        setLogEntries, // Still passing, but aware of limitations
+        currentLogEntries: logEntries, // Pass current log entries
         initialSuggestions
       });
 
-      // Add classification info to history (optional)
-      // const classificationOutput: OutputLine = {
-      //    id: `classify-${timestamp}`,
-      //    text: `Classified as: ${category}${classificationReasoning ? ` (${classificationReasoning})` : ''}`,
-      //    type: 'info',
-      //    category: 'internal',
-      // };
-      // setHistory((prev) => [...prev, classificationOutput, ...output]);
+      // Update local logEntries state if the server action modified them
+       if (newLogEntries) {
+          setLogEntries(newLogEntries);
+       }
 
        // Update history with just the command output
-       setHistory((prev) => [...prev, ...output]);
+       setHistory((prev) => [...prev, ...outputLines]);
 
 
     } catch (error) {
@@ -165,8 +156,6 @@ export default function Home() {
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
        <header className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <h1 className="text-2xl font-semibold">SimuShell</h1>
-         {/* Mode selection Checkboxes removed */}
-         {/* <div className="flex items-center space-x-4"> ... </div> */}
       </header>
 
       <Separator className="mb-4" />
@@ -181,10 +170,17 @@ export default function Home() {
         <CommandInput
             onSubmit={handleCommandSubmit}
             suggestions={allCurrentSuggestions} // Provide all suggestions
-            // currentMode is removed as prop
             disabled={isRunning}
          />
       </footer>
     </div>
   );
+}
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'page.tsx';
 }

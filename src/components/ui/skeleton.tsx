@@ -1,3 +1,4 @@
+// src/components/ui/skeleton.tsx
 import { cn } from "@/lib/utils"
 
 function Skeleton({
@@ -10,6 +11,14 @@ function Skeleton({
       {...props}
     />
   )
+}
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'skeleton.tsx';
 }
 
 export { Skeleton }

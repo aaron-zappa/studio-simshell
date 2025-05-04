@@ -1,4 +1,5 @@
 // src/hooks/use-toast.ts
+// src/hooks/use-toast.ts
 "use client"
 
 // Inspired by react-hot-toast library
@@ -185,10 +186,19 @@ function useToast() {
     }
   }, [state])
 
+  /**
+   * Returns the name of the current file.
+   * @returns The filename.
+   */
+   function getFilename(): string {
+       return 'use-toast.ts';
+   }
+
   return {
     ...state,
     toast,
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    getFilename, // Exporting the function
   }
 }
 

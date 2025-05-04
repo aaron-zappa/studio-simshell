@@ -1,4 +1,6 @@
 // src/lib/formatting.ts
+// src/lib/formatting.ts
+'use server';
 /**
  * Formats database results (array of objects) into a simple text table.
  * This is a synchronous utility function.
@@ -41,4 +43,13 @@ export function formatResultsAsTable(results: any[]): string | null {
     });
 
     return [headerLine, separatorLine, ...dataLines, `(${results.length} row${results.length === 1 ? '' : 's'})`].join('\n');
+}
+
+/**
+ * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
+ * @returns The filename.
+ */
+function getFilename(): string {
+    return 'formatting.ts';
 }

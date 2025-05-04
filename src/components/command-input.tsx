@@ -1,3 +1,5 @@
+// src/components/command-input.tsx
+// src/components/command-input.tsx
 "use client";
 
 import * as React from "react";
@@ -7,17 +9,14 @@ import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover"
 import { Command as CommandPrimitive, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command"; // Use ShadCN Command
 import { cn } from "@/lib/utils";
 import { Terminal } from 'lucide-react';
-// type CommandMode removed as import
 
 interface CommandInputProps {
   onSubmit: (command: string) => void;
   suggestions: string[]; // List of possible commands/subcommands from potentially all modes
-  // currentMode?: CommandMode; // Removed currentMode prop
   className?: string;
   disabled?: boolean;
 }
 
-// Removed currentMode from props destructuring
 export function CommandInput({ onSubmit, suggestions, className, disabled = false }: CommandInputProps) {
   const [inputValue, setInputValue] = React.useState("");
   const [filteredSuggestions, setFilteredSuggestions] = React.useState<string[]>([]);
@@ -76,12 +75,9 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
     }
   };
 
-  // Removed getModeDisplay function
 
   return (
     <div className={cn("flex items-center space-x-2", className)}>
-       {/* Removed mode display span */}
-       {/* <span className="text-muted-foreground font-mono text-sm shrink-0">{getModeDisplay()} $</span> */}
        <span className="text-muted-foreground font-mono text-sm shrink-0">$</span> {/* Default prompt */}
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverAnchor asChild>
@@ -121,7 +117,6 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
                     className="cursor-pointer font-mono"
                     data-disabled={disabled}
                   >
-                    {/* Removed mode-specific display logic for suggestions */}
                     {suggestion}
                   </CommandItem>
                 ))}
@@ -135,4 +130,12 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
       </Button>
     </div>
   );
+}
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'command-input.tsx';
 }

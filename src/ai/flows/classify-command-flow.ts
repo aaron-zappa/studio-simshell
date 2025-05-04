@@ -1,4 +1,5 @@
 // src/ai/flows/classify-command-flow.ts
+// src/ai/flows/classify-command-flow.ts
 'use server';
 /**
  * @fileOverview A Genkit flow to classify user commands.
@@ -84,16 +85,21 @@ const classifyCommandFlow = ai.defineFlow<
     const commandPrefix = commandLower.split(' ')[0] + (commandLower.includes(' ') ? ' ' : ''); // e.g. 'show ' or 'help'
 
     // Check if the command *exactly* matches or *starts with* a known internal command prefix
-    if (internalCommands.some(intCmd => {
+    // Updated add_int_cmd check
+     if (internalCommands.some(intCmd => {
         const cmdPrefix = intCmd.includes(' ') ? intCmd.split(' ')[0] + ' ' : intCmd;
-        return commandLower === intCmd || (intCmd.includes(' ') && commandPrefix === cmdPrefix);
+        const isMatch = commandLower === intCmd || (intCmd.includes(' ') && commandPrefix === cmdPrefix);
+        // Special check for add_int_cmd which requires arguments
+        if (intCmd === 'add_int_cmd') {
+            return commandPrefix === 'add_int_cmd ';
+        }
+        return isMatch;
     })) {
         return { category: 'internal' };
     }
-    // Add more specific checks if needed, e.g., for custom commands if provided in input
 
     // If not a clear internal command, proceed with AI classification
-    const {output} = await classifyPrompt(input);
+    const {output} = await prompt(input);
 
     // Basic validation or refinement can happen here if needed
     if (!output) {
@@ -113,3 +119,12 @@ const classifyCommandFlow = ai.defineFlow<
 // Add the flow to the dev registry
 import {flows} from '@/ai/dev';
 flows.push(classifyCommandFlow);
+
+/**
+ * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
+ * @returns The filename.
+ */
+function getFilename(): string {
+    return 'classify-command-flow.ts';
+}

@@ -1,3 +1,4 @@
+// src/components/ui/form.tsx
 "use client"
 
 import * as React from "react"
@@ -165,6 +166,14 @@ const FormMessage = React.forwardRef<
   )
 })
 FormMessage.displayName = "FormMessage"
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'form.tsx';
+}
 
 export {
   useFormField,

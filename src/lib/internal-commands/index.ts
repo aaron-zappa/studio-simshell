@@ -1,4 +1,5 @@
 // src/lib/internal-commands/index.ts
+// src/lib/internal-commands/index.ts
 'use server';
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
@@ -26,19 +27,26 @@ interface InternalCommandHandlerParams {
     commandName: string;
     args: string[];
     timestamp: string;
-    addSuggestion: (mode: CommandMode, command: string) => void;
-    addCustomCommand: (name: string, action: CustomCommandAction) => void;
-    getCustomCommandAction: (name: string) => CustomCommandAction | undefined;
-    logEntries: LogEntry[];
-    setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>;
+    addSuggestion: (mode: CommandMode, command: string) => void; // Client-side, problematic
+    addCustomCommand: (name: string, action: CustomCommandAction) => void; // Client-side, problematic
+    getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Client-side, problematic
+    currentLogEntries: LogEntry[]; // Pass current logs
     initialSuggestions: Record<string, string[]>;
 }
 
+// Define the structure for the return value, including potential log updates
+interface HandlerResult {
+    outputLines: OutputLine[];
+    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified
+}
+
+
 /**
  * Central dispatcher for handling internal commands.
+ * Now returns a HandlerResult object.
  */
-export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<OutputLine[]> => {
-    const { commandName, commandLower, initialSuggestions, getCustomCommandAction, timestamp } = params;
+export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<HandlerResult> => {
+    const { commandName, commandLower, getCustomCommandAction } = params;
 
     // 1. Built-in commands (prioritized)
     switch (commandName) {
@@ -46,7 +54,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleHelp(params);
         case 'clear':
             // Special case handled entirely client-side in handleCommandSubmit
-            return [];
+            return { outputLines: [] }; // Return empty result
         case 'mode':
             return handleMode(params);
         case 'history':
@@ -56,32 +64,45 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         case 'refine':
             return handleRefine(params);
         case 'add_int_cmd':
-             return handleAddCommand(params);
+             return handleAddCommand(params); // This now returns HandlerResult
         case 'export': // Check if it's 'export log'
              if (commandLower === 'export log') {
+                 // Export is client-side, server handler is informational
                 return handleExportLog(params);
              }
              break; // Fall through if not 'export log'
         case 'pause':
+            // Pause is mostly client-side, server handler is informational
             return handlePause(params);
         case 'create': // Check if it's 'create sqlite'
             if (commandLower.startsWith('create sqlite')) {
-                return await handleCreateSqlite(params);
+                 const outputLines = await handleCreateSqlite(params);
+                 return { outputLines }; // Wrap in HandlerResult
             }
             break; // Fall through if not 'create sqlite'
         case 'show': // Check if it's 'show requirements'
             if (commandLower.startsWith('show requirements')) {
-                 return await handleShowRequirements(params); // Added await
+                 return await handleShowRequirements(params); // This now returns HandlerResult
             }
             break; // Fall through if not 'show requirements'
     }
 
     // 2. Custom internal commands
-    const customAction = getCustomCommandAction(commandName);
+    const customAction = getCustomCommandAction(params.commandName);
     if (customAction !== undefined) {
-        return await handleCustomCommand(params, customAction); // Added await
+        // handleCustomCommand now returns HandlerResult
+        return await handleCustomCommand(params, customAction);
     }
 
     // 3. Command not found
-    return handleNotFound(params);
+    return handleNotFound(params); // This now returns HandlerResult
 };
+
+/**
+ * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
+ * @returns The filename.
+ */
+function getFilename(): string {
+    return 'index.ts';
+}

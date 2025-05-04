@@ -1,13 +1,22 @@
 // src/lib/internal-commands/handle-show-requirements.ts
+// src/lib/internal-commands/handle-show-requirements.ts
 'use server';
 
 import type { OutputLine } from '@/components/output-display';
-import { getRequiArr } from '@/lib/logging'; // Import the function to get the requirements array
+import { getRequiArr, type LogEntry, type RequiElement } from '@/lib/logging'; // Import necessary types/functions
 import * as path from 'path';
+
+// Define the structure for the return value, including potential log updates
+interface HandlerResult {
+    outputLines: OutputLine[];
+    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (not applicable here)
+}
+
 
 interface HandlerParams {
     args: string[];
     timestamp: string;
+    // Potentially add currentLogEntries if needed
 }
 
 /**
@@ -16,12 +25,14 @@ interface HandlerParams {
  * The requi_code is prefixed with the filename where the structure is defined.
  * Ignores any arguments provided.
  */
-export const handleShowRequirements = async ({ timestamp, args }: HandlerParams): Promise<OutputLine[]> => {
+// Update function signature to return HandlerResult
+export const handleShowRequirements = async ({ timestamp, args }: HandlerParams): Promise<HandlerResult> => {
     let outputText = '';
+    let outputType: OutputLine['type'] = 'output';
     const definitionFilename = 'src/lib/logging.ts'; // Filename where LogEntry/RequiElement are defined
 
     try {
-        const requirements = getRequiArr();
+        const requirements: RequiElement[] = getRequiArr();
 
         if (requirements.length === 0) {
             outputText = 'No requirements defined.';
@@ -30,26 +41,25 @@ export const handleShowRequirements = async ({ timestamp, args }: HandlerParams)
             const header = 'filename,requi_code,requirement';
              // Create CSV rows
             const rows = requirements.map(req => {
-                // Prepend filename to requi_code
-                const formattedRequiCode = `${path.basename(definitionFilename)}:${req.requi_code}`;
-                // Basic CSV formatting, quoting fields if they contain commas
+                 // Prepend filename basename to requi_code
+                 const baseFilename = path.basename(definitionFilename);
+                 const formattedRequiCode = `${baseFilename}:${req.requi_code}`;
+
+                // Basic CSV formatting, quoting fields if they contain commas or quotes
                 const filenameCsv = definitionFilename.includes(',') ? `"${definitionFilename}"` : definitionFilename;
                 const requiCodeCsv = formattedRequiCode.includes(',') ? `"${formattedRequiCode}"` : formattedRequiCode;
-                const requirementCsv = req.requirement.includes(',') ? `"${req.requirement.replace(/"/g, '""')}"` : req.requirement; // Also escape quotes within requirement
+                const requirementCsv = req.requirement.includes(',') || req.requirement.includes('"')
+                    ? `"${req.requirement.replace(/"/g, '""')}"`
+                    : req.requirement;
                 return `${filenameCsv},${requiCodeCsv},${requirementCsv}`;
             }).join('\n');
-            outputText = header + '\n' + rows + `\n(${requirements.length} requirements found)`;
+            outputText = header + '\n' + rows + `\n(${requirements.length} requirement${requirements.length === 1 ? '' : 's'} found)`;
         }
 
     } catch (error) {
         console.error("Error generating requirements CSV:", error);
         outputText = `Error generating requirements list: ${error instanceof Error ? error.message : 'Unknown error'}`;
-         return [{
-            id: `req-error-${timestamp}`,
-            text: outputText,
-            type: 'error',
-            category: 'internal'
-        }];
+        outputType = 'error';
     }
 
     // TODO: Handle arguments if needed (e.g., filtering)
@@ -57,10 +67,22 @@ export const handleShowRequirements = async ({ timestamp, args }: HandlerParams)
         console.warn("'show requirements' currently ignores arguments:", args);
     }
 
-    return [{
-        id: `req-output-${timestamp}`,
+     const outputLines: OutputLine[] = [{
+        id: `req-${outputType}-${timestamp}`,
         text: outputText,
-        type: 'output',
+        type: outputType,
         category: 'internal'
     }];
+
+    // Return the result object (no log changes)
+    return { outputLines: outputLines };
 };
+
+/**
+ * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
+ * @returns The filename.
+ */
+function getFilename(): string {
+    return 'handle-show-requirements.ts';
+}

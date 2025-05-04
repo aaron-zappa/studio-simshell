@@ -1,3 +1,4 @@
+// src/components/ui/alert.tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -55,5 +56,13 @@ const AlertDescription = React.forwardRef<
   />
 ))
 AlertDescription.displayName = "AlertDescription"
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'alert.tsx';
+}
 
 export { Alert, AlertTitle, AlertDescription }

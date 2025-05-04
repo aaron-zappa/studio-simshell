@@ -1,4 +1,5 @@
 // src/lib/command-executor.ts
+// src/lib/command-executor.ts
 'use server';
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
@@ -12,12 +13,17 @@ import { handleInternalCommand } from '@/lib/internal-commands'; // Import the c
 interface ExecuteCommandParams {
   command: string;
   mode: CommandMode; // This is now the *classified category* passed from the client
-  addSuggestion: (mode: CommandMode, command: string) => void;
-  addCustomCommand: (name: string, action: CustomCommandAction) => void;
-  getCustomCommandAction: (name: string) => CustomCommandAction | undefined;
-  logEntries: LogEntry[];
-  setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>; // Still problematic, needs refactor
-  initialSuggestions: Record<string, string[]>;
+  addSuggestion: (mode: CommandMode, command: string) => void; // Potentially problematic in Server Action
+  addCustomCommand: (name: string, action: CustomCommandAction) => void; // Potentially problematic in Server Action
+  getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Potentially problematic in Server Action
+  currentLogEntries: LogEntry[]; // Pass current logs for modification
+  initialSuggestions: Record<string, string[]>; // Passed for 'help' and validation
+}
+
+// Define the return type to include potentially updated log entries
+interface ExecuteCommandResult {
+  outputLines: OutputLine[];
+  newLogEntries?: LogEntry[]; // Include new log entries if they were modified
 }
 
 /**
@@ -25,16 +31,15 @@ interface ExecuteCommandParams {
  * Delegates internal command handling to a separate module.
  * This is intended to be used as a Server Action.
  */
-export const executeCommand = async ({
+export async function executeCommand ({
     command,
     mode, // mode is the classified category
     addSuggestion,
     addCustomCommand,
     getCustomCommandAction,
-    logEntries,
-    setLogEntries,
+    currentLogEntries, // Receive current logs
     initialSuggestions
-}: ExecuteCommandParams): Promise<OutputLine[]> => {
+}: ExecuteCommandParams): Promise<ExecuteCommandResult> { // Return the result object
   const timestamp = new Date().toISOString();
   const commandLower = command.toLowerCase().trim();
   const commandName = commandLower.split(' ')[0];
@@ -48,26 +53,30 @@ export const executeCommand = async ({
   };
 
   let outputLines: OutputLine[] = [];
+  let potentiallyUpdatedLogs: LogEntry[] | undefined = undefined; // Track log changes
 
   // --- Dispatch based on Classified Mode ---
   if (mode === 'internal') {
     // Internal commands are handled by a dedicated module
-     outputLines = await handleInternalCommand({
+    // It now returns an object including potential log updates
+     const internalResult = await handleInternalCommand({
         command,
         commandLower,
         commandName,
         args: command.split(' ').slice(1),
         timestamp,
-        addSuggestion,
-        addCustomCommand,
-        getCustomCommandAction,
-        logEntries,
-        setLogEntries, // Problematic state passing
-        initialSuggestions
+        // Functions like addSuggestion/addCustomCommand/getCustomCommandAction are tricky in Server Actions
+        // as they often rely on client-side state. Passing them is generally not recommended
+        // unless they are adapted to work server-side (e.g., modifying a database).
+        // For now, we pass them but acknowledge this limitation.
+        addSuggestion: addSuggestion, // PROBLEM: Modifies client state
+        addCustomCommand: addCustomCommand, // PROBLEM: Modifies client state
+        getCustomCommandAction: getCustomCommandAction, // PROBLEM: Reads client state
+        currentLogEntries: currentLogEntries, // Pass current logs
+        initialSuggestions: initialSuggestions
     });
-     // Note: 'mode' command logic within handleInternalCommand might need adjustment
-     // as mode switching is no longer directly user-controlled via 'mode x' cmd.
-     // It might become informational or be removed.
+     outputLines = internalResult.outputLines;
+     potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
   }
   else if (mode === 'python') {
      // Simulate potential delay
@@ -149,6 +158,18 @@ export const executeCommand = async ({
    }
 
 
-  // Return the command itself followed by any output lines
-  return [commandOutput, ...outputLines];
+  // Return the result object
+  return {
+    outputLines: [commandOutput, ...outputLines],
+    newLogEntries: potentiallyUpdatedLogs, // Return updated logs if they changed
+  };
 };
+
+/**
+ * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
+ * @returns The filename.
+ */
+function getFilename(): string {
+    return 'command-executor.ts';
+}

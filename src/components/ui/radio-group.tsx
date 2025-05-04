@@ -1,3 +1,4 @@
+// src/components/ui/radio-group.tsx
 "use client"
 
 import * as React from "react"
@@ -40,5 +41,13 @@ const RadioGroupItem = React.forwardRef<
   )
 })
 RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'radio-group.tsx';
+}
 
 export { RadioGroup, RadioGroupItem }

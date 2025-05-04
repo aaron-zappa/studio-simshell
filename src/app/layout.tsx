@@ -1,3 +1,5 @@
+// src/app/layout.tsx
+// src/app/layout.tsx
 import type {Metadata} from 'next';
 import { Inter } from "next/font/google"; // Using Inter as a fallback example if needed, but Geist is primary
 import { Geist, Geist_Mono } from "next/font/google";
@@ -39,4 +41,12 @@ export default function RootLayout({
       </body>
     </html>
   );
+}
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'layout.tsx';
 }

@@ -1,4 +1,5 @@
-
+// src/components/output-display.tsx
+// src/components/output-display.tsx
 "use client";
 
 import * as React from 'react';
@@ -70,4 +71,13 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
     </Card>
   );
 }
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'output-display.tsx';
+}
+
 

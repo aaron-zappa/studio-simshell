@@ -1,3 +1,4 @@
+// src/components/ui/table.tsx
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -104,6 +105,14 @@ const TableCaption = React.forwardRef<
   />
 ))
 TableCaption.displayName = "TableCaption"
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'table.tsx';
+}
 
 export {
   Table,

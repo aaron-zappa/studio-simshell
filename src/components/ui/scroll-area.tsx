@@ -1,3 +1,4 @@
+// src/components/ui/scroll-area.tsx
 "use client"
 
 import * as React from "react"
@@ -44,5 +45,13 @@ const ScrollBar = React.forwardRef<
   </ScrollAreaPrimitive.ScrollAreaScrollbar>
 ))
 ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName
+
+/**
+ * Returns the name of the current file.
+ * @returns The filename.
+ */
+export function getFilename(): string {
+    return 'scroll-area.tsx';
+}
 
 export { ScrollArea, ScrollBar }

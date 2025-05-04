@@ -1,8 +1,11 @@
 // src/lib/logging.ts
+// src/lib/logging.ts
 'use client';
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display'; // Import OutputLine
+import * as path from 'path'; // Import path for basename
+
 
 /**
  * Represents a single log entry for a command addition.
@@ -16,7 +19,7 @@ export type LogEntry = {
 };
 
 // Define the structure for the requirement array elements
-interface RequiElement {
+export interface RequiElement { // Exporting for use in handle-show-requirements.ts
   requi_code: keyof LogEntry; // Use keys of LogEntry for type safety
   requirement: string;
 }
@@ -35,21 +38,30 @@ const requiArr: RequiElement[] = [
  * @returns An array of objects, each with 'requi_code' and 'requirement'.
  */
 export function getRequiArr(): RequiElement[] {
+  // We don't modify requi_code here; modification happens in handleShowRequirements
   return requiArr;
 }
 
 
 /**
  * Appends a new log entry to the log state.
- * This should ideally be replaced with a proper logging mechanism (e.g., database call)
- * when used within Server Actions to avoid direct state manipulation issues.
+ * WARNING: This function signature relying on React state setters is problematic
+ * within Server Actions. It's kept for conceptual demonstration but needs refactoring
+ * for a robust server-side logging mechanism (e.g., database write).
  * @param entry - The log entry to add.
  * @param setLogEntries - The React state setter function for log entries.
  */
 export const addLogEntry = (entry: LogEntry, setLogEntries: React.Dispatch<React.SetStateAction<LogEntry[]>>) => {
-  // Warning: Directly modifying client state from a server action context like this is problematic.
-  // Consider returning the log entry or using a dedicated logging service/database call.
-  setLogEntries((prev) => [...prev, entry]);
+  // This approach is flawed in Server Actions.
+  // A server action should typically return data or status, not directly call client state setters.
+  console.warn("Calling addLogEntry with setLogEntries directly in a Server Action context is not recommended practice.");
+  // To maintain functionality for now, we call the setter, but this relies on potentially outdated closures.
+   try {
+      setLogEntries((prev) => [...prev, entry]);
+   } catch (error) {
+       console.error("Failed to update log entries via setLogEntries in Server Action context:", error);
+       // Consider alternative logging mechanisms or returning the entry to the client to handle state update.
+   }
 };
 
 /**
@@ -61,6 +73,7 @@ export const addLogEntry = (entry: LogEntry, setLogEntries: React.Dispatch<React
 export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
     const timestamp = new Date().toISOString();
     if (logEntries.length === 0) {
+        // Return an OutputLine directly if there are no logs
         return { id: `log-export-empty-${timestamp}`, text: 'No log entries to export.', type: 'info', category: 'internal' };
     }
 
@@ -106,3 +119,12 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
         return { id: `log-export-error-${timestamp}`, text: `Error exporting log file: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error', category: 'internal' };
     }
 };
+
+/**
+ * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
+ * @returns The filename.
+ */
+function getFilename(): string {
+    return 'logging.ts';
+}

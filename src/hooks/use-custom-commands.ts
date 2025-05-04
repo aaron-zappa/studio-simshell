@@ -1,4 +1,5 @@
 // src/hooks/use-custom-commands.ts
+// src/hooks/use-custom-commands.ts
 'use client';
 
 import * as React from 'react';
@@ -23,6 +24,14 @@ export const useCustomCommands = () => {
     },
     [customCommands]
   );
+
+  /**
+   * Returns the name of the current file.
+   * @returns The filename.
+   */
+   export function getFilename(): string {
+       return 'use-custom-commands.ts';
+   }
 
   return { customCommands, addCustomCommand, getCustomCommandAction };
 };
