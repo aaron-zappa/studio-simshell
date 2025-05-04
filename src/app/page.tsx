@@ -200,7 +200,7 @@ export default function Home() {
           </div>
       </header>
 
-      <Separator className="mb-4" />
+      {/* Separator Removed */}
 
       <main className="flex-1 overflow-hidden mb-4">
         <OutputDisplay history={history} className="h-full" />
