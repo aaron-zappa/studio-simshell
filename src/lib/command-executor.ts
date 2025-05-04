@@ -182,7 +182,7 @@ export async function executeCommand ({
          } else {
             await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
             const simOutput = `Simulating Python: ${commandTrimmed} (output placeholder)`;
-            outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'python', timestamp }];
+            outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'python', timestamp: undefined }]; // timestamp was missing
             logEntry = { timestamp, type: 'I', text: simOutput };
          }
       }
@@ -194,18 +194,12 @@ export async function executeCommand ({
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
              logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
          } else if (commandLower.startsWith('echo ')) {
-             // --- DEMO COMMAND ---
-             if (commandTrimmed === 'echo "Hello SimuShell Demo!"') {
-                 simOutput = 'Hello SimuShell Demo!';
-                 outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
-                 logEntry = { timestamp, type: 'I', text: `Executed demo echo command. Output: ${simOutput}` };
-             } else {
-                 simOutput = commandTrimmed.substring(5); // General echo simulation
-                 outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
-                 logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
-             }
+             // Removed specific "Hello SimuShell Demo!" case
+             simOutput = commandTrimmed.substring(5); // General echo simulation
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
+             logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
          } else {
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }]; // Older timestamp format kept for consistency here
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }]; // Use standard no timestamp format
              logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
          }
       }
@@ -219,7 +213,7 @@ export async function executeCommand ({
              simOutput = commandTrimmed.substring(5);
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined }];
          } else {
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }]; // Older timestamp format kept for consistency here
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined }]; // Use standard no timestamp format
          }
          logEntry = { timestamp, type: 'I', text: `Windows simulation output: ${simOutput}` };
       }

@@ -186,21 +186,7 @@ export default function Home() {
            setIsRunning(false);
            clientHandled = true;
          }
-         else if (finalCommandLower.startsWith('echo "hello simushell demo!"') && category === 'unix') {
-              const demoOutput: OutputLine = {
-                  id: `demo-${timestamp}`,
-                  text: 'Hello SimuShell Demo!',
-                  type: 'output',
-                  category: 'unix', // Explicitly unix for this demo
-                  timestamp: undefined, // No log format
-              };
-              if (commandLogOutput) {
-                  setHistory((prev) => [...prev, commandLogOutput, demoOutput]);
-              }
-               const demoLog: LogEntry = { timestamp, type: 'I', text: "Executed demo echo command." };
-               setLogEntries(prev => [...prev, demoLog]);
-              clientHandled = true;
-         }
+         // Removed the specific 'echo "hello simushell demo!"' handling
       }
 
 
