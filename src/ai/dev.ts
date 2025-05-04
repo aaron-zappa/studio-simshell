@@ -1,10 +1,13 @@
 // src/ai/dev.ts
 // src/ai/dev.ts
-import type {Flow} from 'genkit';
+import type {Flow, Tool} from 'genkit';
 
 // Import flows explicitly
 import { classifyCommandFlow } from './flows/classify-command-flow';
 import { simpleTextGenFlow } from './flows/simple-text-gen-flow';
+
+// Import tools explicitly
+import { getVariableValue } from './tools/get-variable-tool';
 
 // Create the flows array by exporting the imported flow objects
 export const flows: Flow<any, any, any>[] = [
@@ -13,6 +16,13 @@ export const flows: Flow<any, any, any>[] = [
   // Add other imported flows here
   // e.g., anotherFlow,
 ];
+
+// Create the tools array (optional for dev UI, but useful)
+export const tools: Tool<any, any>[] = [
+    getVariableValue,
+    // Add other imported tools here
+];
+
 
 /**
  * Returns the name of the current file.

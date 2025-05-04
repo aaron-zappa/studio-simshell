@@ -11,9 +11,10 @@
 
 import {ai} from '@/ai/ai-instance';
 import {z} from 'genkit';
+import { getVariableValue } from '@/ai/tools/get-variable-tool'; // Import the new tool
 
 const SimpleTextGenInputSchema = z.object({
-  inputText: z.string().describe('The input text prompt for the AI.'),
+  inputText: z.string().describe('The input text prompt for the AI. Variable values referenced with {varname} have already been substituted if found.'),
 });
 export type SimpleTextGenInput = z.infer<typeof SimpleTextGenInputSchema>;
 
@@ -36,7 +37,13 @@ const simpleTextPrompt = ai.definePrompt({
   output: {
     schema: SimpleTextGenOutputSchema,
   },
-  prompt: `Respond directly to the following input: {{{inputText}}}`,
+  // Provide the tool to the prompt
+  tools: [getVariableValue],
+  // Update prompt instructions
+  prompt: `Respond directly to the following input. If the input mentions a variable name and its value seems relevant but was not provided (e.g., marked as '<variable 'varname' not found>'), use the 'getVariableValue' tool to retrieve its current value before formulating your response.
+
+Input:
+{{{inputText}}}`,
 });
 
 
