@@ -1,5 +1,4 @@
 // src/ai/flows/simple-text-gen-flow.ts
-// src/ai/flows/simple-text-gen-flow.ts
 'use server';
 /**
  * @fileOverview A simple Genkit flow for generating text based on input.
@@ -11,10 +10,10 @@
 
 import {ai} from '@/ai/ai-instance';
 import {z} from 'genkit';
-import { getVariableValue } from '@/ai/tools/get-variable-tool'; // Import the new tool
+import { getVariableValue } from '@/ai/tools/get-variable-tool'; // Import the tool
 
 const SimpleTextGenInputSchema = z.object({
-  inputText: z.string().describe('The input text prompt for the AI. Variable values referenced with {varname} have already been substituted if found.'),
+  inputText: z.string().describe('The user\'s input text. Variable values referenced with {varname} may have already been substituted. If a variable was not found, it might appear as `<variable \'varname\' not found>`.'),
 });
 export type SimpleTextGenInput = z.infer<typeof SimpleTextGenInputSchema>;
 
@@ -40,7 +39,13 @@ const simpleTextPrompt = ai.definePrompt({
   // Provide the tool to the prompt
   tools: [getVariableValue],
   // Update prompt instructions
-  prompt: `Respond directly to the following input. If the input mentions a variable name and its value seems relevant but was not provided (e.g., marked as '<variable 'varname' not found>'), use the 'getVariableValue' tool to retrieve its current value before formulating your response.
+  prompt: `Carefully analyze the following user input and generate a helpful response.
+
+Sometimes, the input text might refer to variables using curly braces like {varname}. The system tries to substitute these with their stored values beforehand.
+
+**IMPORTANT:** If you encounter a placeholder like "<variable 'some_variable_name' not found>" in the input, OR if the user's query implicitly requires the value of a variable {varname} that wasn't substituted, you MUST use the 'getVariableValue' tool to retrieve the current value for 'some_variable_name' before formulating your final answer. Only use the tool if obtaining the variable's value is necessary to properly address the user's request.
+
+Respond directly and concisely based on the potentially updated information.
 
 Input:
 {{{inputText}}}`,

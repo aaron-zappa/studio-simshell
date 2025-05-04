@@ -12,19 +12,19 @@ import { z } from 'genkit';
 
 // Define input schema for the tool
 const GetVariableInputSchema = z.object({
-  variableName: z.string().describe('The name of the variable to retrieve the value for.'),
+  variableName: z.string().describe('The exact name of the variable whose value needs to be retrieved.'),
 });
 
 // Define output schema for the tool
 const GetVariableOutputSchema = z.object({
-  value: z.string().nullable().describe('The value of the variable as a string, or null if the variable is not found.'),
+  value: z.string().nullable().describe('The stored value of the variable as a string. Returns null if the variable name is not found in the system storage.'),
 });
 
 // Define the Genkit tool
 export const getVariableValue = ai.defineTool(
   {
     name: 'getVariableValue',
-    description: 'Retrieves the current value of a specified variable stored in the system. Use this if you need the value of a variable mentioned in the user query that was not provided directly.',
+    description: 'Retrieves the current value of a specified variable that is stored in the system. Use this tool only when you need the value of a variable mentioned in the user\'s query (often indicated by `{varname}` or `<variable \'varname\' not found>`) but the value was not provided in the initial input text.',
     inputSchema: GetVariableInputSchema,
     outputSchema: GetVariableOutputSchema,
   },
