@@ -37,12 +37,13 @@ function getDb(): DB {
 
 /**
  * Executes a SQL query against the in-memory database.
+ * Note: better-sqlite3 is synchronous, but marked async to satisfy Next.js build.
  * @param sql The SQL query string to execute.
  * @param params Optional parameters for the SQL query.
  * @returns An object containing the results (for SELECT) or changes info (for others).
  * @throws Throws an error if the SQL execution fails.
  */
-export function runSql(sql: string, params: any[] = []): { results: any[] | null, changes: number | null, lastInsertRowid: bigint | null } {
+export async function runSql(sql: string, params: any[] = []): Promise<{ results: any[] | null, changes: number | null, lastInsertRowid: bigint | number | null }> {
   const db = getDb(); // Ensure DB is initialized
   try {
     // Use prepare for safety against SQL injection, even though input isn't directly user-provided here yet.
@@ -56,54 +57,22 @@ export function runSql(sql: string, params: any[] = []): { results: any[] | null
     } else {
         // .run() executes the statement for INSERT, UPDATE, DELETE, etc.
         const info = stmt.run(params);
-        return { results: null, changes: info.changes, lastInsertRowid: info.lastInsertRowid };
+        // Ensure lastInsertRowid is consistently number or null for easier handling downstream if needed
+        const lastInsertRowid = typeof info.lastInsertRowid === 'bigint' ? Number(info.lastInsertRowid) : info.lastInsertRowid;
+        return { results: null, changes: info.changes, lastInsertRowid: lastInsertRowid };
     }
   } catch (error) {
     console.error(`Error executing SQL: ${sql}`, error);
     // Re-throw the error with potentially more context or as a specific type
     if (error instanceof Error) {
+        // Provide a more specific error message for common SQLite errors
+        if (error.message.includes('syntax error')) {
+            throw new Error(`SQL Syntax Error near '${sql.substring(0, 50)}...'`);
+        }
         throw new Error(`SQL Error: ${error.message}`);
     }
     throw new Error('An unknown SQL error occurred.');
   }
 }
 
-/**
- * Formats database results (array of objects) into a simple text table.
- * @param results Array of result objects from better-sqlite3.
- * @returns A string representing the formatted table, or null if no results.
- */
-export function formatResultsAsTable(results: any[]): string | null {
-    if (!results || results.length === 0) {
-        return "(0 rows)"; // Indicate no results
-    }
-
-    const headers = Object.keys(results[0]);
-    const columnWidths = headers.map(header => header.length);
-
-    // Calculate max width for each column based on data
-    results.forEach(row => {
-        headers.forEach((header, index) => {
-            const value = row[header];
-            const valueLength = value !== null && value !== undefined ? String(value).length : 4; // Length of 'null'
-            if (valueLength > columnWidths[index]) {
-                columnWidths[index] = valueLength;
-            }
-        });
-    });
-
-    // Create header row
-    const headerLine = headers.map((header, index) => header.padEnd(columnWidths[index])).join(' | ');
-    const separatorLine = columnWidths.map(width => '-'.repeat(width)).join('-+-'); // Use '+' for intersection
-
-    // Create data rows
-    const dataLines = results.map(row => {
-        return headers.map((header, index) => {
-            const value = row[header];
-            const stringValue = value !== null && value !== undefined ? String(value) : 'null';
-            return stringValue.padEnd(columnWidths[index]);
-        }).join(' | ');
-    });
-
-    return [headerLine, separatorLine, ...dataLines, `(${results.length} row${results.length === 1 ? '' : 's'})`].join('\n');
-}
+// formatResultsAsTable moved to src/lib/formatting.ts
