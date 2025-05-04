@@ -35,28 +35,89 @@ export default function Home() {
     );
   };
 
-  const handleCommandSubmit = async (command: string) => {
-    const commandLower = command.toLowerCase().trim();
+  // --- Client-side clipboard access ---
+  const readClipboard = async (): Promise<string> => {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      throw new Error("Clipboard API not available or permission denied.");
+    }
+    try {
+      return await navigator.clipboard.readText();
+    } catch (err) {
+      console.error("Failed to read clipboard contents: ", err);
+      throw new Error("Failed to read clipboard. Check browser permissions.");
+    }
+  };
+  // --- End client-side clipboard access ---
+
+
+  const handleCommandSubmit = async (originalCommand: string) => {
+    const commandTrimmed = originalCommand.trim();
+    const commandLower = commandTrimmed.toLowerCase();
     const timestamp = new Date().toISOString();
     let commandLogOutput: OutputLine | null = null;
     setIsRunning(true);
+
+    let finalCommand = commandTrimmed; // Use this variable for execution
+    let clipboardReadError: string | null = null;
+
+    // --- Client-side Pre-processing for Clipboard ---
+    const clipboardGetRegex = /^\s*clipboard\s*=\s*get\(\)\s*$/i;
+    if (clipboardGetRegex.test(commandTrimmed)) {
+       try {
+         const clipboardContent = await readClipboard();
+         // Replace the command with the actual assignment including the content
+         // Escape quotes within the clipboard content before inserting into the string
+         const escapedContent = clipboardContent.replace(/"/g, '\\"');
+         finalCommand = `clipboard = "${escapedContent}"`;
+         console.log("Clipboard content read, command transformed:", finalCommand);
+       } catch (error) {
+         console.error("Clipboard read error:", error);
+         clipboardReadError = error instanceof Error ? error.message : 'Unknown clipboard error';
+         // Don't execute the command if clipboard read failed
+         finalCommand = ''; // Prevent execution
+       }
+    }
+    // --- End Client-side Pre-processing ---
+
 
     let classificationResult: { category: CommandCategory; reasoning?: string | undefined } | null = null;
     let executionResult: { outputLines: OutputLine[]; newLogEntries?: LogEntry[] | undefined } | null = null;
     let errorOccurred = false;
 
     try {
+      // Handle immediate clipboard read error
+      if (clipboardReadError) {
+        throw new Error(clipboardReadError); // Throw to enter the catch block
+      }
+      // If clipboard processing resulted in an empty command, skip execution
+      if (!finalCommand) {
+         // Log the original attempt but don't proceed
+         commandLogOutput = {
+             id: `cmd-clipboard-skip-${timestamp}`,
+             text: originalCommand, // Log the original command
+             type: 'command',
+             category: 'python', // Assume python category for clipboard get
+             timestamp: timestamp
+         };
+         setHistory((prev) => [...prev, commandLogOutput]);
+         // Log entry handled in catch block
+         throw new Error("Command execution skipped due to clipboard read failure.");
+      }
+
+
       classificationResult = await classifyCommand({
-          command,
+          command: finalCommand, // Use the potentially modified command for classification
           activeCategories: selectedCategories
       });
       const category: CommandCategory = classificationResult.category;
       const classificationReasoning = classificationResult.reasoning;
 
+      // Log the original command entered by the user, but use finalCommand for execution logic
       commandLogOutput = {
          id: `cmd-${timestamp}`,
-         text: command,
+         text: originalCommand, // Always log the original command
          type: 'command',
+         // Classify the log based on the *execution* category
          category: (category === 'ambiguous' || category === 'unknown') ? 'internal' : category,
          timestamp: timestamp
       };
@@ -83,14 +144,16 @@ export default function Home() {
       }
 
       let clientHandled = false;
+      // Use finalCommand's lower case for internal checks
+      const finalCommandLower = finalCommand.toLowerCase();
       if (category === 'internal') {
-         if (commandLower === 'clear') {
+         if (finalCommandLower === 'clear') {
           setHistory([]);
           const clearLog: LogEntry = { timestamp, type: 'I', text: "History cleared." };
           setLogEntries(prev => [...prev, clearLog]);
           clientHandled = true;
          }
-         else if (commandLower === 'export log') {
+         else if (finalCommandLower === 'export log') {
           const exportResultLine = exportLogFile(logEntries);
           const logText = exportResultLine ? exportResultLine.text : "Attempted log export.";
           const logType = exportResultLine?.type === 'error' ? 'E' : 'I';
@@ -104,7 +167,7 @@ export default function Home() {
           }
           clientHandled = true;
          }
-         else if (commandLower === 'pause') {
+         else if (finalCommandLower === 'pause') {
            const pauseOutput: OutputLine = {
              id: `pause-${timestamp}`,
              text: 'task stopped',
@@ -124,12 +187,13 @@ export default function Home() {
 
 
       if (clientHandled) {
-         if (commandLower !== 'pause') setIsRunning(false);
+         // Use finalCommandLower for pause check
+         if (finalCommandLower !== 'pause') setIsRunning(false);
          return;
       }
 
       executionResult = await executeCommand({
-        command,
+        command: finalCommand, // Pass the final command (potentially with clipboard content)
         mode: category as CommandMode,
         addSuggestion,
         addCustomCommand,
@@ -169,15 +233,14 @@ export default function Home() {
          } else {
              setLogEntries(prev => [...prev, errorLog]);
          }
-         if(commandLogOutput){
-             setHistory((prev) => [...prev, commandLogOutput, errorOutput]);
-         } else {
-             const genericCommandLog: OutputLine = { id: `cmd-err-${timestamp}`, text: command, type: 'command', category: 'internal', timestamp: timestamp };
-             setHistory((prev) => [...prev, genericCommandLog, errorOutput]);
-         }
+         // Ensure commandLogOutput exists even if classification failed early due to clipboard error
+         const cmdLog = commandLogOutput || { id: `cmd-err-${timestamp}`, text: originalCommand, type: 'command', category: 'internal', timestamp: timestamp };
+         setHistory((prev) => [...prev, cmdLog, errorOutput]);
+
 
     } finally {
-      if (commandLower !== 'pause' && !errorOccurred) {
+      // Use finalCommandLower for pause check
+      if (finalCommandLower !== 'pause' && !errorOccurred) {
           setIsRunning(false);
       } else if (errorOccurred) {
           setIsRunning(false);
@@ -191,6 +254,10 @@ export default function Home() {
            (suggestions[cat] || []).forEach(sug => combinedSuggestions.add(sug));
            if (cat === 'internal') {
                 Object.keys(customCommands).forEach(cmdName => combinedSuggestions.add(cmdName));
+           }
+            // Add clipboard suggestion if python is active
+           if (cat === 'python') {
+               combinedSuggestions.add('clipboard = get()');
            }
         });
        return Array.from(combinedSuggestions).sort();

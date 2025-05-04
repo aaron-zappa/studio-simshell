@@ -5,6 +5,7 @@ import type { OutputLine } from '@/components/output-display';
 import type { LogEntry } from '@/types/log-types';
 import { runSql } from '@/lib/database';
 import { storeVariableInDb } from '@/lib/variables';
+// Removed: import { readClipboardText } from '@/lib/clipboard'; // Cannot be used in Server Action
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
@@ -20,6 +21,7 @@ interface HandlerParams {
 /**
  * Handles the 'init' command.
  * Initializes the database ('variables' table) and sets some default Python variables.
+ * DOES NOT handle clipboard, as that requires client-side API access.
  */
 export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     const createTableSql = `
@@ -44,12 +46,13 @@ export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams
         logEntries.push({ timestamp, type: 'I', text: dbInitMsg });
         outputLines.push({ id: `init-db-${timestamp}`, text: dbInitMsg, type: 'info', category: 'internal', timestamp });
 
-        // 2. Initialize Default Python Variables
+        // 2. Initialize Default Python Variables (excluding clipboard)
         const defaultVars = [
             { name: 'max_iterations', value: '100', datatype: 'integer' },
             { name: 'learning_rate', value: '0.01', datatype: 'real' },
             { name: 'model_name', value: 'default_model', datatype: 'string' },
             { name: 'is_training_enabled', value: 'True', datatype: 'boolean' },
+            // { name: 'clipboard', value: 'placeholder - get on client', datatype: 'string' }, // Removed clipboard initialization here
         ];
 
         let varsAddedCount = 0;
@@ -68,6 +71,13 @@ export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams
             }
         }
 
+        // Handle clipboard initialization feedback (without actual reading)
+        const clipboardInitMsg = "Clipboard variable placeholder created. Assign with `clipboard = get()` command (requires clipboard access).";
+        logEntries.push({ timestamp, type: 'I', text: clipboardInitMsg });
+        // Don't add clipboard specific message to direct output, keep it simple
+        // outputLines.push({ id: `init-clipboard-${timestamp}`, text: clipboardInitMsg, type: 'info', category: 'internal', timestamp });
+
+
         const varInitMsg = `Initialized ${varsAddedCount} default Python variable(s).`;
         logEntries.push({ timestamp, type: 'I', text: varInitMsg });
         outputLines.push({ id: `init-vars-${timestamp}`, text: varInitMsg, type: 'info', category: 'internal', timestamp });
@@ -76,10 +86,11 @@ export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams
             outputLines.push({ id: `init-vars-err-${timestamp}`, text: `Errors encountered during variable initialization:\n${varErrors.join('\n')}`, type: 'error', category: 'internal', timestamp });
         }
 
-        finalMessage = `Initialization complete. ${dbInitMsg} ${varInitMsg}`;
-        if (!overallSuccess) {
+        // Add the clipboard info message to the final combined message
+        finalMessage = `Initialization complete. ${dbInitMsg} ${varInitMsg} ${clipboardInitMsg}`;
+         if (!overallSuccess) {
              finalMessage += " Some errors occurred during variable initialization.";
-        }
+         }
 
 
     } catch (error) {

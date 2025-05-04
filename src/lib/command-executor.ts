@@ -10,6 +10,7 @@ import { runSql } from '@/lib/database';
 import { formatResultsAsTable } from '@/lib/formatting';
 import { handleInternalCommand } from '@/lib/internal-commands'; // Import the central internal command handler
 import { storeVariableInDb } from '@/lib/variables'; // Import variable storing function
+// Removed: import { readClipboardText } from '@/lib/clipboard'; // Import clipboard function - Cannot be used in Server Action
 
 interface ExecuteCommandParams {
   command: string;
@@ -95,10 +96,10 @@ export async function executeCommand ({
             // Store in DB (pass the string representation for the DB)
             await storeVariableInDb(variableName, String(actualValue), dataType);
             outputLines = []; // Simulate no direct output for assignment
-            logEntry = { timestamp, type: 'I', text: `Stored/Updated variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
+            logEntry = { timestamp, type: 'I', text: `Stored/Updated internal variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
          } catch (error) {
             console.error("Error storing variable:", error);
-            const errorMsg = `Error storing variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+            const errorMsg = `Error storing internal variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
             outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
             logEntry = { timestamp, type: 'E', text: errorMsg };
          }
@@ -124,9 +125,55 @@ export async function executeCommand ({
       }
       // --- Other Category Handlers ---
       else if (mode === 'python') {
-         // REMOVED variable assignment logic from here
+         // Handle Python variable assignment (different from internal)
+         // The command should arrive here with the clipboard value already substituted by the client
+         if (assignmentMatch) {
+             const variableName = assignmentMatch[1];
+             const valueString = assignmentMatch[2].trim();
+             let dataType = 'unknown';
+             let actualValue: any = valueString;
+
+             // Infer data type for Python
+             if (/^\d+$/.test(valueString)) {
+                 dataType = 'integer';
+                 actualValue = parseInt(valueString, 10);
+             } else if (/^\d+\.\d+$/.test(valueString)) {
+                 dataType = 'real'; // Use 'real' consistent with DB
+                 actualValue = parseFloat(valueString);
+             } else if (valueString === 'True' || valueString === 'False') {
+                 dataType = 'boolean';
+                 actualValue = valueString === 'True';
+             } else if ((valueString.startsWith('"') && valueString.endsWith('"')) || (valueString.startsWith("'") && valueString.endsWith("'"))) {
+                 dataType = 'string';
+                 actualValue = valueString.slice(1, -1);
+             } else if (valueString.toLowerCase() === 'none') {
+                 dataType = 'none';
+                 actualValue = null; // Represent None as null
+             }
+             // Removed clipboard get() handling here - it's done client-side now
+             else {
+                 // Attempt to treat as an identifier (another variable) or raw string if not quoted
+                  dataType = 'string'; // Default to string if not recognized type
+                  actualValue = valueString;
+                  console.warn(`Python variable assignment for '${variableName}' treated as string: ${valueString}`);
+             }
+
+              // Store the variable value (which might have come from the clipboard originally)
+              try {
+                  await storeVariableInDb(variableName, String(actualValue), dataType);
+                  outputLines = []; // No direct output for assignment
+                  logEntry = { timestamp, type: 'I', text: `Stored/Updated Python variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
+              } catch (error) {
+                  console.error("Error storing Python variable:", error);
+                  const errorMsg = `Error storing Python variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+                  outputLines = [{ id: `py-assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python', timestamp }];
+                  logEntry = { timestamp, type: 'E', text: errorMsg };
+              }
+
+
+         }
          // --- Other Python Commands (Simulation) ---
-         if (commandLower.startsWith('print(')) {
+         else if (commandLower.startsWith('print(')) {
             const match = commandTrimmed.match(/print\((['"]?)(.*?)\1\)/);
             const printOutput = match ? match[2] : 'Syntax Error in print';
             const type = match ? 'output' : 'error';
@@ -144,26 +191,35 @@ export async function executeCommand ({
          let simOutput = `Simulating Unix: ${commandTrimmed} (output placeholder)`;
          if (commandLower === 'ls') {
              simOutput = 'file1.txt  directoryA  script.sh';
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
+             logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
          } else if (commandLower.startsWith('echo ')) {
-             simOutput = commandTrimmed.substring(5);
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
+             // --- DEMO COMMAND ---
+             if (commandTrimmed === 'echo "Hello SimuShell Demo!"') {
+                 simOutput = 'Hello SimuShell Demo!';
+                 outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
+                 logEntry = { timestamp, type: 'I', text: `Executed demo echo command. Output: ${simOutput}` };
+             } else {
+                 simOutput = commandTrimmed.substring(5); // General echo simulation
+                 outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
+                 logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
+             }
          } else {
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp }]; // Older timestamp format kept for consistency here
+             logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
          }
-         logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
       }
       else if (mode === 'windows') {
          await new Promise(resolve => setTimeout(resolve, Math.random() * 900 + 150));
          let simOutput = `Simulating Windows: ${commandTrimmed} (output placeholder)`;
          if (commandLower === 'dir') {
              simOutput = ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free';
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined }];
          } else if (commandLower.startsWith('echo ')) {
              simOutput = commandTrimmed.substring(5);
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined }];
          } else {
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp }]; // Older timestamp format kept for consistency here
          }
          logEntry = { timestamp, type: 'I', text: `Windows simulation output: ${simOutput}` };
       }
@@ -175,7 +231,7 @@ export async function executeCommand ({
            if (results) {
              const formattedTable = await formatResultsAsTable(results); // Await the async function
              const sqlOutput = formattedTable || "Query executed successfully, no results returned.";
-             outputLines = [{ id: `out-${timestamp}`, text: sqlOutput, type: 'output', category: 'sql', timestamp }];
+             outputLines = [{ id: `out-${timestamp}`, text: sqlOutput, type: 'output', category: 'sql', timestamp: undefined }];
              logEntry = { timestamp, type: 'I', text: `SQL query result: ${sqlOutput}` };
            } else if (changes !== null) {
              let infoText = `Query executed successfully. ${changes} row${changes === 1 ? '' : 's'} affected.`;
@@ -243,8 +299,7 @@ export async function executeCommand ({
       finalLogEntries = [...currentLogEntries, logEntry];
   } else if (finalLogEntries && logEntry) {
        // If internal handler already updated logs, we might need to decide whether to add the generic log too.
-       // For now, let's assume internal handlers provide sufficient logging unless it's an assignment log.
-        if (logEntry.text.startsWith('Stored/Updated variable')) {
+        if (logEntry.text.includes('variable')) {
            // If it's a variable assignment log, add it even if internal handler modified logs.
             finalLogEntries = [...finalLogEntries, logEntry];
         } else {

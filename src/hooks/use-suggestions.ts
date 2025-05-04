@@ -24,7 +24,10 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'init', // Added general init command
       'init db', // Keep specific init db as well
     ],
-  python: ['print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield '],
+  python: [
+      'print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield ',
+      'clipboard = get()' // Add clipboard suggestion here
+    ],
   unix: ['ls', 'cd', 'pwd', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'grep', 'echo', 'man', 'sudo'],
   windows: ['dir', 'cd', 'cls', 'mkdir', 'rmdir', 'copy', 'move', 'type', 'findstr', 'echo', 'help'],
   sql: ['SELECT', 'INSERT INTO', 'UPDATE', 'DELETE FROM', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'WHERE', 'FROM', 'JOIN', 'GROUP BY', 'ORDER BY', 'SELECT 1;'], // Added SELECT 1;
@@ -64,6 +67,10 @@ export const useSuggestions = () => {
             if (mode === 'internal' && lowerCommand === 'init') {
                 suggestionToAdd = 'init';
             }
+             // Add format for clipboard get (though it's already in initial)
+             if (mode === 'python' && lowerCommand === 'clipboard = get()') {
+                  suggestionToAdd = 'clipboard = get()';
+             }
 
 
             if (!modeSuggestions.some(s => s.toLowerCase() === suggestionToAdd.toLowerCase())) {
@@ -85,7 +92,6 @@ export const useSuggestions = () => {
 /**
  * Returns the name of the current file.
  * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
  */
 function getFilename(): string {
     return 'use-suggestions.ts';
