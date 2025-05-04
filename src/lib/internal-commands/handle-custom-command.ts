@@ -1,4 +1,4 @@
-
+// src/lib/internal-commands/handle-custom-command.ts
 import type { OutputLine } from '@/components/output-display';
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 

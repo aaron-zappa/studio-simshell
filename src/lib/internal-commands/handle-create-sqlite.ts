@@ -1,4 +1,4 @@
-
+// src/lib/internal-commands/handle-create-sqlite.ts
 import type { OutputLine } from '@/components/output-display';
 // Note: Database initialization happens implicitly on first SQL query via getDb().
 

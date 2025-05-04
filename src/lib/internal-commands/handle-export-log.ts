@@ -1,4 +1,4 @@
-
+// src/lib/internal-commands/handle-export-log.ts
 import type { OutputLine } from '@/components/output-display';
 // exportLogFile is client-side, so this handler mainly provides info if called directly (unlikely).
 

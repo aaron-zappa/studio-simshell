@@ -1,4 +1,4 @@
-
+// src/lib/logging.ts
 'use client';
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';

@@ -1,4 +1,4 @@
-
+// src/lib/internal-commands/index.ts
 'use server';
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';

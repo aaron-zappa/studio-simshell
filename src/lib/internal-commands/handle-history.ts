@@ -1,4 +1,4 @@
-
+// src/lib/internal-commands/handle-history.ts
 import type { OutputLine } from '@/components/output-display';
 
 interface HandlerParams {

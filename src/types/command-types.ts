@@ -1,3 +1,4 @@
+// src/types/command-types.ts
 /**
  * Defines the possible modes/categories for the command shell.
  * This is used both for initial suggestions and for the result of AI classification.

@@ -1,3 +1,4 @@
+// src/lib/internal-commands/handle-mode.ts
 import type { OutputLine } from '@/components/output-display';
 import type { CommandMode } from '@/types/command-types';
 

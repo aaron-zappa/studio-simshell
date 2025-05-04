@@ -1,3 +1,4 @@
+// src/hooks/use-suggestions.ts
 'use client';
 
 import * as React from 'react';

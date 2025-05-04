@@ -1,4 +1,4 @@
-
+// src/lib/formatting.ts
 /**
  * Formats database results (array of objects) into a simple text table.
  * This is a synchronous utility function.

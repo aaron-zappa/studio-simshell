@@ -1,4 +1,4 @@
-
+// src/lib/internal-commands/handle-show-requirements.ts
 'use server';
 
 import type { OutputLine } from '@/components/output-display';

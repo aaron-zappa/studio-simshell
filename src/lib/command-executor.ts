@@ -1,3 +1,4 @@
+// src/lib/command-executor.ts
 'use server';
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';

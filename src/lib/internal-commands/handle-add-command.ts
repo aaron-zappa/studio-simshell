@@ -1,4 +1,4 @@
-
+// src/lib/internal-commands/handle-add-command.ts
 import type { OutputLine } from '@/components/output-display';
 import type { LogEntry, addLogEntry } from '@/lib/logging';
 import type { CommandMode } from '@/types/command-types';

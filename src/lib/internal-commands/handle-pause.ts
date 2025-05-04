@@ -1,4 +1,4 @@
-
+// src/lib/internal-commands/handle-pause.ts
 import type { OutputLine } from '@/components/output-display';
 
 interface HandlerParams {
