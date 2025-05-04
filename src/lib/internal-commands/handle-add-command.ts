@@ -2,7 +2,7 @@
 // src/lib/internal-commands/handle-add-command.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry, addLogEntry } from '@/lib/logging';
+import type { LogEntry } from '@/lib/logging'; // Keep LogEntry import
 import type { CommandMode } from '@/types/command-types';
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 
@@ -22,7 +22,8 @@ interface HandlerParams {
     initialSuggestions: Record<string, string[]>;
 }
 
-export const handleAddCommand = (params: HandlerParams): HandlerResult => {
+// Make the function async
+export const handleAddCommand = async (params: HandlerParams): Promise<HandlerResult> => {
     const { command, timestamp, addSuggestion, addCustomCommand, currentLogEntries, initialSuggestions } = params;
     let outputLines: OutputLine[] = [];
     let updatedLogEntries = [...currentLogEntries]; // Start with a copy of current logs
@@ -44,6 +45,8 @@ export const handleAddCommand = (params: HandlerParams): HandlerResult => {
             // This structure assumes these functions *could* potentially be adapted
             // to work server-side (e.g., by updating a database instead of client state).
             try {
+                 // These calls might still cause issues depending on how they are implemented
+                 // and whether they rely on client-side React state hooks.
                  addSuggestion('internal', newCommandName);
                  addCustomCommand(newCommandName, newCommandAction);
             } catch (e) {

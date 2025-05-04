@@ -15,8 +15,8 @@ interface HandlerParams {
     currentLogEntries: LogEntry[]; // Needed if we were to trigger export server-side (not current approach)
 }
 
-// Update function signature to return HandlerResult
-export const handleExportLog = ({ timestamp }: HandlerParams): HandlerResult => {
+// Update function signature to return HandlerResult and make it async
+export const handleExportLog = async ({ timestamp }: HandlerParams): Promise<HandlerResult> => {
     // Actual export is handled client-side due to browser APIs.
     // This server-side handler provides informational feedback.
     const outputLines = [{ id: `log-export-info-${timestamp}`, text: 'Log export is handled client-side. Check your downloads if you ran it there.', type: 'info', category: 'internal' }];
