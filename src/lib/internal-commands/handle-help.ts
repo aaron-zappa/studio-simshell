@@ -1,4 +1,5 @@
 // src/lib/internal-commands/handle-help.ts
+// src/lib/internal-commands/handle-help.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
 import type { CommandMode } from '@/types/command-types';
