@@ -20,7 +20,7 @@ interface HandlerParams {
 /**
  * Handles the 'add ai_tool' internal command.
  * Parses arguments and stores the tool's metadata (name, description, args_description)
- * in the 'ai_tools' SQLite table.
+ * in the 'ai_tools' SQLite table. Newly added tools are active by default.
  * Syntax: add ai_tool <toolname> "<args_description>" "<description>"
  */
 export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerResult> => {
@@ -32,16 +32,18 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
     let outputType: 'info' | 'error' = 'info';
     let outputText = '';
 
-    // Corrected Regex for: add ai_tool <toolname> "<args_description>" "<description>"
+    // Regex for: add ai_tool <toolname> "<args_description>" "<description>"
     const addToolRegex = /^add ai_tool\s+(\S+)\s+"([^"]+)"\s+"([^"]+)"$/i;
     const match = command.match(addToolRegex);
 
     if (match && match[1] && match[2] && match[3]) {
         const toolName = match[1];
-        // Corrected order: Args Description is second, Description is third
         const toolArgsDescription = match[2].trim();
         const toolDescription = match[3].trim();
 
+        // Insert statement relies on the DEFAULT 1 for isactive on new entries.
+        // The ON CONFLICT clause only updates description and args_description,
+        // preserving the existing isactive state if the tool already exists.
         const insertSql = `
             INSERT INTO ai_tools (name, description, args_description)
             VALUES (?, ?, ?)
@@ -49,13 +51,12 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
                 description = excluded.description,
                 args_description = excluded.args_description;
         `;
-        // Ensure params match the *database column order*: name, description, args_description
+        // Params match the INSERT columns (name, description, args_description)
         const insertParams = [toolName, toolDescription, toolArgsDescription];
 
         try {
             await runSql(insertSql, insertParams);
-            // Update feedback message to reflect correct user input order
-            outputText = `AI tool metadata stored/updated for: "${toolName}". Args Description: "${toolArgsDescription}", Description: "${toolDescription}"`;
+            outputText = `AI tool metadata stored/updated for: "${toolName}". Args Description: "${toolArgsDescription}", Description: "${toolDescription}". Tool is active by default or retains previous status.`;
             outputType = 'info';
             logText = outputText;
             logType = 'I';

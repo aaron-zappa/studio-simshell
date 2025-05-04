@@ -31,12 +31,13 @@ export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerPara
             default_value TEXT
         );
     `;
-    // Define the SQL to create the ai_tools table
+    // Define the SQL to create the ai_tools table, including the new isactive column
     const createAiToolsTableSql = `
         CREATE TABLE IF NOT EXISTS ai_tools (
             name VARCHAR(255) NOT NULL PRIMARY KEY,
             description TEXT NOT NULL,
-            args_description TEXT NOT NULL
+            args_description TEXT NOT NULL,
+            isactive BOOLEAN NOT NULL DEFAULT 1 -- Added isactive column, defaults to true (1)
         );
     `;
 
@@ -53,8 +54,8 @@ export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerPara
 
         // Execute the SQL to create the ai_tools table
         await runSql(createAiToolsTableSql);
-        logText += "Ensured 'ai_tools' table exists.";
-        outputLines.push({ id: `init-tools-table-${timestamp}`, text: "Ensured 'ai_tools' table exists.", type: 'info', category: 'internal', timestamp });
+        logText += "Ensured 'ai_tools' table exists (including 'isactive' column)."; // Updated log message
+        outputLines.push({ id: `init-tools-table-${timestamp}`, text: "Ensured 'ai_tools' table exists (including 'isactive' column).", type: 'info', category: 'internal', timestamp }); // Updated output message
 
         logText = "Database initialized successfully. " + logText;
         outputType = 'info';
