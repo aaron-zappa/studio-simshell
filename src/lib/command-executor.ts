@@ -67,19 +67,31 @@ export async function executeCommand ({
 
   // --- Fetch User Permissions ---
   let userPermissions: string[] = [];
-  try {
-      userPermissions = await getUserPermissions(userId);
-      // Optional: Log fetched permissions for debugging
-      // logEntry = { timestamp, type: 'I', flag: 0, text: `User ${userId} Permissions: ${userPermissions.join(', ')}` };
-      // potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
-  } catch (permError) {
-       console.error("Error fetching user permissions:", permError);
-       const errorMsg = `Error fetching user permissions: ${permError instanceof Error ? permError.message : 'Unknown error'}`;
-       outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }); // Set flag to 0 for error
-       logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
+  // Special case: Allow 'help' and 'init db' even if permissions can't be fetched (e.g., DB not ready)
+  if (commandLower !== 'help' && commandLower !== 'init db') {
+      const permResult = await getUserPermissions(userId);
+
+      if (Array.isArray(permResult)) {
+          userPermissions = permResult;
+          // Optional: Log fetched permissions for debugging
+          // logEntry = { timestamp, type: 'I', flag: 0, text: `User ${userId} Permissions: ${userPermissions.join(', ')}` };
+          // potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
+      } else {
+          // Handle error fetching permissions
+           console.error("Error fetching user permissions:", permResult.error);
+           const errorMsg = permResult.code === 'DB_NOT_INITIALIZED'
+                ? "Permission check skipped: Database RBAC tables not initialized. Please run 'init db'."
+                : `Error fetching user permissions: ${permResult.error}`;
+           outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }); // Set flag to 0 for error
+           logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
+           potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
+           // Return early if permissions couldn't be fetched, as they might be critical
+           return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
+      }
+  } else {
+      // If it's 'help' or 'init db', skip strict permission fetching for now
+       logEntry = { timestamp, type: 'I', flag: 0, text: `Permission check skipped for '${commandLower}'.` };
        potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
-       // Return early if permissions couldn't be fetched, as they might be critical
-       return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
   }
 
 
@@ -88,11 +100,14 @@ export async function executeCommand ({
       // --- Permission Check Example (Apply where needed) ---
       // Example: Check if user can execute SQL modify commands
       if (mode === 'sql' && !userPermissions.includes('execute_sql_select') && !userPermissions.includes('execute_sql_modify')) {
-          const errorMsg = "Permission denied: You do not have permission to execute SQL queries.";
-          outputLines = [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
-          logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
-          potentiallyUpdatedLogs = potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, logEntry] : [...currentLogEntries, logEntry];
-          return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
+          // Allow 'help'/'init db' check again, though it should be caught by the initial skip
+          if (commandLower !== 'help' && commandLower !== 'init db') {
+            const errorMsg = "Permission denied: You do not have permission to execute SQL queries.";
+            outputLines = [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
+            logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
+            potentiallyUpdatedLogs = potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, logEntry] : [...currentLogEntries, logEntry];
+            return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
+          }
       }
       // Add more permission checks for other modes/actions as needed
 
@@ -296,8 +311,15 @@ export async function executeCommand ({
          } catch (error) {
            console.error("SQL execution error:", error);
            const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
-           outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 0 }]; // Set flag to 0 for error
-           logEntry = { timestamp, type: 'E', flag: 0, text: `SQL Error: ${errorMsg}` }; // Set flag to 0 for error
+            // Check if the error indicates missing tables (potentially from init db not being run)
+            if (error instanceof Error && error.message.includes('no such table')) {
+               const suggestInitMsg = `${errorMsg}. Consider running 'init db'.`;
+               outputLines = [{ id: `err-${timestamp}`, text: suggestInitMsg, type: 'error', category: 'sql', timestamp, flag: 0 }]; // Set flag to 0 for error
+               logEntry = { timestamp, type: 'E', flag: 0, text: `SQL Error: ${suggestInitMsg}` }; // Set flag to 0 for error
+            } else {
+                outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 0 }]; // Set flag to 0 for error
+                logEntry = { timestamp, type: 'E', flag: 0, text: `SQL Error: ${errorMsg}` }; // Set flag to 0 for error
+            }
          }
       }
       else if (mode === 'excel') {
@@ -351,14 +373,18 @@ export async function executeCommand ({
       finalLogEntries = [...currentLogEntries, logEntry];
   } else if (finalLogEntries && logEntry) {
        // If internal handler already updated logs, we might need to decide whether to add the generic log too.
-        if (logEntry.text.includes('variable') || logEntry.text.startsWith('SQL') || logEntry.text.startsWith('Excel') || logEntry.text.startsWith('Simulating')) {
+        if (logEntry.text.includes('variable') || logEntry.text.startsWith('SQL') || logEntry.text.startsWith('Excel') || logEntry.text.startsWith('Simulating') || logEntry.text.startsWith('Python print')) {
            // If it's a relevant log, add it even if internal handler modified logs.
            // Avoid duplicates if the internal handler already logged this exact message.
             if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
                  finalLogEntries = [...finalLogEntries, logEntry];
             }
+        } else if (logEntry.type === 'E') { // Always add error logs
+             if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
+                 finalLogEntries = [...finalLogEntries, logEntry];
+            }
         } else {
-            console.warn("Log entry generated but internal handler also modified logs. Generic log ignored.");
+            console.warn("Log entry generated but internal handler also modified logs. Generic log ignored: ", logEntry.text);
         }
   }
 
