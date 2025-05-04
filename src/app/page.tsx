@@ -110,9 +110,7 @@ export default function Home() {
       }
 
       if (clientHandled) {
-         if (commandLower !== 'pause') { // Only reset if not pause
-            // No explicit state change needed if already set to false by pause logic
-         }
+         // No explicit state change needed if already set to false by pause logic
         return; // Stop further processing if handled client-side
       }
 
