@@ -4,35 +4,80 @@
 
 import Database from 'better-sqlite3';
 import type { Database as DB } from 'better-sqlite3';
-import * as fs from 'fs'; // Import fs for file system operations in persistDbToFile
+import * as fs from 'fs'; // Import fs for file system operations
 import * as path from 'path'; // Import path for secure path joining
 
 // Module-level variable to hold the database instance.
-// WARNING: This simple approach might have issues with concurrency in high-traffic scenarios
-// or specific serverless environments. It's suitable for a single-user demo/simulation.
 let dbInstance: DB | null = null;
+const dataDir = path.join(process.cwd(), 'data'); // Define data directory path
 
 /**
- * Gets the singleton in-memory SQLite database instance, creating it if it doesn't exist.
- * DOES NOT automatically create tables; use 'init db' command for that.
+ * Validates a SQLite filename.
+ * Allows alphanumeric, underscores, hyphens, and periods. Must end with .db.
+ * Prevents path traversal.
+ * @param filename - The filename to validate.
+ * @returns True if valid, false otherwise.
+ */
+function isValidFilename(filename: string): boolean {
+    return /^[a-zA-Z0-9_\-\.]+\.db$/.test(filename) && !filename.includes('/') && !filename.includes('..');
+}
+
+/**
+ * Ensures the data directory exists.
+ */
+function ensureDataDirectory(): void {
+    try {
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+            console.log(`Created data directory: ${dataDir}`);
+        }
+    } catch (error) {
+        console.error(`Error creating data directory '${dataDir}':`, error);
+        // Decide how critical this is. For loading, maybe proceed and let DB creation fail?
+        // For saving, it's more critical. Let's re-throw for now.
+        throw new Error(`Failed to ensure data directory exists: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/**
+ * Gets the singleton SQLite database instance.
+ * If SIMUSHELL_DB_FILE env var is set and the file exists in ./data, it loads from the file.
+ * Otherwise, it creates/uses an in-memory database.
  * @returns The better-sqlite3 Database instance.
  */
 function getDb(): DB {
   if (!dbInstance) {
-    try {
-      // Creates an in-memory database
-      dbInstance = new Database(':memory:');
-      // Enable WAL mode for potentially better performance, though less critical for :memory:
-      dbInstance.pragma('journal_mode = WAL');
-      console.log('In-memory SQLite database initialized.');
+    ensureDataDirectory(); // Ensure ./data exists
+    const dbFilename = process.env.SIMUSHELL_DB_FILE;
+    let dbPath: string | null = null;
+    let mode: 'file' | 'memory' = 'memory';
 
-      // Optional: Add a cleanup hook for graceful shutdown if needed, though complex in serverless
+    if (dbFilename && isValidFilename(dbFilename)) {
+        dbPath = path.join(dataDir, dbFilename);
+        if (fs.existsSync(dbPath)) {
+            console.log(`Attempting to load database from file: ${dbPath}`);
+            mode = 'file';
+        } else {
+            console.warn(`Database file specified by SIMUSHELL_DB_FILE (${dbPath}) not found. Falling back to in-memory database.`);
+            dbPath = null; // Reset to null to force in-memory
+        }
+    } else if (dbFilename) {
+         console.warn(`Invalid filename specified in SIMUSHELL_DB_FILE: "${dbFilename}". Falling back to in-memory database.`);
+    }
+
+    try {
+      // Use the file path if mode is 'file', otherwise ':memory:'
+      dbInstance = new Database(mode === 'file' && dbPath ? dbPath : ':memory:');
+      // Enable WAL mode for potentially better performance
+      dbInstance.pragma('journal_mode = WAL');
+      console.log(`SQLite database initialized (${mode === 'file' ? `file: ${dbPath}` : 'in-memory'}).`);
+
+      // Optional: Add a cleanup hook for graceful shutdown if needed
       // process.on('exit', () => dbInstance?.close());
 
     } catch (error) {
-        console.error("Failed to initialize in-memory SQLite database:", error);
+        console.error(`Failed to initialize SQLite database (${mode === 'file' ? `file: ${dbPath}` : 'in-memory'}):`, error);
         // If initialization fails, subsequent calls might also fail.
-        // Re-throwing or handling this more gracefully might be needed.
         throw error; // Re-throw to indicate failure
     }
   }
@@ -46,12 +91,13 @@ function getDb(): DB {
  * @returns The better-sqlite3 Database instance or null.
  */
 function getCurrentDbInstanceInternal(): DB | null {
+    // Return the instance if it exists, don't try to initialize it here.
     return dbInstance;
 }
 
 
 /**
- * Executes a SQL query against the in-memory database.
+ * Executes a SQL query against the database.
  * Marked async as it's used within Server Actions, although better-sqlite3 is synchronous.
  * @param sql The SQL query string to execute.
  * @param params Optional parameters for the SQL query.
@@ -59,28 +105,21 @@ function getCurrentDbInstanceInternal(): DB | null {
  * @throws Throws an error if the SQL execution fails.
  */
 export async function runSql(sql: string, params: any[] = []): Promise<{ results: any[] | null, changes: number | null, lastInsertRowid: bigint | number | null }> {
-  const db = getDb(); // Ensure DB is initialized
+  const db = getDb(); // Ensure DB is initialized (loads from file or memory)
   try {
-    // Use prepare for safety against SQL injection, even though input isn't directly user-provided here yet.
     const stmt = db.prepare(sql);
 
-    // Check if it's a SELECT statement (heuristic)
     if (stmt.reader) {
-        // .all() executes the statement and returns all rows
         const results = stmt.all(params);
         return { results, changes: null, lastInsertRowid: null };
     } else {
-        // .run() executes the statement for INSERT, UPDATE, DELETE, etc.
         const info = stmt.run(params);
-        // Ensure lastInsertRowid is consistently number or null for easier handling downstream if needed
         const lastInsertRowid = typeof info.lastInsertRowid === 'bigint' ? Number(info.lastInsertRowid) : info.lastInsertRowid;
         return { results: null, changes: info.changes, lastInsertRowid: lastInsertRowid };
     }
   } catch (error) {
     console.error(`Error executing SQL: ${sql}`, error);
-    // Re-throw the error with potentially more context or as a specific type
     if (error instanceof Error) {
-        // Provide a more specific error message for common SQLite errors
         if (error.message.includes('syntax error')) {
             throw new Error(`SQL Syntax Error near '${sql.substring(0, 50)}...'`);
         }
@@ -91,56 +130,34 @@ export async function runSql(sql: string, params: any[] = []): Promise<{ results
 }
 
 /**
- * Persists the current in-memory database to a file.
- * WARNING: This allows writing to the server's file system. Use with caution.
+ * Persists the current database (in-memory or file-based) to a target file.
+ * If the current DB is file-based, it effectively copies/overwrites the target.
+ * WARNING: Allows writing to the server's file system. Use with caution.
  * @param targetFilename The desired filename (e.g., 'mybackup.db'). Basic validation is performed.
  * @returns A boolean indicating success or failure.
- * @throws Throws an error if the operation fails.
+ * @throws Throws an error if the operation fails or the DB isn't initialized.
  */
 export async function persistDbToFile(targetFilename: string): Promise<boolean> {
-    const currentDb = getCurrentDbInstanceInternal(); // Use the internal function
-    if (!currentDb) {
-        // Do NOT automatically initialize if trying to persist but not yet created.
-        // Require 'create sqlite' or 'init db' first.
-         throw new Error('Database not initialized. Run "create sqlite" or "init db" first before persisting.');
-    }
-    // Use the existing DB instance
-    return persistDb(currentDb, targetFilename);
-}
+    const currentDb = getDb(); // Get the current DB instance (could be memory or file)
+    // No need to check if null, getDb always returns an instance or throws
 
-// Helper function for persistence logic
-async function persistDb(db: DB, targetFilename: string): Promise<boolean> {
-    // Basic filename validation to prevent path traversal etc.
-    // Allow alphanumeric, underscores, hyphens, and periods. Must end with .db
-    if (!/^[a-zA-Z0-9_\-\.]+\.db$/.test(targetFilename) || targetFilename.includes('/') || targetFilename.includes('..')) {
-        throw new Error('Invalid filename. Use only alphanumeric, underscores, hyphens, and periods, ending with .db.');
+    // Validate target filename
+    if (!isValidFilename(targetFilename)) {
+        throw new Error('Invalid target filename. Use only alphanumeric, underscores, hyphens, and periods, ending with .db.');
     }
 
-    // Define a safe directory to write to (e.g., a 'data' subdirectory)
-    // Ensure this directory exists or create it.
-    const dataDir = path.join(process.cwd(), 'data'); // Use current working directory + /data
-    try {
-        if (!fs.existsSync(dataDir)) {
-            fs.mkdirSync(dataDir, { recursive: true });
-            console.log(`Created data directory: ${dataDir}`);
-        }
-    } catch (error) {
-        console.error(`Error creating data directory '${dataDir}':`, error);
-        throw new Error(`Failed to ensure data directory exists: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    ensureDataDirectory(); // Ensure ./data exists
 
-    const targetPath = path.join(dataDir, targetFilename); // Securely join path
-    console.log(`Attempting to persist in-memory DB to: ${targetPath}`);
+    const targetPath = path.join(dataDir, targetFilename);
+    console.log(`Attempting to persist current DB to: ${targetPath}`);
 
     try {
-        // Use the backup API to write the in-memory DB to the file
-        // The 'main' argument refers to the source database name (default for the primary DB)
-        await db.backup(targetPath);
+        // Use the backup API to write the current DB state to the target file
+        await currentDb.backup(targetPath);
         console.log(`Successfully persisted database to ${targetPath}`);
         return true;
     } catch (error) {
         console.error(`Error persisting database to ${targetPath}:`, error);
-        // Re-throw a more specific error
         throw new Error(`Failed to persist database: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
