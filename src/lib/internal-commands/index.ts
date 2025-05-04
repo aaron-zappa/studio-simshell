@@ -17,7 +17,8 @@ import { handleAddCommand } from './handle-add-command';
 import { handleExportLog } from './handle-export-log';
 import { handlePause } from './handle-pause';
 import { handleCreateSqlite } from './handle-create-sqlite';
-import { handleShowRequirements } from './handle-show-requirements'; // Import new handler
+import { handleShowRequirements } from './handle-show-requirements';
+import { handlePersistDb } from './handle-persist-db'; // Import new handler
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -76,8 +77,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handlePause(params);
         case 'create': // Check if it's 'create sqlite'
             if (commandLower.startsWith('create sqlite')) {
-                 const outputLines = await handleCreateSqlite(params);
-                 return { outputLines }; // Wrap in HandlerResult
+                 return await handleCreateSqlite(params); // Returns HandlerResult
             }
             break; // Fall through if not 'create sqlite'
         case 'show': // Check if it's 'show requirements'
@@ -85,6 +85,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  return await handleShowRequirements(params); // This now returns HandlerResult
             }
             break; // Fall through if not 'show requirements'
+        case 'persist': // Check if it's 'persist memory db to'
+            if (commandLower.startsWith('persist memory db to ')) {
+                 return await handlePersistDb(params); // Call the new handler
+            }
+            break; // Fall through if not the exact command
     }
 
     // 2. Custom internal commands

@@ -49,11 +49,11 @@ const classifyPrompt = ai.definePrompt({
 Consider the command syntax, keywords, and typical usage.
 
 Categories:
-- internal: SimuShell specific commands like 'help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'show requirements', and any custom defined internal commands.
+- internal: SimuShell specific commands like 'help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'show requirements', 'persist memory db to', and any custom defined internal commands.
 - python: Python code snippets or commands (e.g., 'print("hello")', 'import os', 'def my_func():').
 - unix: Common Unix/Linux shell commands (e.g., 'ls -la', 'cd /home', 'grep "pattern" file.txt', 'echo $PATH').
 - windows: Common Windows Command Prompt or PowerShell commands (e.g., 'dir C:\\', 'cd %USERPROFILE%', 'echo %VAR%', 'Copy-Item'). Note that 'echo' and 'cd' can also be Unix.
-- sql: SQL queries (e.g., 'SELECT * FROM users WHERE id = 1;', 'INSERT INTO products (...) VALUES (...)', 'CREATE TABLE ...').
+- sql: SQL queries (e.g., 'SELECT * FROM users WHERE id = 1;', 'INSERT INTO products (...) VALUES (...)', 'CREATE TABLE ...', 'SELECT 1;').
 - excel: Excel-like formulas (e.g., 'SUM(A1:B5)', 'VLOOKUP(...)').
 
 If the command could belong to multiple categories (e.g., 'echo hello' could be unix or windows), classify it as 'ambiguous'.
@@ -80,26 +80,29 @@ const classifyCommandFlow = ai.defineFlow<
   async (input) => {
     // Add simple pre-checks for common internal commands to potentially bypass AI call
     const commandLower = input.command.toLowerCase().trim();
-    const internalCommands = ['help', 'clear', 'mode', 'history', 'define', 'refine', 'add_int_cmd', 'export log', 'pause', 'create sqlite', 'show requirements'];
+    const internalCommands = [
+        'help', 'clear', 'mode', 'history', 'define', 'refine',
+        'add_int_cmd', 'export log', 'pause', 'create sqlite', 'show requirements',
+        'persist memory db to' // Added new command prefix
+    ];
     const commandName = commandLower.split(' ')[0];
     const commandPrefix = commandLower.split(' ')[0] + (commandLower.includes(' ') ? ' ' : ''); // e.g. 'show ' or 'help'
 
     // Check if the command *exactly* matches or *starts with* a known internal command prefix
-    // Updated add_int_cmd check
      if (internalCommands.some(intCmd => {
-        const cmdPrefix = intCmd.includes(' ') ? intCmd.split(' ')[0] + ' ' : intCmd;
-        const isMatch = commandLower === intCmd || (intCmd.includes(' ') && commandPrefix === cmdPrefix);
-        // Special check for add_int_cmd which requires arguments
-        if (intCmd === 'add_int_cmd') {
-            return commandPrefix === 'add_int_cmd ';
+        const cmdPrefixToCheck = intCmd.includes(' ') ? intCmd.split(' ')[0] + ' ' : intCmd; // e.g., 'add_int_cmd ' or 'help'
+        // Special check for commands requiring arguments
+        if (intCmd === 'add_int_cmd' || intCmd === 'create sqlite' || intCmd === 'persist memory db to') {
+            return commandPrefix === intCmd + ' '; // Must have space after command name
         }
-        return isMatch;
+        // For commands without arguments or variable arguments (like help)
+        return commandLower === intCmd || commandPrefix === cmdPrefixToCheck;
     })) {
         return { category: 'internal' };
     }
 
     // If not a clear internal command, proceed with AI classification
-    const {output} = await classifyPrompt(input); // Fix: Use classifyPrompt instead of prompt
+    const {output} = await classifyPrompt(input);
 
     // Basic validation or refinement can happen here if needed
     if (!output) {

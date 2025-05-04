@@ -4,6 +4,8 @@
 
 import Database from 'better-sqlite3';
 import type { Database as DB } from 'better-sqlite3';
+import * as fs from 'fs'; // Import fs for file system operations in persistDbToFile
+import * as path from 'path'; // Import path for secure path joining
 
 // Module-level variable to hold the database instance.
 // WARNING: This simple approach might have issues with concurrency in high-traffic scenarios
@@ -35,6 +37,17 @@ function getDb(): DB {
   }
   return dbInstance;
 }
+
+/**
+ * Returns the current in-memory database instance if it exists, otherwise null.
+ * Useful for operations that need the instance but shouldn't initialize it (like persisting).
+ * This function is NOT exported.
+ * @returns The better-sqlite3 Database instance or null.
+ */
+function getCurrentDbInstance(): DB | null {
+    return dbInstance;
+}
+
 
 /**
  * Executes a SQL query against the in-memory database.
@@ -77,6 +90,57 @@ export async function runSql(sql: string, params: any[] = []): Promise<{ results
 }
 
 /**
+ * Persists the current in-memory database to a file.
+ * WARNING: This allows writing to the server's file system. Use with caution.
+ * @param targetFilename The desired filename (e.g., 'mybackup.db'). Basic validation is performed.
+ * @returns A boolean indicating success or failure.
+ * @throws Throws an error if the operation fails.
+ */
+export async function persistDbToFile(targetFilename: string): Promise<boolean> {
+    const currentDb = getCurrentDbInstance(); // Use the internal function
+    if (!currentDb) {
+        throw new Error('In-memory database is not initialized. Cannot persist.');
+    }
+
+    // Basic filename validation to prevent path traversal etc.
+    // Allow alphanumeric, underscores, hyphens, and periods. Must end with .db
+    if (!/^[a-zA-Z0-9_\-\.]+\.db$/.test(targetFilename) || targetFilename.includes('/') || targetFilename.includes('..')) {
+        throw new Error('Invalid filename. Use only alphanumeric, underscores, hyphens, and periods, ending with .db.');
+    }
+
+    // Define a safe directory to write to (e.g., a 'data' subdirectory)
+    // Ensure this directory exists or create it.
+    const dataDir = path.join(process.cwd(), 'data'); // Use current working directory + /data
+    try {
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+            console.log(`Created data directory: ${dataDir}`);
+        }
+    } catch (error) {
+        console.error(`Error creating data directory '${dataDir}':`, error);
+        throw new Error(`Failed to ensure data directory exists: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+
+    const targetPath = path.join(dataDir, targetFilename); // Securely join path
+
+    console.log(`Attempting to persist in-memory DB to: ${targetPath}`);
+
+    try {
+        // Use the backup API to write the in-memory DB to the file
+        // The 'main' argument refers to the source database name (default for the primary DB)
+        await currentDb.backup(targetPath);
+        console.log(`Successfully persisted database to ${targetPath}`);
+        return true;
+    } catch (error) {
+        console.error(`Error persisting database to ${targetPath}:`, error);
+        // Re-throw a more specific error
+        throw new Error(`Failed to persist database: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+
+/**
  * Returns the name of the current file.
  * This function is not exported to avoid being treated as a Server Action.
  * @returns The filename.
@@ -84,5 +148,3 @@ export async function runSql(sql: string, params: any[] = []): Promise<{ results
 function getFilename(): string {
     return 'database.ts';
 }
-
-// formatResultsAsTable moved to src/lib/formatting.ts
