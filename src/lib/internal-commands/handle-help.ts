@@ -18,9 +18,9 @@ interface HandlerParams {
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
-// Update function signature to return HandlerResult and make it async
+// Update function signature to return Promise<HandlerResult> and make it async
 export const handleHelp = async ({ timestamp, initialSuggestions, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
-    // Update help text to include 'add ai_tool' command
+    // Correct the help text for add ai_tool
     const helpText = `Command category is automatically detected.
 Available categories: ${Object.keys(initialSuggestions).join(', ')}.
 Available internal commands: help, clear, history, define, refine, add int_cmd <short> <name> "<description>" <whatToDo>, add ai_tool <toolname> "<description>" "<args_description>", export log, pause, create sqlite <filename.db>, init, init db, list py vars, show requirements, persist memory db to <filename.db>, ai <inputtext> (use {varname} for variable substitution)

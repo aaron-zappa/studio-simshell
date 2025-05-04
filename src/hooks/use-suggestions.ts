@@ -16,7 +16,7 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'define',
       'refine',
       'add int_cmd <short> <name> "<description>" <whatToDo>', // Updated old command suggestion
-      'add ai_tool <toolname> "<description>" "<args_description>"', // Added new AI tool suggestion
+      'add ai_tool <toolname> "<description>" "<args_description>"', // Corrected AI tool suggestion order
       'export log',
       'pause',
       'create sqlite <filename.db>',
@@ -54,7 +54,7 @@ export const useSuggestions = () => {
             if (mode === 'internal' && lowerCommand.startsWith('add int_cmd')) {
                 suggestionToAdd = 'add int_cmd <short> <name> "<description>" <whatToDo>';
             }
-            // Special format for add_ai_tool suggestion
+            // Corrected format for add_ai_tool suggestion
              if (mode === 'internal' && lowerCommand.startsWith('add ai_tool')) {
                  suggestionToAdd = 'add ai_tool <toolname> "<description>" "<args_description>"';
              }
