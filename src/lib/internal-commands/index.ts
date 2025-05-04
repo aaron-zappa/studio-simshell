@@ -20,6 +20,7 @@ import { handleCreateSqlite } from './handle-create-sqlite';
 import { handleShowRequirements } from './handle-show-requirements';
 import { handlePersistDb } from './handle-persist-db';
 import { handleInitDb } from './handle-init-db';
+import { handleInit } from './handle-init'; // Import the new init handler
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -48,7 +49,7 @@ interface HandlerResult {
  * Now returns a HandlerResult object.
  */
 export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<HandlerResult> => {
-    const { commandName, commandLower, getCustomCommandAction } = params;
+    const { commandName, commandLower, args, getCustomCommandAction } = params; // Destructure args
 
     // 1. Built-in commands (prioritized)
     switch (commandName) {
@@ -91,11 +92,13 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  return handlePersistDb(params); // Call the new handler
             }
             break; // Fall through if not the exact command
-        case 'init': // Check if it's 'init db'
+        case 'init': // Check if it's 'init' or 'init db'
             if (commandLower === 'init db') {
-                 return handleInitDb(params); // Call the new handler
+                 return handleInitDb(params); // Call the specific handler
+            } else if (commandLower === 'init' && args.length === 0) { // Check for 'init' without args
+                 return handleInit(params); // Call the new general init handler
             }
-            break; // Fall through if not 'init db'
+            break; // Fall through if not 'init' or 'init db'
     }
 
     // 2. Custom internal commands

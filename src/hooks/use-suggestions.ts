@@ -21,7 +21,8 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'create sqlite <filename.db>',
       'show requirements',
       'persist memory db to <filename.db>',
-      'init db', // Added init db suggestion
+      'init', // Added general init command
+      'init db', // Keep specific init db as well
     ],
   python: ['print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield '],
   unix: ['ls', 'cd', 'pwd', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'grep', 'echo', 'man', 'sudo'],
@@ -58,6 +59,10 @@ export const useSuggestions = () => {
             // Add format for init db
             if (mode === 'internal' && lowerCommand === 'init db') {
                 suggestionToAdd = 'init db';
+            }
+            // Add format for init
+            if (mode === 'internal' && lowerCommand === 'init') {
+                suggestionToAdd = 'init';
             }
 
 
