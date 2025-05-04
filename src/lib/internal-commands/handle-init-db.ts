@@ -92,10 +92,10 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         // Role-Permission Assignments
         // Admin gets all
         `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r, permissions p WHERE r.role_name = 'administrator';`,
-        // Developer gets variable management, SQL execution, AI tool usage/management
-        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('manage_variables', 'execute_sql_select', 'execute_sql_modify', 'use_ai_tools', 'manage_ai_tools') WHERE r.role_name = 'developer';`,
-        // Basic user gets read variables and use AI tools
-        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('read_variables', 'use_ai_tools') WHERE r.role_name = 'basic_user';`,
+        // Developer gets variable management, SQL execution, AI tool usage/management, AND manage_roles_permissions
+        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('manage_variables', 'execute_sql_select', 'execute_sql_modify', 'use_ai_tools', 'manage_ai_tools', 'manage_roles_permissions') WHERE r.role_name = 'developer';`,
+        // Basic user gets read variables, use AI tools, AND manage_roles_permissions
+        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('read_variables', 'use_ai_tools', 'manage_roles_permissions') WHERE r.role_name = 'basic_user';`,
 
         // Users
         `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('admin', 'dummy_hash');`, // Replace with real hashing
@@ -145,6 +145,8 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         const finalSummaryText = `DB Initialization: ${successfulStatements} statements executed successfully. ${errors.length} errors encountered.`;
         logText += finalSummaryText;
         // Add a final summary line to the output
+        // Determine final output type based on errors
+        outputType = errors.length > 0 ? 'error' : 'info';
         outputLines.push({ id: `init-summary-${timestamp}`, text: finalSummaryText, type: outputType, category: 'internal', timestamp });
 
 
