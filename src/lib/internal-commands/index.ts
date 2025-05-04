@@ -37,7 +37,7 @@ interface InternalCommandHandlerParams {
     timestamp: string;
     addSuggestion: (mode: CommandMode, command: string) => void; // Client-side, problematic
     addCustomCommand: (name: string, action: CustomCommandAction) => void; // Client-side, problematic
-    getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Client-side, problematic
+    getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Potentially problematic in Server Action
     currentLogEntries: LogEntry[]; // Pass current logs (uses new LogEntry type)
     initialSuggestions: Record<string, string[]>;
 }
