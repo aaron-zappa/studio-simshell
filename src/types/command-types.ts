@@ -6,6 +6,10 @@
  */
 export type CommandMode = 'internal' | 'python' | 'unix' | 'windows' | 'sql' | 'excel';
 
+// Array containing all possible command modes
+export const ALL_COMMAND_MODES: CommandMode[] = ['internal', 'python', 'unix', 'windows', 'sql', 'excel'];
+
+
 // Note: The CommandCategory type from the classification flow also includes 'ambiguous' and 'unknown'.
 // We are keeping CommandMode simpler for now, representing only the executable categories.
 // The UI/executor handles 'ambiguous'/'unknown' before calling executeCommand.

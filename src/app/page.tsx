@@ -6,10 +6,12 @@ import * as React from 'react';
 import { CommandInput } from '@/components/command-input';
 import { OutputDisplay, type OutputLine } from '@/components/output-display';
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
+import { Label } from "@/components/ui/label"; // Import Label
 import { useCustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions';
 import { executeCommand } from '@/lib/command-executor';
-import type { CommandMode } from '@/types/command-types';
+import { CommandMode, ALL_COMMAND_MODES } from '@/types/command-types'; // Import CommandMode and ALL_COMMAND_MODES
 import { exportLogFile, type LogEntry } from '@/lib/logging';
 import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-command-flow'; // Import classification flow
 import { useToast } from "@/hooks/use-toast"; // Import toast
@@ -21,9 +23,20 @@ export default function Home() {
   const [isRunning, setIsRunning] = React.useState<boolean>(false);
   const { toast } = useToast(); // Toast hook for notifications
 
-  // Suggestions hook now returns all suggestions potentially
-  const { suggestions, addSuggestion, getAllSuggestions, initialSuggestions } = useSuggestions();
+  // State for selected categories, default to all selected
+  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(ALL_COMMAND_MODES);
+
+  // Suggestions hook now returns categorized suggestions
+  const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
   const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
+
+  const handleCategoryChange = (category: CommandMode, checked: boolean | 'indeterminate') => {
+    setSelectedCategories(prev =>
+      checked
+        ? [...prev, category]
+        : prev.filter(c => c !== category)
+    );
+  };
 
   const handleCommandSubmit = async (command: string) => {
     const commandLower = command.toLowerCase().trim();
@@ -148,14 +161,40 @@ export default function Home() {
     }
   };
 
-   // Get suggestions across all relevant modes
-   const allCurrentSuggestions = getAllSuggestions(customCommands);
+   // Calculate suggestions based on selected categories
+   const filteredSuggestionsForInput = React.useMemo(() => {
+       const combinedSuggestions = new Set<string>();
+        selectedCategories.forEach(cat => {
+           (suggestions[cat] || []).forEach(sug => combinedSuggestions.add(sug));
+           // Add custom internal commands if 'internal' category is selected
+           if (cat === 'internal') {
+                Object.keys(customCommands).forEach(cmdName => combinedSuggestions.add(cmdName));
+           }
+        });
+       return Array.from(combinedSuggestions).sort();
+   }, [selectedCategories, suggestions, customCommands]);
 
 
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
        <header className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <h1 className="text-2xl font-semibold">SimuShell</h1>
+          {/* Category Checkboxes */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="text-sm font-medium mr-2">Show Suggestions For:</span>
+              {ALL_COMMAND_MODES.map(category => (
+                  <div key={category} className="flex items-center space-x-2">
+                      <Checkbox
+                          id={`category-${category}`}
+                          checked={selectedCategories.includes(category)}
+                          onCheckedChange={(checked) => handleCategoryChange(category, checked)}
+                      />
+                      <Label htmlFor={`category-${category}`} className="text-sm font-normal capitalize">
+                          {category}
+                      </Label>
+                  </div>
+              ))}
+          </div>
       </header>
 
       <Separator className="mb-4" />
@@ -169,7 +208,7 @@ export default function Home() {
       <footer className="shrink-0">
         <CommandInput
             onSubmit={handleCommandSubmit}
-            suggestions={allCurrentSuggestions} // Provide all suggestions
+            suggestions={filteredSuggestionsForInput} // Provide filtered suggestions
             disabled={isRunning}
          />
       </footer>
@@ -181,6 +220,6 @@ export default function Home() {
  * Returns the name of the current file.
  * @returns The filename.
  */
-export function getFilename(): string {
+function getFilename(): string {
     return 'page.tsx';
 }
