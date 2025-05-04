@@ -22,39 +22,38 @@ interface HandlerParams {
 
 /**
  * Handles the 'help' command.
- * Displays available categories, internal commands, and usage notes.
+ * Displays available categories, internal commands, and usage notes, grouped by category.
  */
 // Update function signature to return Promise<HandlerResult> and make it async
 export const handleHelp = async ({ timestamp, initialSuggestions, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
     // No specific permission needed for help
-    // Format the internal commands list with a bold heading and newlines
-    const internalCommandsList = [
-        'help', 'clear', 'history', 'define', 'refine',
-        'add int_cmd <short> <name> "<description>" <whatToDo>',
-        'add ai_tool <toolname> "<args_description>" "<description>"',
-        'set ai_tool <name> active <0|1>',
-        'export log', 'export db', 'pause',
-        'create sqlite <filename.db>', 'init', 'init db',
-        'list py vars', 'show requirements',
-        'persist memory db to <filename.db>',
-        'ai <inputtext> (use {varname} for variable substitution)'
-    ].join('\n- '); // Join with newline and hyphen for list format
 
-    // Note: The help text currently focuses on internal commands. If other categories
-    // need detailed command lists in help, they should follow the same \n**Category**\n format.
-    const helpText = `Command category is automatically detected.
+    let helpText = `Command category is automatically detected based on input and active categories.
 @bat:<filename><.bat/.sh/.sim>(experimental).
 
 Available categories: ${Object.keys(initialSuggestions).join(', ')}.
 
-**Internal**
-- ${internalCommandsList}
+--- Command Suggestions by Category ---`;
 
-Run custom commands by typing their name.
+    // Iterate through categories and their suggestions
+    for (const category in initialSuggestions) {
+        const suggestions = initialSuggestions[category as CommandMode];
+        if (suggestions && suggestions.length > 0) {
+            // Add bold category heading
+            helpText += `\n\n**${category.charAt(0).toUpperCase() + category.slice(1)}**`;
+            // List suggestions under the category
+            suggestions.forEach(suggestion => {
+                helpText += `\n- ${suggestion}`;
+            });
+        }
+    }
+
+    helpText += `\n\nRun custom commands by typing their name.
 Assign variables using \`var_name = value\`.
 Note: 'mode' command is informational only.`;
 
-    const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp: undefined }]; // Remove timestamp for non-log output
+
+    const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp: undefined, flag: 0 }]; // Add flag
 
     // Create log entry with flag=0
     const logEntry: LogEntry = { timestamp, type: 'I', flag: 0, text: `Displayed help. (User: ${userId})` };
