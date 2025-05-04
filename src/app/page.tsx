@@ -35,17 +35,26 @@ export default function Home() {
         try {
             const status = await getDbStatusAction();
             const timestamp = new Date().toISOString();
+            let statusType: OutputLine['type'] = 'info';
+            let logType: LogEntry['type'] = 'I';
+
+            // Check if the status message indicates failure ('nok')
+            if (status.includes('nok')) {
+                statusType = 'error';
+                logType = 'E';
+            }
+
             const statusLine: OutputLine = {
                 id: `db-status-${timestamp}`,
                 text: status,
-                type: 'info',
+                type: statusType, // Use determined type
                 category: 'internal',
-                timestamp: timestamp,
+                timestamp: timestamp, // Add timestamp for log format
             };
             // Use functional update to ensure latest state
             setHistory(prev => [...prev, statusLine]);
             // Also add to log entries
-            setLogEntries(prev => [...prev, { timestamp, type: 'I', text: status }]);
+            setLogEntries(prev => [...prev, { timestamp, type: logType, text: status }]); // Use determined type
         } catch (error) {
             console.error("Failed to fetch DB status:", error);
             const timestamp = new Date().toISOString();

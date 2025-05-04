@@ -54,7 +54,7 @@ function getDb(): DB {
     if (dbFilename && isValidFilename(dbFilename)) {
         const potentialPath = path.join(dataDir, dbFilename);
         if (fs.existsSync(potentialPath)) {
-            console.log(`Attempting to load database from file: ${potentialPath}`);
+            // console.log(`Attempting to load database from file: ${potentialPath}`); // Log removed, handled by getDbStatusAction
             dbPath = potentialPath;
             mode = 'file';
         } else {
@@ -74,15 +74,11 @@ function getDb(): DB {
 
       if (mode === 'file' && dbPath) {
           loadedDbPath = dbPath; // Store the path if loaded from file
-          console.log(`Successfully loaded database from file: ${loadedDbPath}`);
+          // console.log(`Successfully loaded database from file: ${loadedDbPath}`); // Log removed, handled by getDbStatusAction
       } else {
           loadedDbPath = ':memory:';
-          console.log(`SQLite database initialized (in-memory).`);
+          // console.log(`SQLite database initialized (in-memory).`); // Log removed, handled by getDbStatusAction
       }
-
-
-      // Optional: Add a cleanup hook for graceful shutdown if needed
-      // process.on('exit', () => dbInstance?.close());
 
     } catch (error) {
         console.error(`Failed to initialize SQLite database (${mode === 'file' ? `file: ${dbPath}` : 'in-memory'}):`, error);
@@ -183,16 +179,19 @@ export async function persistDbToFile(targetFilename: string): Promise<boolean> 
 // --- Server Action to get DB status ---
 /**
  * Server Action to get the status of the loaded database.
- * @returns A string indicating the loaded database path or if it's in-memory.
+ * @returns A string indicating the loaded database path or if it's in-memory, with status.
  */
 export async function getDbStatusAction(): Promise<string> {
     const path = getLoadedDbPathInternal();
     if (path === ':memory:') {
-        return "Database is running in-memory.";
+        return "Database loaded with status ok (in-memory)";
     } else if (path) {
-        return `Database loaded from file: ${path}`;
+        // Assuming if path is set and not ':memory:', it loaded successfully.
+        // Error during loading would have thrown in getDb().
+        return `Database loaded with status ok (file: ${path})`;
     } else {
-        return "Database status unknown or not initialized.";
+        // If path is null, it means getDb() potentially failed or wasn't called.
+        return "Database loaded with status nok (not initialized or error)";
     }
 }
 // --- End Server Action ---
