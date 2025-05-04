@@ -2,25 +2,31 @@
 // src/lib/internal-commands/handle-not-found.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/lib/logging'; // Import LogEntry
+import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (not applicable here yet)
+    newLogEntries?: LogEntry[]; // Uses new LogEntry type
 }
 
 interface HandlerParams {
     commandName: string;
     timestamp: string;
-    // Potentially add currentLogEntries if this needs to log
+    currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handleNotFound = async ({ commandName, timestamp }: HandlerParams): Promise<HandlerResult> => {
-    const outputLines = [{ id: `out-${timestamp}`, text: `Internal command not found: ${commandName}`, type: 'error', category: 'internal' }];
-    // Return the result object (no log changes)
-    return { outputLines: outputLines };
+export const handleNotFound = async ({ commandName, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+    const outputText = `Internal command not found: ${commandName}`;
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'error', category: 'internal' }];
+
+    // Create log entry
+    const logEntry: LogEntry = { timestamp, type: 'W', text: `Attempted unknown internal command: ${commandName}` };
+    const newLogEntries = [...currentLogEntries, logEntry];
+
+    // Return the result object
+    return { outputLines: outputLines, newLogEntries };
 };
 
 /**
@@ -31,4 +37,3 @@ export const handleNotFound = async ({ commandName, timestamp }: HandlerParams):
 function getFilename(): string {
     return 'handle-not-found.ts';
 }
-

@@ -2,26 +2,32 @@
 // src/lib/internal-commands/handle-pause.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/lib/logging'; // Import LogEntry
+import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (not applicable here)
+    newLogEntries?: LogEntry[]; // Uses new LogEntry type
 }
 
 interface HandlerParams {
     timestamp: string;
-    // Potentially add currentLogEntries if this needs to log
+    currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handlePause = async ({ timestamp }: HandlerParams): Promise<HandlerResult> => {
+export const handlePause = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     // 'pause' logic is primarily client-side to interact with the running state.
     // This server-side handler might provide confirmation if needed, but the core stop logic is client-side.
-    const outputLines = [{ id: `out-${timestamp}`, text: `'pause' command acknowledged server-side (actual stop is client-side).`, type: 'info', category: 'internal' }];
-    // Return the result object (no log changes)
-    return { outputLines: outputLines };
+    const outputText = `'pause' command acknowledged server-side (actual stop is client-side).`;
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'info', category: 'internal' }];
+
+    // No server-side log generated here, client handles logging 'Task paused.'
+    // const logEntry: LogEntry = { timestamp, type: 'I', text: outputText };
+    // const newLogEntries = [...currentLogEntries, logEntry];
+
+    // Return the result object
+    return { outputLines: outputLines /*, newLogEntries */ };
 };
 
 /**
@@ -32,4 +38,3 @@ export const handlePause = async ({ timestamp }: HandlerParams): Promise<Handler
 function getFilename(): string {
     return 'handle-pause.ts';
 }
-

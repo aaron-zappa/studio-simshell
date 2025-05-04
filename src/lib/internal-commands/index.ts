@@ -4,7 +4,7 @@
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/lib/logging';
+import type { LogEntry } from '@/types/log-types'; // Import the new LogEntry type
 import type { CommandMode } from '@/types/command-types';
 
 // Import individual command handlers
@@ -19,7 +19,7 @@ import { handlePause } from './handle-pause';
 import { handleCreateSqlite } from './handle-create-sqlite';
 import { handleShowRequirements } from './handle-show-requirements';
 import { handlePersistDb } from './handle-persist-db';
-import { handleInitDb } from './handle-init-db'; // Import the new handler
+import { handleInitDb } from './handle-init-db';
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -32,14 +32,14 @@ interface InternalCommandHandlerParams {
     addSuggestion: (mode: CommandMode, command: string) => void; // Client-side, problematic
     addCustomCommand: (name: string, action: CustomCommandAction) => void; // Client-side, problematic
     getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Client-side, problematic
-    currentLogEntries: LogEntry[]; // Pass current logs
+    currentLogEntries: LogEntry[]; // Pass current logs (uses new LogEntry type)
     initialSuggestions: Record<string, string[]>;
 }
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified
+    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (uses new LogEntry type)
 }
 
 
@@ -78,22 +78,22 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handlePause(params);
         case 'create': // Check if it's 'create sqlite'
             if (commandLower.startsWith('create sqlite')) {
-                 return await handleCreateSqlite(params); // Returns HandlerResult
+                 return handleCreateSqlite(params); // Returns HandlerResult
             }
             break; // Fall through if not 'create sqlite'
         case 'show': // Check if it's 'show requirements'
             if (commandLower.startsWith('show requirements')) {
-                 return await handleShowRequirements(params); // This now returns HandlerResult
+                 return handleShowRequirements(params); // This now returns HandlerResult
             }
             break; // Fall through if not 'show requirements'
         case 'persist': // Check if it's 'persist memory db to'
             if (commandLower.startsWith('persist memory db to ')) {
-                 return await handlePersistDb(params); // Call the new handler
+                 return handlePersistDb(params); // Call the new handler
             }
             break; // Fall through if not the exact command
         case 'init': // Check if it's 'init db'
             if (commandLower === 'init db') {
-                 return await handleInitDb(params); // Call the new handler
+                 return handleInitDb(params); // Call the new handler
             }
             break; // Fall through if not 'init db'
     }
@@ -102,7 +102,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
     const customAction = getCustomCommandAction(params.commandName);
     if (customAction !== undefined) {
         // handleCustomCommand now returns HandlerResult
-        return await handleCustomCommand(params, customAction);
+        return handleCustomCommand(params, customAction);
     }
 
     // 3. Command not found

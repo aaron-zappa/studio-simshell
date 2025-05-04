@@ -3,23 +3,23 @@
 'use server';
 import type { OutputLine } from '@/components/output-display';
 import type { CommandMode } from '@/types/command-types';
-import type { LogEntry } from '@/lib/logging'; // Import LogEntry
+import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (not applicable here yet)
+    newLogEntries?: LogEntry[]; // Uses new LogEntry type
 }
 
 
 interface HandlerParams {
     timestamp: string;
     initialSuggestions: Record<string, string[]>;
-    // Potentially add currentLogEntries if this command needs to log
+    currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handleHelp = async ({ timestamp, initialSuggestions }: HandlerParams): Promise<HandlerResult> => {
+export const handleHelp = async ({ timestamp, initialSuggestions, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     // Update help text to include 'init db' command
     const helpText = `Command category is automatically detected.
 Available categories: ${Object.keys(initialSuggestions).join(', ')}.
@@ -28,8 +28,12 @@ Run custom commands by typing their name.
 Note: 'mode' command is informational only.`;
     const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal' }];
 
-    // Return the result object (no log changes in this handler)
-    return { outputLines: outputLines };
+    // Create log entry
+    const logEntry: LogEntry = { timestamp, type: 'I', text: `Displayed help.` };
+    const newLogEntries = [...currentLogEntries, logEntry];
+
+    // Return the result object
+    return { outputLines: outputLines, newLogEntries };
 };
 
 /**

@@ -2,26 +2,31 @@
 // src/lib/internal-commands/handle-define.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/lib/logging'; // Import LogEntry
+import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (not applicable here yet)
+    newLogEntries?: LogEntry[]; // Uses new LogEntry type
 }
 
 interface HandlerParams {
     args: string[];
     timestamp: string;
-    // Potentially add currentLogEntries if this command needs to log
+    currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return Promise<HandlerResult> and make it async
-export const handleDefine = async ({ args, timestamp }: HandlerParams): Promise<HandlerResult> => {
+export const handleDefine = async ({ args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     // TODO: Implement define functionality
-    const outputLines = [{ id: `out-${timestamp}`, text: `Define command placeholder for: ${args.join(' ')}`, type: 'output', category: 'internal' }];
-    // Return the result object (no log changes in this handler currently)
-    return { outputLines: outputLines };
+    const outputText = `Define command placeholder for: ${args.join(' ')}`;
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal' }];
+
+    // Create log entry
+    const logEntry: LogEntry = { timestamp, type: 'W', text: `Define command not yet implemented. Args: ${args.join(' ')}` };
+    const newLogEntries = [...currentLogEntries, logEntry];
+
+    return { outputLines: outputLines, newLogEntries };
 };
 
 /**

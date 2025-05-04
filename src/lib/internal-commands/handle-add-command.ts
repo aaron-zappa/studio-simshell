@@ -2,14 +2,14 @@
 // src/lib/internal-commands/handle-add-command.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/lib/logging'; // Keep LogEntry import
+import type { LogEntry } from '@/types/log-types'; // Import the new LogEntry type
 import type { CommandMode } from '@/types/command-types';
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified
+    newLogEntries?: LogEntry[]; // Uses the new LogEntry type
 }
 
 
@@ -18,7 +18,7 @@ interface HandlerParams {
     timestamp: string;
     addSuggestion: (mode: CommandMode, command: string) => void; // Client-side function, problematic
     addCustomCommand: (name: string, action: CustomCommandAction) => void; // Client-side function, problematic
-    currentLogEntries: LogEntry[]; // Pass current logs
+    currentLogEntries: LogEntry[]; // Pass current logs (uses new LogEntry type)
     initialSuggestions: Record<string, string[]>;
 }
 
@@ -42,30 +42,26 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
             outputLines = [{ id: `out-${timestamp}`, text: `Error: Cannot redefine built-in command "${newCommandName}".`, type: 'error', category: 'internal' }];
         } else {
             // Note: Calling these client-side functions from a server action is problematic.
-            // This structure assumes these functions *could* potentially be adapted
-            // to work server-side (e.g., by updating a database instead of client state).
             try {
-                 // These calls might still cause issues depending on how they are implemented
-                 // and whether they rely on client-side React state hooks.
                  addSuggestion('internal', newCommandName);
                  addCustomCommand(newCommandName, newCommandAction);
             } catch (e) {
                 console.warn("addSuggestion/addCustomCommand called in server context, may not behave as expected.", e)
             }
 
-
+            // Create log entry in the new format
+            const logText = `Added internal command: "${newCommandName}" (short: ${newCommandShort}). Desc: "${newCommandDescription}". Action: "${newCommandAction}".`;
             const logEntry: LogEntry = {
                 timestamp: new Date().toISOString(),
-                short: newCommandShort,
-                commandName: newCommandName,
-                description: newCommandDescription,
-                action: newCommandAction,
+                type: 'I', // Info type
+                text: logText,
             };
 
             // Update the log entries array directly
             updatedLogEntries.push(logEntry);
 
-            outputLines.push({ id: `out-${timestamp}`, text: `Added internal command: "${newCommandName}" (short: ${newCommandShort}). Description: "${newCommandDescription}". Action: "${newCommandAction}". Logged to session log.`, type: 'info', category: 'internal' });
+            // Provide feedback (same text as log entry for consistency)
+            outputLines.push({ id: `out-${timestamp}`, text: logText, type: 'info', category: 'internal' });
         }
     } else {
         outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`, type: 'error', category: 'internal' }];

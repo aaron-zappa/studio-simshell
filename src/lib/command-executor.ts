@@ -4,8 +4,8 @@
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
-import { type LogEntry } from '@/lib/logging';
-import type { CommandMode } from '@/types/command-types'; // CommandMode now represents the classified category
+import { type LogEntry } from '@/types/log-types'; // Import the new LogEntry type
+import type { CommandMode } from '@/types/command-types';
 import { runSql } from '@/lib/database';
 import { formatResultsAsTable } from '@/lib/formatting';
 import { handleInternalCommand } from '@/lib/internal-commands'; // Import the central internal command handler
@@ -17,14 +17,14 @@ interface ExecuteCommandParams {
   addSuggestion: (mode: CommandMode, command: string) => void; // Potentially problematic in Server Action
   addCustomCommand: (name: string, action: CustomCommandAction) => void; // Potentially problematic in Server Action
   getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Potentially problematic in Server Action
-  currentLogEntries: LogEntry[]; // Pass current log entries for modification
+  currentLogEntries: LogEntry[]; // Pass current log entries (uses new LogEntry type)
   initialSuggestions: Record<string, string[]>; // Passed for 'help' and validation
 }
 
 // Define the return type to include potentially updated log entries
 interface ExecuteCommandResult {
   outputLines: OutputLine[];
-  newLogEntries?: LogEntry[]; // Include new log entries if they were modified
+  newLogEntries?: LogEntry[]; // Include new log entries if they were modified (uses new LogEntry type)
 }
 
 /**
@@ -55,157 +55,194 @@ export async function executeCommand ({
 
   let outputLines: OutputLine[] = [];
   let potentiallyUpdatedLogs: LogEntry[] | undefined = undefined; // Track log changes
+  let logEntry: LogEntry | null = null; // Variable to hold a potential new log entry
 
   // --- Dispatch based on Classified Mode ---
-  if (mode === 'internal') {
-    // Internal commands are handled by a dedicated module
-    // It now returns an object including potential log updates
-     const internalResult = await handleInternalCommand({
-        command,
-        commandLower,
-        commandName,
-        args: command.split(' ').slice(1),
-        timestamp,
-        // Functions like addSuggestion/addCustomCommand/getCustomCommandAction are tricky in Server Actions
-        // as they often rely on client-side state. Passing them is generally not recommended
-        // unless they are adapted to work server-side (e.g., modifying a database).
-        // For now, we pass them but acknowledge this limitation.
-        addSuggestion: addSuggestion, // PROBLEM: Modifies client state
-        addCustomCommand: addCustomCommand, // PROBLEM: Modifies client state
-        getCustomCommandAction: getCustomCommandAction, // PROBLEM: Reads client state
-        currentLogEntries: currentLogEntries, // Pass current logs
-        initialSuggestions: initialSuggestions
-    });
-     outputLines = internalResult.outputLines;
-     potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
-  }
-  else if (mode === 'python') {
-     // --- Python Variable Assignment Handling ---
-     const assignmentRegex = /^\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$/;
-     const assignmentMatch = command.match(assignmentRegex);
+  try {
+      if (mode === 'internal') {
+        // Internal commands are handled by a dedicated module
+        const internalResult = await handleInternalCommand({
+            command,
+            commandLower,
+            commandName,
+            args: command.split(' ').slice(1),
+            timestamp,
+            addSuggestion: addSuggestion,
+            addCustomCommand: addCustomCommand,
+            getCustomCommandAction: getCustomCommandAction,
+            currentLogEntries: currentLogEntries,
+            initialSuggestions: initialSuggestions
+        });
+         outputLines = internalResult.outputLines;
+         potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
+      }
+      else if (mode === 'python') {
+         // --- Python Variable Assignment Handling ---
+         const assignmentRegex = /^\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$/;
+         const assignmentMatch = command.match(assignmentRegex);
 
-     if (assignmentMatch) {
-         const variableName = assignmentMatch[1];
-         const valueString = assignmentMatch[2].trim();
-         let dataType = 'unknown';
-         let actualValue: any = valueString; // Store the string representation by default
+         if (assignmentMatch) {
+             const variableName = assignmentMatch[1];
+             const valueString = assignmentMatch[2].trim();
+             let dataType = 'unknown';
+             let actualValue: any = valueString;
 
-         // Infer data type
-         if (/^\d+$/.test(valueString)) {
-             dataType = 'integer';
-             actualValue = parseInt(valueString, 10);
-         } else if (/^\d+\.\d+$/.test(valueString)) {
-             dataType = 'real';
-              actualValue = parseFloat(valueString);
-         } else if (valueString === 'True' || valueString === 'False') {
-             dataType = 'boolean';
-              actualValue = valueString === 'True';
-         } else if ((valueString.startsWith('"') && valueString.endsWith('"')) || (valueString.startsWith("'") && valueString.endsWith("'"))) {
-             dataType = 'string';
-             actualValue = valueString.slice(1, -1); // Remove quotes for storage
-         } else {
-            // Could be an expression, None, list, dict etc. - treat as string for now
-             dataType = 'string'; // Defaulting complex types to string for simplicity
-             actualValue = valueString;
-         }
+             // Infer data type
+             if (/^\d+$/.test(valueString)) {
+                 dataType = 'integer';
+                 actualValue = parseInt(valueString, 10);
+             } else if (/^\d+\.\d+$/.test(valueString)) {
+                 dataType = 'real';
+                 actualValue = parseFloat(valueString);
+             } else if (valueString === 'True' || valueString === 'False') {
+                 dataType = 'boolean';
+                 actualValue = valueString === 'True';
+             } else if ((valueString.startsWith('"') && valueString.endsWith('"')) || (valueString.startsWith("'") && valueString.endsWith("'"))) {
+                 dataType = 'string';
+                 actualValue = valueString.slice(1, -1);
+             } else {
+                 dataType = 'string';
+                 actualValue = valueString;
+             }
 
-         try {
-            // Store in DB (pass the string representation for the DB)
-            await storeVariableInDb(variableName, String(actualValue), dataType);
-            // Simulate no direct output for assignment, similar to Python REPL
-            outputLines = [];
-             // Optionally add an info message if desired:
-             // outputLines = [{ id: `assign-${timestamp}`, text: `Variable '${variableName}' set.`, type: 'info', category: 'python' }];
-         } catch (error) {
-            console.error("Error storing Python variable:", error);
-            outputLines = [{ id: `assign-err-${timestamp}`, text: `Error storing variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error', category: 'python' }];
-         }
-     }
-     // --- Other Python Commands (Simulation) ---
-     else if (commandLower.startsWith('print(')) {
-        const match = command.match(/print\((['"]?)(.*?)\1\)/);
-         // Simple print handling (does not evaluate variables yet)
-        outputLines = [{ id: `out-${timestamp}`, text: match ? match[2] : 'Syntax Error in print', type: match ? 'output' : 'error', category: 'python' }];
-     } else {
-        // Simulate other Python commands
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
-        outputLines = [{ id: `out-${timestamp}`, text: `Simulating Python: ${command} (output placeholder)`, type: 'output', category: 'python' }];
-     }
-  }
-  else if (mode === 'unix') {
-     // Simulate potential delay
-     await new Promise(resolve => setTimeout(resolve, Math.random() * 800 + 100));
-     if (commandLower === 'ls') {
-         outputLines = [{ id: `out-${timestamp}`, text: 'file1.txt  directoryA  script.sh', type: 'output', category: 'unix' }];
-     } else if (commandLower.startsWith('echo ')) {
-         outputLines = [{ id: `out-${timestamp}`, text: command.substring(5), type: 'output', category: 'unix' }];
-     } else {
-         outputLines = [{ id: `out-${timestamp}`, text: `Simulating Unix: ${command} (output placeholder)`, type: 'output', category: 'unix' }];
-     }
-  }
-  else if (mode === 'windows') {
-     // Simulate potential delay
-     await new Promise(resolve => setTimeout(resolve, Math.random() * 900 + 150));
-     if (commandLower === 'dir') {
-         outputLines = [{ id: `out-${timestamp}`, text: ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free', type: 'output', category: 'windows' }];
-     } else if (commandLower.startsWith('echo ')) {
-         outputLines = [{ id: `out-${timestamp}`, text: command.substring(5), type: 'output', category: 'windows' }];
-     } else {
-         outputLines = [{ id: `out-${timestamp}`, text: `Simulating Windows: ${command} (output placeholder)`, type: 'output', category: 'windows' }];
-     }
-  }
-  else if (mode === 'sql') {
-     await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50));
-     try {
-       const { results, changes, lastInsertRowid } = await runSql(command); // runSql is async now
-
-       if (results) {
-         const formattedTable = formatResultsAsTable(results);
-         outputLines = [{ id: `out-${timestamp}`, text: formattedTable || "Query executed successfully, no results returned.", type: 'output', category: 'sql' }];
-       } else if (changes !== null) {
-         let infoText = `Query executed successfully. ${changes} row${changes === 1 ? '' : 's'} affected.`;
-         if (lastInsertRowid !== null && lastInsertRowid > 0) {
-            infoText += ` Last inserted row ID: ${lastInsertRowid}`;
-         }
-         outputLines = [{ id: `out-${timestamp}`, text: infoText, type: 'info', category: 'sql' }];
-       } else {
-          outputLines = [{ id: `out-${timestamp}`, text: "Query executed successfully.", type: 'info', category: 'sql' }];
-       }
-     } catch (error) {
-       console.error("SQL execution error:", error);
-       outputLines = [{ id: `err-${timestamp}`, text: error instanceof Error ? error.message : 'Unknown SQL execution error', type: 'error', category: 'sql' }];
-     }
-  }
-  else if (mode === 'excel') {
-     // Simulate potential delay
-     await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100));
-     if (commandLower.startsWith('sum(')) {
-         const numbersMatch = command.match(/sum\(([\d\s,.]+)\)/i);
-         if (numbersMatch && numbersMatch[1]) {
              try {
-                 const numbers = numbersMatch[1].split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
-                 const sum = numbers.reduce((acc, val) => acc + val, 0);
-                 outputLines = [{ id: `out-${timestamp}`, text: `${sum}`, type: 'output', category: 'excel' }];
-             } catch (e) {
-                 outputLines = [{ id: `out-${timestamp}`, text: '#VALUE!', type: 'error', category: 'excel' }];
+                // Store in DB (pass the string representation for the DB)
+                await storeVariableInDb(variableName, String(actualValue), dataType);
+                outputLines = []; // Simulate no direct output for assignment
+                logEntry = { timestamp, type: 'I', text: `Stored/Updated Python variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
+             } catch (error) {
+                console.error("Error storing Python variable:", error);
+                const errorMsg = `Error storing variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+                outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python' }];
+                logEntry = { timestamp, type: 'E', text: errorMsg };
+             }
+         }
+         // --- Other Python Commands (Simulation) ---
+         else if (commandLower.startsWith('print(')) {
+            const match = command.match(/print\((['"]?)(.*?)\1\)/);
+            const printOutput = match ? match[2] : 'Syntax Error in print';
+            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: match ? 'output' : 'error', category: 'python' }];
+            logEntry = { timestamp, type: match ? 'I' : 'E', text: `Python print: ${printOutput}` };
+         } else {
+            await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
+            const simOutput = `Simulating Python: ${command} (output placeholder)`;
+            outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'python' }];
+            logEntry = { timestamp, type: 'I', text: simOutput };
+         }
+      }
+      else if (mode === 'unix') {
+         await new Promise(resolve => setTimeout(resolve, Math.random() * 800 + 100));
+         let simOutput = `Simulating Unix: ${command} (output placeholder)`;
+         if (commandLower === 'ls') {
+             simOutput = 'file1.txt  directoryA  script.sh';
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix' }];
+         } else if (commandLower.startsWith('echo ')) {
+             simOutput = command.substring(5);
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix' }];
+         } else {
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix' }];
+         }
+         logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
+      }
+      else if (mode === 'windows') {
+         await new Promise(resolve => setTimeout(resolve, Math.random() * 900 + 150));
+         let simOutput = `Simulating Windows: ${command} (output placeholder)`;
+         if (commandLower === 'dir') {
+             simOutput = ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free';
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows' }];
+         } else if (commandLower.startsWith('echo ')) {
+             simOutput = command.substring(5);
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows' }];
+         } else {
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows' }];
+         }
+         logEntry = { timestamp, type: 'I', text: `Windows simulation output: ${simOutput}` };
+      }
+      else if (mode === 'sql') {
+         await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50));
+         try {
+           const { results, changes, lastInsertRowid } = await runSql(command);
+
+           if (results) {
+             const formattedTable = formatResultsAsTable(results);
+             const sqlOutput = formattedTable || "Query executed successfully, no results returned.";
+             outputLines = [{ id: `out-${timestamp}`, text: sqlOutput, type: 'output', category: 'sql' }];
+             logEntry = { timestamp, type: 'I', text: `SQL query result: ${sqlOutput}` };
+           } else if (changes !== null) {
+             let infoText = `Query executed successfully. ${changes} row${changes === 1 ? '' : 's'} affected.`;
+             if (lastInsertRowid !== null && lastInsertRowid > 0) {
+                infoText += ` Last inserted row ID: ${lastInsertRowid}`;
+             }
+             outputLines = [{ id: `out-${timestamp}`, text: infoText, type: 'info', category: 'sql' }];
+             logEntry = { timestamp, type: 'I', text: infoText };
+           } else {
+              const successMsg = "Query executed successfully.";
+              outputLines = [{ id: `out-${timestamp}`, text: successMsg, type: 'info', category: 'sql' }];
+              logEntry = { timestamp, type: 'I', text: successMsg };
+           }
+         } catch (error) {
+           console.error("SQL execution error:", error);
+           const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
+           outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql' }];
+           logEntry = { timestamp, type: 'E', text: `SQL Error: ${errorMsg}` };
+         }
+      }
+      else if (mode === 'excel') {
+         await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100));
+         let excelOutput = `Simulating Excel: ${command} (output placeholder)`;
+         let excelLogType: 'I' | 'E' = 'I';
+         if (commandLower.startsWith('sum(')) {
+             const numbersMatch = command.match(/sum\(([\d\s,.]+)\)/i);
+             if (numbersMatch && numbersMatch[1]) {
+                 try {
+                     const numbers = numbersMatch[1].split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
+                     const sum = numbers.reduce((acc, val) => acc + val, 0);
+                     excelOutput = `${sum}`;
+                     outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: 'output', category: 'excel' }];
+                 } catch (e) {
+                     excelOutput = '#VALUE!';
+                     excelLogType = 'E';
+                     outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: 'error', category: 'excel' }];
+                 }
+             } else {
+                  excelOutput = '#NAME?';
+                  excelLogType = 'E';
+                  outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: 'error', category: 'excel' }];
              }
          } else {
-              outputLines = [{ id: `out-${timestamp}`, text: '#NAME?', type: 'error', category: 'excel' }];
+              outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: 'output', category: 'excel' }];
          }
-     } else {
-          outputLines = [{ id: `out-${timestamp}`, text: `Simulating Excel: ${command} (output placeholder)`, type: 'output', category: 'excel' }];
-     }
+         logEntry = { timestamp, type: excelLogType, text: `Excel simulation output: ${excelOutput}` };
+      }
+       else {
+         const errorMsg = `Error: Command execution logic not implemented for category '${mode}'.`;
+         outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: errorMsg, type: 'error', category: 'internal' }];
+         logEntry = { timestamp, type: 'E', text: errorMsg };
+       }
+
+  } catch (error) { // Catch errors from handlers themselves
+      console.error("Unhandled error during command execution:", error);
+      const errorMsg = `Internal Server Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal' }];
+      logEntry = { timestamp, type: 'E', text: errorMsg };
   }
-   else {
-     // Fallback for any unexpected category/mode passed
-     outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: `Error: Command execution logic not implemented for category '${mode}'.`, type: 'error', category: 'internal' }];
-   }
+
+
+  // Combine logs if a new entry was created outside internal handlers
+  let finalLogEntries = potentiallyUpdatedLogs;
+  if (!finalLogEntries && logEntry) {
+      finalLogEntries = [...currentLogEntries, logEntry];
+  } else if (finalLogEntries && logEntry) {
+       // If internal handler already updated logs, we might need to decide whether to add the generic log too.
+       // For now, let's assume internal handlers provide sufficient logging.
+       console.warn("Log entry generated but internal handler also modified logs. Generic log ignored.");
+  }
 
 
   // Return the result object
   return {
     outputLines: [commandOutput, ...outputLines],
-    newLogEntries: potentiallyUpdatedLogs, // Return updated logs if they changed
+    newLogEntries: finalLogEntries, // Return updated logs if they changed
   };
 };
 

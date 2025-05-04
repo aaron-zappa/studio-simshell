@@ -2,24 +2,25 @@
 // src/lib/internal-commands/handle-init-db.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/lib/logging';
+import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 import { runSql } from '@/lib/database';
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified
+    newLogEntries?: LogEntry[]; // Uses new LogEntry type
 }
 
 interface HandlerParams {
     timestamp: string;
+    currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 /**
  * Handles the 'init db' command.
  * Creates the 'variables' table in the in-memory SQLite database.
  */
-export const handleInitDb = async ({ timestamp }: HandlerParams): Promise<HandlerResult> => {
+export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     const createTableSql = `
         CREATE TABLE IF NOT EXISTS variables (
             name VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -30,29 +31,34 @@ export const handleInitDb = async ({ timestamp }: HandlerParams): Promise<Handle
             default_value TEXT
         );
     `;
+    let logText: string;
+    let logType: 'I' | 'E' = 'I';
+    let outputType: OutputLine['type'] = 'info';
 
     try {
         // runSql already ensures the DB is initialized via getDb()
         await runSql(createTableSql);
-        return {
-            outputLines: [{
-                id: `init-db-success-${timestamp}`,
-                text: "Database initialized successfully. 'variables' table ensured.",
-                type: 'info',
-                category: 'internal'
-            }]
-        };
+        logText = "Database initialized successfully. 'variables' table ensured.";
+        outputType = 'info';
     } catch (error) {
         console.error("Error initializing database table:", error);
-        return {
-            outputLines: [{
-                id: `init-db-error-${timestamp}`,
-                text: `Error initializing database: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                type: 'error',
-                category: 'internal'
-            }]
-        };
+        logText = `Error initializing database: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        logType = 'E';
+        outputType = 'error';
     }
+
+    const logEntry: LogEntry = { timestamp, type: logType, text: logText };
+    const newLogEntries = [...currentLogEntries, logEntry];
+
+    return {
+        outputLines: [{
+            id: `init-db-${outputType === 'info' ? 'success' : 'error'}-${timestamp}`,
+            text: logText,
+            type: outputType,
+            category: 'internal'
+        }],
+        newLogEntries
+    };
 };
 
 /**

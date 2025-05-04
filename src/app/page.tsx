@@ -5,28 +5,24 @@
 import * as React from 'react';
 import { CommandInput } from '@/components/command-input';
 import { OutputDisplay, type OutputLine } from '@/components/output-display';
-import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
-import { Label } from "@/components/ui/label"; // Import Label
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useCustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions';
 import { executeCommand } from '@/lib/command-executor';
-import { CommandMode, ALL_COMMAND_MODES } from '@/types/command-types'; // Import CommandMode and ALL_COMMAND_MODES
-import { exportLogFile, type LogEntry } from '@/lib/logging';
-import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-command-flow'; // Import classification flow
-import { useToast } from "@/hooks/use-toast"; // Import toast
+import { CommandMode, ALL_COMMAND_MODES } from '@/types/command-types';
+import { exportLogFile } from '@/lib/logging';
+import { type LogEntry } from '@/types/log-types'; // Import the new LogEntry type
+import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-command-flow';
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
-  // Store log entries in state to pass to export function
-  const [logEntries, setLogEntries] = React.useState<LogEntry[]>([]);
+  const [logEntries, setLogEntries] = React.useState<LogEntry[]>([]); // Uses new LogEntry type
   const [isRunning, setIsRunning] = React.useState<boolean>(false);
-  const { toast } = useToast(); // Toast hook for notifications
+  const { toast } = useToast();
 
-  // State for selected categories, default to only 'sql' selected
   const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['sql']);
-
-  // Suggestions hook now returns categorized suggestions
   const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
   const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
 
@@ -40,22 +36,29 @@ export default function Home() {
 
   const handleCommandSubmit = async (command: string) => {
     const commandLower = command.toLowerCase().trim();
-    const timestamp = Date.now();
-    let output: OutputLine[] = [];
-    setIsRunning(true); // Set running state
+    const timestamp = new Date().toISOString(); // Use ISO string for consistency
+    let commandLogOutput: OutputLine | null = null; // For logging the command itself
+    setIsRunning(true);
+
+    let classificationResult: { category: CommandCategory; reasoning?: string | undefined } | null = null;
+    let executionResult: { outputLines: OutputLine[]; newLogEntries?: LogEntry[] | undefined } | null = null;
+    let errorOccurred = false;
 
     try {
       // --- Classify Command (AI Call) ---
-      // Pass the currently selected categories to the classification flow
-      const classificationResult = await classifyCommand({
+      classificationResult = await classifyCommand({
           command,
           activeCategories: selectedCategories
       });
       const category: CommandCategory = classificationResult.category;
       const classificationReasoning = classificationResult.reasoning;
 
-      const commandOutputBase: Omit<OutputLine, 'id' | 'text' | 'category'> = {
+      commandLogOutput = {
+         id: `cmd-${timestamp}`,
+         text: command,
          type: 'command',
+         // Assign category based on classification, default to 'internal' if ambiguous/unknown
+         category: (category === 'ambiguous' || category === 'unknown') ? 'internal' : category,
       };
 
       // Handle ambiguous or unknown commands based on active categories
@@ -66,98 +69,133 @@ export default function Home() {
               ? `Command is ambiguous within active categories (${selectedCategories.join(', ')}). ${classificationReasoning || 'Please specify context or be more specific.'}`
               : `Command not recognized within active categories (${selectedCategories.join(', ')}). ${classificationReasoning || 'Please try again or type "help".'}`,
           type: 'error',
-          category: 'internal', // Assign a default category for display
+          category: 'internal',
         };
-         const commandLogOutput: OutputLine = {
-            ...commandOutputBase,
-            id: `cmd-${timestamp}`,
-            text: command,
-            category: 'internal', // Log ambiguous/unknown under internal for now
-         };
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
+        // Log the classification error itself
+        const classificationLog: LogEntry = {
+            timestamp,
+            type: 'W', // Warning for ambiguous/unknown
+            text: ambiguousOutput.text
+        };
+        setLogEntries(prev => [...prev, classificationLog]);
         setIsRunning(false);
         return;
       }
 
-      // --- Client-Side Internal Command Handling ---
-      // Handle specific internal commands directly on the client if classified correctly
+      // --- Client-Side Internal Command Handling (Limited) ---
       let clientHandled = false;
       if (category === 'internal') {
-        if (commandLower === 'clear') {
+         // 'clear' is handled purely client-side
+         if (commandLower === 'clear') {
           setHistory([]);
+          // Log clear event
+          const clearLog: LogEntry = { timestamp, type: 'I', text: "History cleared." };
+          setLogEntries(prev => [...prev, clearLog]);
           clientHandled = true;
-        } else if (commandLower === 'export log') {
-          const exportResult = exportLogFile(logEntries);
-          const cmdOut: OutputLine = { ...commandOutputBase, id: `cmd-${timestamp}`, text: command, category: 'internal'};
-          if (exportResult) {
-            setHistory((prev) => [...prev, cmdOut, exportResult]);
-          } else {
-             // exportLogFile handles the "no log" case internally now
-            console.error("exportLogFile returned null unexpectedly when log should exist"); // Should not happen
-             const errOut: OutputLine = { id: `log-export-err-${timestamp}`, text: 'Error during log export.', type: 'error', category: 'internal' };
-            setHistory((prev) => [...prev, cmdOut, errOut]);
+         }
+         // 'export log' triggers client-side download
+         else if (commandLower === 'export log') {
+          const exportResultLine = exportLogFile(logEntries); // exportLogFile now returns OutputLine or null
+          const logText = exportResultLine ? exportResultLine.text : "Attempted log export.";
+          const logType = exportResultLine?.type === 'error' ? 'E' : 'I';
+          const exportLog: LogEntry = { timestamp, type: logType, text: logText };
+          setLogEntries(prev => [...prev, exportLog]);
+          if(commandLogOutput && exportResultLine){
+             setHistory((prev) => [...prev, commandLogOutput, exportResultLine]);
           }
           clientHandled = true;
-        } else if (commandLower === 'pause') {
-           const cmdOut: OutputLine = { ...commandOutputBase, id: `cmd-${timestamp}`, text: command, category: 'internal' };
+         }
+         // 'pause' is handled client-side for UI state
+         else if (commandLower === 'pause') {
            const pauseOutput: OutputLine = {
              id: `pause-${timestamp}`,
-             text: 'task stopped', // Updated feedback message
+             text: 'task stopped',
              type: 'info',
              category: 'internal',
            };
-           setHistory((prev) => [...prev, cmdOut, pauseOutput]);
-           // Assume 'pause' stops things immediately client-side
-           setIsRunning(false);
+            if(commandLogOutput){
+               setHistory((prev) => [...prev, commandLogOutput, pauseOutput]);
+            }
+            const pauseLog: LogEntry = { timestamp, type: 'I', text: "Task paused." };
+            setLogEntries(prev => [...prev, pauseLog]);
+           setIsRunning(false); // Stop execution indicator
            clientHandled = true;
-        }
+         }
       }
 
+
       if (clientHandled) {
-         // No explicit state change needed if already set to false by pause logic
-        return; // Stop further processing if handled client-side
+         // For pause, isRunning is already false. For others, reset it.
+         if (commandLower !== 'pause') setIsRunning(false);
+         return; // Stop further processing
       }
 
       // --- Server-Side Command Execution ---
-      // If not handled client-side, execute via Server Action, passing the determined category
-      // Critical Change: We now update logEntries state based on the result from executeCommand
-      const { outputLines, newLogEntries } = await executeCommand({
+      // Pass classified category, log state, and state modification functions (with caveats)
+      executionResult = await executeCommand({
         command,
-        mode: category as CommandMode, // Pass the classified category as the mode
+        mode: category as CommandMode,
         addSuggestion,
         addCustomCommand,
         getCustomCommandAction,
-        currentLogEntries: logEntries, // Pass current log entries
+        currentLogEntries: logEntries, // Pass current log state
         initialSuggestions
       });
 
-      // Update local logEntries state if the server action modified them
-       if (newLogEntries) {
-          setLogEntries(newLogEntries);
+      // Update history with command output lines *excluding* the command itself
+      // The command was logged above or by client handlers
+      const outputToDisplay = executionResult.outputLines.filter(line => line.type !== 'command');
+       if(commandLogOutput){
+         setHistory((prev) => [...prev, commandLogOutput, ...outputToDisplay]);
        }
 
-       // Update history with just the command output
-       setHistory((prev) => [...prev, ...outputLines]);
+
+      // Update local logEntries state if the server action returned new ones
+       if (executionResult.newLogEntries) {
+          setLogEntries(executionResult.newLogEntries);
+       }
 
 
     } catch (error) {
+        errorOccurred = true;
         console.error("Error during command handling:", error);
-        toast({ // Use toast for user feedback on errors
+        const errorMsg = `Failed to process command: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        toast({
            title: "Command Error",
-           description: `Failed to process command: ${error instanceof Error ? error.message : 'Unknown error'}`,
+           description: errorMsg,
            variant: "destructive",
         });
-        // Add basic error line to history as well
+        // Add basic error line to history
         const errorOutput: OutputLine = {
             id: `error-${timestamp}`,
             text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
             type: 'error',
-            category: 'internal', // Default category for general errors
+            category: 'internal',
         };
-        setHistory((prev) => [...prev, errorOutput]);
+         // Log the error
+         const errorLog: LogEntry = { timestamp, type: 'E', text: errorMsg };
+         // Ensure log state is updated even on error
+         if (executionResult?.newLogEntries) {
+             setLogEntries([...executionResult.newLogEntries, errorLog]);
+         } else {
+             setLogEntries(prev => [...prev, errorLog]);
+         }
+         // Show command and error in history
+         if(commandLogOutput){
+             setHistory((prev) => [...prev, commandLogOutput, errorOutput]);
+         } else {
+             // If classification failed before commandLogOutput was set
+             const genericCommandLog: OutputLine = { id: `cmd-err-${timestamp}`, text: command, type: 'command', category: 'internal' };
+             setHistory((prev) => [...prev, genericCommandLog, errorOutput]);
+         }
+
     } finally {
-      // Reset running state unless handled by 'pause' earlier
-      if (commandLower !== 'pause') {
+      // Reset running state unless handled by 'pause' or an error occurred
+      if (commandLower !== 'pause' && !errorOccurred) {
+          setIsRunning(false);
+      } else if (errorOccurred) {
+          // Ensure isRunning is false after an error too
           setIsRunning(false);
       }
     }
@@ -168,7 +206,6 @@ export default function Home() {
        const combinedSuggestions = new Set<string>();
         selectedCategories.forEach(cat => {
            (suggestions[cat] || []).forEach(sug => combinedSuggestions.add(sug));
-           // Add custom internal commands if 'internal' category is selected
            if (cat === 'internal') {
                 Object.keys(customCommands).forEach(cmdName => combinedSuggestions.add(cmdName));
            }
@@ -180,8 +217,7 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
        <header className="flex items-center justify-between mb-4 flex-wrap gap-4">
-        <h1 className="text-xl font-semibold">SimuShell</h1> {/* Reduced font size */}
-          {/* Category Checkboxes */}
+        <h1 className="text-xl font-semibold">SimuShell</h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className="text-sm font-medium mr-2">Active Categories:</span>
               {ALL_COMMAND_MODES.map(category => (
@@ -200,18 +236,14 @@ export default function Home() {
           </div>
       </header>
 
-      {/* Main content area containing the output display */}
-       <main className="flex-grow-[0.8] flex-shrink overflow-hidden mb-4"> {/* Reduced flex-grow, added flex-shrink */}
+       <main className="flex-grow-[0.8] flex-shrink overflow-hidden mb-4">
         <OutputDisplay history={history} className="h-full" />
       </main>
 
-      <Separator className="mb-4" />
-
-      {/* Footer containing the command input */}
-       <footer className="shrink-0"> {/* Keep shrink-0 */}
+       <footer className="shrink-0">
         <CommandInput
             onSubmit={handleCommandSubmit}
-            suggestions={filteredSuggestionsForInput} // Provide filtered suggestions based on selected categories
+            suggestions={filteredSuggestionsForInput}
             disabled={isRunning}
          />
       </footer>
@@ -221,6 +253,7 @@ export default function Home() {
 
 /**
  * Returns the name of the current file.
+ * This function is not exported to avoid being treated as a Server Action.
  * @returns The filename.
  */
 function getFilename(): string {

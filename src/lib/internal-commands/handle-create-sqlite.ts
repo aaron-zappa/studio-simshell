@@ -2,22 +2,43 @@
 // src/lib/internal-commands/handle-create-sqlite.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-// Note: Database initialization happens implicitly on first SQL query via getDb().
+import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
+
+// Define the structure for the return value, including potential log updates
+interface HandlerResult {
+    outputLines: OutputLine[];
+    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified
+}
+
 
 interface HandlerParams {
     args: string[];
     timestamp: string;
+    currentLogEntries: LogEntry[]; // Pass current logs
 }
 
-export const handleCreateSqlite = async ({ args, timestamp }: HandlerParams): Promise<OutputLine[]> => {
-    // const filename = args[1]; // Filename is currently ignored
-    if (args.length >= 1) { // Check if 'sqlite' keyword is present
-        // Simulate a brief action, actual DB init is deferred.
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return [{ id: `out-${timestamp}`, text: `Internal SQLite in-memory database is ready. Use SQL commands directly.`, type: 'info', category: 'internal' }];
+export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+    const logText = `Internal SQLite in-memory database is ready. Use SQL commands directly.`;
+    let logType: 'I' | 'E' = 'I'; // Changed const to let
+    let outputType: OutputLine['type'] = 'info';
+    let outputText = logText;
+
+    if (args.length < 1) { // Check if 'sqlite' keyword is present
+        outputText = `Error: Invalid syntax. Use: create sqlite <filename.db> (filename is ignored, uses in-memory DB)`;
+        outputType = 'error';
+        logType = 'E';
     } else {
-        return [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: create sqlite <filename.db> (filename is ignored, uses in-memory DB)`, type: 'error', category: 'internal' }];
+         // Simulate a brief action, actual DB init is deferred to first use or 'init db'.
+         await new Promise(resolve => setTimeout(resolve, 100));
     }
+
+    const logEntry: LogEntry = { timestamp, type: logType, text: outputText };
+    const newLogEntries = [...currentLogEntries, logEntry];
+
+    return {
+         outputLines: [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal' }],
+         newLogEntries: newLogEntries
+    };
 };
 
 /**

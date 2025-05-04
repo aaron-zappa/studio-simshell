@@ -2,25 +2,31 @@
 // src/lib/internal-commands/handle-history.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/lib/logging'; // Import LogEntry
+import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (not applicable here yet)
+    newLogEntries?: LogEntry[]; // Uses new LogEntry type
 }
 
 interface HandlerParams {
     timestamp: string;
-    // Potentially add currentLogEntries if this command needs to log or access history logs
+    currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handleHistory = async ({ timestamp }: HandlerParams): Promise<HandlerResult> => {
+export const handleHistory = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     // TODO: Implement fetching history from SQLite database if needed
-    const outputLines = [{ id: `out-${timestamp}`, text: 'History command placeholder (currently only shows command history in output).', type: 'output', category: 'internal' }];
-    // Return the result object (no log changes in this handler)
-    return { outputLines: outputLines };
+    const outputText = 'History command placeholder (currently only shows command history in output).';
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal' }];
+
+    // Create log entry
+    const logEntry: LogEntry = { timestamp, type: 'W', text: 'History command not fully implemented.' };
+    const newLogEntries = [...currentLogEntries, logEntry];
+
+    // Return the result object
+    return { outputLines: outputLines, newLogEntries };
 };
 
 /**
@@ -31,4 +37,3 @@ export const handleHistory = async ({ timestamp }: HandlerParams): Promise<Handl
 function getFilename(): string {
     return 'handle-history.ts';
 }
-
