@@ -16,6 +16,7 @@ import { type LogEntry } from '@/types/log-types';
 import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-command-flow';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils'; // Import cn
+import { getDbStatusAction } from '@/lib/database'; // Import the status action
 
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
@@ -26,6 +27,42 @@ export default function Home() {
   const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal', 'python']); // Changed initial categories
   const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
   const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
+
+
+  // --- Fetch and display DB status on initial load ---
+  React.useEffect(() => {
+    const fetchDbStatus = async () => {
+        try {
+            const status = await getDbStatusAction();
+            const timestamp = new Date().toISOString();
+            const statusLine: OutputLine = {
+                id: `db-status-${timestamp}`,
+                text: status,
+                type: 'info',
+                category: 'internal',
+                timestamp: timestamp,
+            };
+            // Use functional update to ensure latest state
+            setHistory(prev => [...prev, statusLine]);
+            // Also add to log entries
+            setLogEntries(prev => [...prev, { timestamp, type: 'I', text: status }]);
+        } catch (error) {
+            console.error("Failed to fetch DB status:", error);
+            const timestamp = new Date().toISOString();
+             const errorLine: OutputLine = {
+                id: `db-status-err-${timestamp}`,
+                text: `Error fetching DB status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                type: 'error',
+                category: 'internal',
+                timestamp: timestamp,
+             };
+             setHistory(prev => [...prev, errorLine]);
+             setLogEntries(prev => [...prev, { timestamp, type: 'E', text: errorLine.text }]);
+        }
+    };
+    // Run only once on component mount
+    fetchDbStatus();
+  }, []); // Empty dependency array ensures this runs once
 
   const handleCategoryChange = (category: CommandMode, checked: boolean | 'indeterminate') => {
     setSelectedCategories(prev =>
@@ -313,3 +350,4 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
+

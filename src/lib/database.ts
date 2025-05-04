@@ -7,8 +7,9 @@ import type { Database as DB } from 'better-sqlite3';
 import * as fs from 'fs'; // Import fs for file system operations
 import * as path from 'path'; // Import path for secure path joining
 
-// Module-level variable to hold the database instance.
+// Module-level variable to hold the database instance and loaded path.
 let dbInstance: DB | null = null;
+let loadedDbPath: string | null = null; // Store the path if loaded from file
 const dataDir = path.join(process.cwd(), 'data'); // Define data directory path
 
 /**
@@ -33,8 +34,6 @@ function ensureDataDirectory(): void {
         }
     } catch (error) {
         console.error(`Error creating data directory '${dataDir}':`, error);
-        // Decide how critical this is. For loading, maybe proceed and let DB creation fail?
-        // For saving, it's more critical. Let's re-throw for now.
         throw new Error(`Failed to ensure data directory exists: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
@@ -53,12 +52,13 @@ function getDb(): DB {
     let mode: 'file' | 'memory' = 'memory';
 
     if (dbFilename && isValidFilename(dbFilename)) {
-        dbPath = path.join(dataDir, dbFilename);
-        if (fs.existsSync(dbPath)) {
-            console.log(`Attempting to load database from file: ${dbPath}`);
+        const potentialPath = path.join(dataDir, dbFilename);
+        if (fs.existsSync(potentialPath)) {
+            console.log(`Attempting to load database from file: ${potentialPath}`);
+            dbPath = potentialPath;
             mode = 'file';
         } else {
-            console.warn(`Database file specified by SIMUSHELL_DB_FILE (${dbPath}) not found. Falling back to in-memory database.`);
+            console.warn(`Database file specified by SIMUSHELL_DB_FILE (${potentialPath}) not found. Falling back to in-memory database.`);
             dbPath = null; // Reset to null to force in-memory
         }
     } else if (dbFilename) {
@@ -67,16 +67,26 @@ function getDb(): DB {
 
     try {
       // Use the file path if mode is 'file', otherwise ':memory:'
-      dbInstance = new Database(mode === 'file' && dbPath ? dbPath : ':memory:');
+      const connectionString = mode === 'file' && dbPath ? dbPath : ':memory:';
+      dbInstance = new Database(connectionString);
       // Enable WAL mode for potentially better performance
       dbInstance.pragma('journal_mode = WAL');
-      console.log(`SQLite database initialized (${mode === 'file' ? `file: ${dbPath}` : 'in-memory'}).`);
+
+      if (mode === 'file' && dbPath) {
+          loadedDbPath = dbPath; // Store the path if loaded from file
+          console.log(`Successfully loaded database from file: ${loadedDbPath}`);
+      } else {
+          loadedDbPath = ':memory:';
+          console.log(`SQLite database initialized (in-memory).`);
+      }
+
 
       // Optional: Add a cleanup hook for graceful shutdown if needed
       // process.on('exit', () => dbInstance?.close());
 
     } catch (error) {
         console.error(`Failed to initialize SQLite database (${mode === 'file' ? `file: ${dbPath}` : 'in-memory'}):`, error);
+        loadedDbPath = null; // Ensure path is null on failure
         // If initialization fails, subsequent calls might also fail.
         throw error; // Re-throw to indicate failure
     }
@@ -84,15 +94,23 @@ function getDb(): DB {
   return dbInstance;
 }
 
+
 /**
- * Returns the current in-memory database instance if it exists, otherwise null.
- * Useful for operations that need the instance but shouldn't initialize it (like persisting).
- * This function is NOT exported.
- * @returns The better-sqlite3 Database instance or null.
+ * Returns the path of the currently loaded database file, or ':memory:' or null.
+ * This function is NOT exported as a Server Action itself but can be called by one.
+ * @returns The loaded database path string or null.
  */
-function getCurrentDbInstanceInternal(): DB | null {
-    // Return the instance if it exists, don't try to initialize it here.
-    return dbInstance;
+function getLoadedDbPathInternal(): string | null {
+    // Ensure the DB is initialized if it hasn't been yet
+    if (!dbInstance) {
+        try {
+            getDb();
+        } catch (e) {
+            // If getDb fails, loadedDbPath should be null
+            console.error("DB initialization failed while checking loaded path.");
+        }
+    }
+    return loadedDbPath;
 }
 
 
@@ -162,6 +180,23 @@ export async function persistDbToFile(targetFilename: string): Promise<boolean> 
     }
 }
 
+// --- Server Action to get DB status ---
+/**
+ * Server Action to get the status of the loaded database.
+ * @returns A string indicating the loaded database path or if it's in-memory.
+ */
+export async function getDbStatusAction(): Promise<string> {
+    const path = getLoadedDbPathInternal();
+    if (path === ':memory:') {
+        return "Database is running in-memory.";
+    } else if (path) {
+        return `Database loaded from file: ${path}`;
+    } else {
+        return "Database status unknown or not initialized.";
+    }
+}
+// --- End Server Action ---
+
 
 /**
  * Returns the name of the current file.
@@ -171,3 +206,4 @@ export async function persistDbToFile(targetFilename: string): Promise<boolean> 
 function getFilename(): string {
     return 'database.ts';
 }
+
