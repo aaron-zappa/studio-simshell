@@ -21,6 +21,7 @@ import { handleShowRequirements } from './handle-show-requirements';
 import { handlePersistDb } from './handle-persist-db';
 import { handleInitDb } from './handle-init-db';
 import { handleInit } from './handle-init'; // Import the new init handler
+import { handleListPyVars } from './handle-list-py-vars'; // Import the new list vars handler
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -99,6 +100,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  return handleInit(params); // Call the new general init handler
             }
             break; // Fall through if not 'init' or 'init db'
+        case 'list': // Check if it's 'list py vars'
+            if (commandLower === 'list py vars') {
+                return handleListPyVars(params); // Call the new list vars handler
+            }
+            break; // Fall through if not the exact command
     }
 
     // 2. Custom internal commands

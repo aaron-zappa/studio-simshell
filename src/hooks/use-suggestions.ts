@@ -11,7 +11,7 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
   internal: [
       'help',
       'clear',
-      'mode',
+      // 'mode', // Removed as it's informational now
       'history',
       'define',
       'refine',
@@ -23,6 +23,7 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'persist memory db to <filename.db>',
       'init', // Added general init command
       'init db', // Keep specific init db as well
+      'list py vars', // Added new command
     ],
   python: [
       'print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield ',
@@ -67,6 +68,10 @@ export const useSuggestions = () => {
             if (mode === 'internal' && lowerCommand === 'init') {
                 suggestionToAdd = 'init';
             }
+             // Add format for list py vars
+            if (mode === 'internal' && lowerCommand === 'list py vars') {
+                 suggestionToAdd = 'list py vars';
+            }
              // Add format for clipboard get (though it's already in initial)
              if (mode === 'python' && lowerCommand === 'clipboard = get()') {
                   suggestionToAdd = 'clipboard = get()';
@@ -92,6 +97,7 @@ export const useSuggestions = () => {
 /**
  * Returns the name of the current file.
  * This function is not exported to avoid being treated as a Server Action.
+ * @returns The filename.
  */
 function getFilename(): string {
     return 'use-suggestions.ts';
