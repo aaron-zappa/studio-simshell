@@ -24,6 +24,7 @@ import { handleInitDb } from './handle-init-db';
 import { handleInit } from './handle-init'; // Import the new init handler
 import { handleListPyVars } from './handle-list-py-vars'; // Import the new list vars handler
 import { handleAiCommand } from './handle-ai-command'; // Import the new AI command handler
+import { handleSetAiToolActive } from './handle-set-ai-tool-active'; // Import the new set tool active handler
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -76,6 +77,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  return handleAddAiTool(params); // Handles defining AI tools
              }
              break; // Fall through if not 'add int_cmd' or 'add ai_tool'
+        case 'set': // Check for 'set ai_tool active'
+             if (commandLower.startsWith('set ai_tool ') && args.length > 2 && args[args.length - 2] === 'active') {
+                 return handleSetAiToolActive(params); // Handles setting tool active state
+             }
+             break; // Fall through if not the specific 'set' command
         case 'export': // Check if it's 'export log'
              if (commandLower === 'export log') {
                  // Export is client-side, server handler is informational
