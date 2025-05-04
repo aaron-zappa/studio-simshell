@@ -3,11 +3,11 @@
 
 /**
  * Formats database results (array of objects) into a simple text table.
- * This is a synchronous utility function.
+ * Marked as async as it's used within Server Actions.
  * @param results Array of result objects from better-sqlite3.
  * @returns A string representing the formatted table, or null if no results.
  */
-export function formatResultsAsTable(results: any[]): string | null {
+export async function formatResultsAsTable(results: any[]): Promise<string | null> {
     if (!results || results.length === 0) {
         return "(0 rows)"; // Indicate no results
     }

@@ -30,10 +30,12 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries }: Handler
     let outputText: string;
 
     try {
+        // runSql ensures DB is initialized
         const { results } = await runSql(sql);
 
         if (results && results.length > 0) {
-             const formattedTable = formatResultsAsTable(results);
+             // formatResultsAsTable is now async
+             const formattedTable = await formatResultsAsTable(results);
              outputText = formattedTable || "No variables found."; // formatResultsAsTable returns null on empty input, but we check length > 0
              logText = `Listed ${results.length} variable(s) from database.`;
         } else {
@@ -58,7 +60,8 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries }: Handler
             text: outputText,
             type: outputType,
             category: 'internal',
-            timestamp: outputType === 'error' ? timestamp : undefined // Add timestamp only for errors
+            // Add timestamp only for errors or info messages that should look like logs
+            timestamp: (outputType === 'error' || outputType === 'info') ? timestamp : undefined
         }],
         newLogEntries
     };
