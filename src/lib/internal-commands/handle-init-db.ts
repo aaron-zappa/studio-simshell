@@ -31,6 +31,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerPara
             default_value TEXT
         );
     `;
+    // Define the SQL to create the ai_tools table
     const createAiToolsTableSql = `
         CREATE TABLE IF NOT EXISTS ai_tools (
             name VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -50,6 +51,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerPara
         logText += "Ensured 'variables' table exists. ";
         outputLines.push({ id: `init-vars-table-${timestamp}`, text: "Ensured 'variables' table exists.", type: 'info', category: 'internal', timestamp });
 
+        // Execute the SQL to create the ai_tools table
         await runSql(createAiToolsTableSql);
         logText += "Ensured 'ai_tools' table exists.";
         outputLines.push({ id: `init-tools-table-${timestamp}`, text: "Ensured 'ai_tools' table exists.", type: 'info', category: 'internal', timestamp });
@@ -61,6 +63,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerPara
         logText = `Error initializing database tables: ${error instanceof Error ? error.message : 'Unknown error'}`;
         logType = 'E';
         outputType = 'error';
+        // Overwrite previous lines with the error message
         outputLines = [{ id: `init-db-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
     }
 
