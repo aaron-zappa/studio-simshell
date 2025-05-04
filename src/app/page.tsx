@@ -200,15 +200,15 @@ export default function Home() {
           </div>
       </header>
 
-      {/* Separator Removed */}
-
-      <main className="flex-1 overflow-hidden mb-4">
+      {/* Main content area containing the output display */}
+       <main className="flex-grow-[0.8] flex-shrink overflow-hidden mb-4"> {/* Reduced flex-grow, added flex-shrink */}
         <OutputDisplay history={history} className="h-full" />
       </main>
 
       <Separator className="mb-4" />
 
-      <footer className="shrink-0">
+      {/* Footer containing the command input */}
+       <footer className="shrink-0"> {/* Keep shrink-0 */}
         <CommandInput
             onSubmit={handleCommandSubmit}
             suggestions={filteredSuggestionsForInput} // Provide filtered suggestions based on selected categories
