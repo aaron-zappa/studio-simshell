@@ -32,6 +32,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
     let outputText: string;
+    let logFlag: 0 | 1 = 0; // Default flag
 
     const targetFilename = DEFAULT_EXPORT_FILENAME;
 
@@ -47,6 +48,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
             outputText = `Failed to export database to ${targetFilename} for an unknown reason.`;
             outputType = 'error';
             logType = 'E';
+            logFlag = 1; // Set flag for error
             logText = outputText + ` (User: ${userId})`;
         }
     } catch (error) {
@@ -54,10 +56,11 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
         outputText = `Error exporting database to ${targetFilename}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         outputType = 'error';
         logType = 'E';
+        logFlag = 1; // Set flag for error
         logText = outputText + ` (User: ${userId})`;
     }
 
-    const logEntry: LogEntry = { timestamp, type: logType, text: logText };
+    const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {

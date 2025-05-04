@@ -57,13 +57,14 @@ interface HandlerResult {
  * Includes permission checks for relevant commands.
  */
 export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<HandlerResult> => {
-    const { commandName, commandLower, args, getCustomCommandAction, userPermissions, timestamp } = params; // Destructure args
+    const { commandName, commandLower, args, getCustomCommandAction, userPermissions, timestamp, userId } = params; // Destructure args
 
     const permissionDenied = (requiredPermission: string): HandlerResult => {
         const errorMsg = `Permission denied: Requires '${requiredPermission}' permission.`;
         return {
             outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }],
-            newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', text: errorMsg }],
+            // Include flag=1 for permission denied error log
+            newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }],
         };
     };
 
@@ -73,7 +74,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         console.warn("Experimental @bat command received, but execution is not yet implemented.");
         return {
             outputLines: [{ id: `bat-warn-${params.timestamp}`, text: `Experimental command @bat: not yet implemented.`, type: 'warning', category: 'internal', timestamp: params.timestamp }],
-            newLogEntries: [...params.currentLogEntries, { timestamp: params.timestamp, type: 'W', text: `Experimental @bat command not implemented: ${params.command}` }]
+            newLogEntries: [...params.currentLogEntries, { timestamp: params.timestamp, type: 'W', flag: 1, text: `Experimental @bat command not implemented: ${params.command} (User: ${userId})` }]
         };
     }
 
@@ -106,9 +107,10 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
              }
              break; // Fall through if not 'add int_cmd' or 'add ai_tool'
         case 'set': // Check for 'set ai_tool active'
-             if (commandLower.startsWith('set ai_tool ') && args.length > 2 && args[args.length - 2] === 'active') {
-                  if (!userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
-                 return handleSetAiToolActive(params); // Handles setting tool active state
+             if (commandLower.startsWith('set ai_tool ')) { // Check if args[1] exists before accessing
+                 if (!userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
+                 // Pass args starting *after* 'set ai_tool' to the handler
+                 return handleSetAiToolActive({ ...params, args: args.slice(2) });
              }
              break; // Fall through if not the specific 'set' command
         case 'export': // Check if it's 'export log' or 'export db'

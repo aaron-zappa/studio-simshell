@@ -51,6 +51,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
             role_id INTEGER PRIMARY KEY AUTOINCREMENT,
             role_name VARCHAR(50) NOT NULL UNIQUE
         );`,
+        // Renamed table from 'permission' to 'permissions'
         `CREATE TABLE IF NOT EXISTS permissions (
             permission_id INTEGER PRIMARY KEY AUTOINCREMENT,
             permission_name VARCHAR(100) NOT NULL UNIQUE -- e.g., 'execute_sql', 'manage_variables'
@@ -155,8 +156,8 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         outputLines = [{ id: `init-db-crit-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
     }
 
-    // Add user ID to the main log entry
-    const logEntry: LogEntry = { timestamp, type: logType, text: logText + ` (User: ${userId})` };
+    // Add user ID and flag to the main log entry
+    const logEntry: LogEntry = { timestamp, type: logType, flag: errors.length > 0 ? 1 : 0, text: logText + ` (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {

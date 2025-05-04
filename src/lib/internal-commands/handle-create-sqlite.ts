@@ -25,11 +25,13 @@ export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, u
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
     let outputText = '';
+    let logFlag: 0 | 1 = 0; // Default flag
 
     if (args.length < 1) { // Check if 'sqlite' keyword is present (or just filename)
         outputText = `Error: Invalid syntax. Use: create sqlite <filename.db> (filename is ignored, uses in-memory DB)`;
         outputType = 'error';
         logType = 'E';
+        logFlag = 1;
         logText = outputText + ` (User: ${userId}, Command: create ${args.join(' ')})`;
     } else {
          // Simulate a brief action, actual DB init is deferred to first use or 'init db'.
@@ -39,7 +41,7 @@ export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, u
          logText = outputText + ` (User: ${userId})`;
     }
 
-    const logEntry: LogEntry = { timestamp, type: logType, text: logText };
+    const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {

@@ -20,8 +20,8 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
     }
 
     try {
-        // Define CSV header for the new format
-        const header = 'timestamp,type,text\n'; // Updated header
+        // Define CSV header for the new format including 'flag'
+        const header = 'timestamp,type,flag,text\n'; // Updated header
 
         // Convert log entries to CSV rows, quoting fields appropriately
         const rows = logEntries.map(entry => {
@@ -32,6 +32,7 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
             return [
                 entry.timestamp,
                 entry.type,
+                entry.flag, // Add the flag value
                 textCsv
             ].join(',');
         }).join('\n');

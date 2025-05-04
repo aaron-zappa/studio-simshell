@@ -24,8 +24,8 @@ export const handleHistory = async ({ timestamp, currentLogEntries, userId }: Ha
     const outputText = 'History command placeholder (currently only shows command history in output).';
     const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
-    // Create log entry
-    const logEntry: LogEntry = { timestamp, type: 'W', text: `History command not fully implemented. (User: ${userId})` };
+    // Create log entry with flag=1 for warning
+    const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `History command not fully implemented. (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

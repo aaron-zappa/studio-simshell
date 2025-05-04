@@ -17,6 +17,7 @@ export async function getUserPermissions(userId: number): Promise<string[]> {
         return [];
     }
 
+    // Updated query to use 'permissions' table name
     const sql = `
         SELECT DISTINCT p.permission_name
         FROM permissions p

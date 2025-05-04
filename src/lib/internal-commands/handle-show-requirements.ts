@@ -23,7 +23,7 @@ interface HandlerParams {
 
 /**
  * Handles the 'show requirements' command.
- * Displays the NEW log entry structure (timestamp, type, text) as CSV.
+ * Displays the NEW log entry structure (timestamp, type, flag, text) as CSV.
  */
 // Update function signature to return HandlerResult
 export const handleShowRequirements = async ({ timestamp, args, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
@@ -32,13 +32,15 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
     let outputType: OutputLine['type'] = 'output';
     let logText: string = '';
     let logType: 'I' | 'E' = 'I';
+    let logFlag: 0 | 1 = 0; // Default flag
     const definitionFilename = 'src/types/log-types.ts'; // File defining the LogEntry type
 
     try {
-        // Define the new requirements based on LogEntry { timestamp, type, text }
+        // Define the new requirements based on LogEntry { timestamp, type, flag, text }
         const requirements = [
             { requi_code: 'timestamp', requirement: 'ISO string timestamp of the log event.' },
             { requi_code: 'type', requirement: 'Type of log event: I (Info), W (Warning), E (Error).' },
+            { requi_code: 'flag', requirement: 'Generic flag (0 or 1) for additional context.'}, // Added flag requirement
             { requi_code: 'text', requirement: 'The descriptive text of the log event.' },
         ];
 
@@ -68,6 +70,7 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
         outputType = 'error';
         logText = outputText + ` (User: ${userId})`;
         logType = 'E';
+        logFlag = 1; // Set flag for error
     }
 
     // TODO: Handle arguments if needed
@@ -85,7 +88,7 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
     }];
 
     // Create log entry
-    const logEntry: LogEntry = { timestamp, type: logType, text: logText };
+    const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

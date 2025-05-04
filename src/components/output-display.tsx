@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { CommandMode } from '@/types/command-types'; // Import shared type
+import type { LogEntry } from '@/types/log-types'; // Import LogEntry type
 
 export type OutputLine = {
   id: string; // For React key prop
@@ -14,6 +15,7 @@ export type OutputLine = {
   type?: 'command' | 'output' | 'error' | 'info' | 'warning'; // Added 'warning' type potentially
   category?: CommandMode | 'internal'; // Use imported CommandMode
   timestamp?: string; // Added optional timestamp for log-like formatting
+  flag?: 0 | 1; // Added optional flag for log-like formatting
 };
 
 interface OutputDisplayProps {
@@ -64,7 +66,8 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
           <div className="space-y-2 font-mono text-sm">
             {history.map((line) => {
                 const typeIndicator = getTypeIndicator(line.type);
-                const showLogFormat = (line.type === 'info' || line.type === 'error' || line.type === 'warning') && line.timestamp && typeIndicator;
+                // Check if it should be shown in log format: requires type (I,W,E), timestamp, and flag is defined
+                const showLogFormat = (line.type === 'info' || line.type === 'error' || line.type === 'warning') && line.timestamp && typeIndicator && line.flag !== undefined;
 
                 return (
                   <div key={line.id} className="flex items-start space-x-2">
@@ -78,7 +81,7 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
                      )}>
                         {line.type === 'command' && '$ '}
                         {showLogFormat
-                           ? `${line.timestamp},${typeIndicator},${line.text}`
+                           ? `${line.timestamp},${typeIndicator},${line.flag},${line.text}` // Added flag here
                            : line.text
                         }
                       </span>

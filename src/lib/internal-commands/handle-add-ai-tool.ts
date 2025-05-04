@@ -34,6 +34,7 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
     let logType: 'I' | 'E' = 'I';
     let outputType: 'info' | 'error' = 'info';
     let outputText = '';
+    let logFlag: 0 | 1 = 0; // Default flag is 0
 
     // Permission Check
     // if (!userPermissions.includes('manage_ai_tools')) {
@@ -41,8 +42,9 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
     //     outputType = 'error';
     //     logType = 'E';
     //     logText = outputText + ` (User: ${userId})`;
+    //     logFlag = 1; // Set flag for permission error
     //     outputLines.push({ id: `perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
-    //     updatedLogEntries.push({ timestamp, type: logType, text: logText });
+    //     updatedLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
     //     return { outputLines, newLogEntries: updatedLogEntries };
     // }
     // Permission check moved to central handler
@@ -82,6 +84,7 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
             outputType = 'error';
             logText = outputText + ` (User: ${userId})`;
             logType = 'E';
+            logFlag = 1; // Set flag for DB error
             outputLines.push({ id: `add-tool-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         }
     } else {
@@ -90,11 +93,12 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
         outputType = 'error';
         logText = outputText + ` (User: ${userId}, Command: ${command})`;
         logType = 'E';
+        logFlag = 1; // Set flag for syntax error
         outputLines = [{ id: `add-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     }
 
     // Add log entry regardless of success/failure
-    updatedLogEntries.push({ timestamp, type: logType, text: logText });
+    updatedLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
 
     return {
         outputLines: outputLines,

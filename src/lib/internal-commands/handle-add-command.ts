@@ -35,7 +35,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
     //     const errorMsg = "Permission denied: Cannot add internal commands.";
     //     return {
     //         outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', text: `${errorMsg} (User: ${userId})` }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }],
     //     };
     // }
     // Permission check commented out for now as it relies on manage_ai_tools which might be too restrictive
@@ -48,6 +48,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
     let logText = '';
     let outputType: 'info' | 'error' = 'info';
     let outputText = '';
+    let logFlag: 0 | 1 = 0; // Default flag is 0
 
     if (match && match[1] && match[2] && match[3] && match[4]) {
         const newCommandShort = match[1];
@@ -59,6 +60,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
             outputText = `Error: Cannot redefine built-in command "${newCommandName}".`;
             outputType = 'error';
             logType = 'E';
+            logFlag = 1; // Set flag for error
             logText = outputText;
             outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
         } else {
@@ -82,12 +84,13 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
         outputText = `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`;
         outputType = 'error';
         logType = 'E';
+        logFlag = 1; // Set flag for syntax error
         logText = outputText + ` (User: ${userId}, Command: ${command})`;
         outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     }
 
      // Add the log entry
-    updatedLogEntries.push({ timestamp, type: logType, text: logText });
+    updatedLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
 
     // Return output and the potentially updated log entries
     return {

@@ -25,8 +25,8 @@ export const handleRefine = async ({ args, timestamp, currentLogEntries, userId 
     const outputText = `Refine command placeholder for: ${args.join(' ')}`;
     const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
-    // Create log entry
-    const logEntry: LogEntry = { timestamp, type: 'W', text: `Refine command not yet implemented. Args: ${args.join(' ')} (User: ${userId})` };
+    // Create log entry with flag=1 for warning
+    const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `Refine command not yet implemented. Args: ${args.join(' ')} (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

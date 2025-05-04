@@ -40,11 +40,13 @@ export default function Home() {
             const timestamp = new Date().toISOString();
             let statusType: OutputLine['type'] = 'info';
             let logType: LogEntry['type'] = 'I';
+            let logFlag: 0 | 1 = 0; // Default flag
 
             // Check if the status message indicates failure ('nok')
             if (status.includes('nok')) {
                 statusType = 'error';
                 logType = 'E';
+                logFlag = 1; // Set flag for error
             }
 
             const statusLine: OutputLine = {
@@ -53,11 +55,12 @@ export default function Home() {
                 type: statusType, // Use determined type
                 category: 'internal',
                 timestamp: timestamp, // Add timestamp for log format
+                flag: logFlag, // Add flag for log format
             };
             // Use functional update to ensure latest state
             setHistory(prev => [...prev, statusLine]);
             // Also add to log entries
-            setLogEntries(prev => [...prev, { timestamp, type: logType, text: status }]); // Use determined type
+            setLogEntries(prev => [...prev, { timestamp, type: logType, flag: logFlag, text: status }]); // Use determined type and flag
         } catch (error) {
             console.error("Failed to fetch DB status:", error);
             const timestamp = new Date().toISOString();
@@ -67,9 +70,10 @@ export default function Home() {
                 type: 'error',
                 category: 'internal',
                 timestamp: timestamp,
+                flag: 1, // Set flag for error
              };
              setHistory(prev => [...prev, errorLine]);
-             setLogEntries(prev => [...prev, { timestamp, type: 'E', text: errorLine.text }]);
+             setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorLine.text }]);
         }
     };
     // Run only once on component mount
@@ -154,6 +158,7 @@ export default function Home() {
              type: 'command',
              category: 'python', // Assume python category for clipboard get
              timestamp: timestamp
+             // No flag for command logs typically
          };
          setHistory((prev) => [...prev, commandLogOutput]);
          // Log entry handled in catch block
@@ -187,11 +192,13 @@ export default function Home() {
           type: 'error',
           category: 'internal',
           timestamp: timestamp,
+          flag: 1, // Set flag for classification error
         };
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         const classificationLog: LogEntry = {
             timestamp,
-            type: 'W',
+            type: 'W', // Treat as warning log level
+            flag: 1, // Set flag
             text: ambiguousOutput.text
         };
         setLogEntries(prev => [...prev, classificationLog]);
@@ -204,7 +211,7 @@ export default function Home() {
       if (category === 'internal') {
          if (finalCommandLower === 'clear') {
           setHistory([]);
-          const clearLog: LogEntry = { timestamp, type: 'I', text: "History cleared." };
+          const clearLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "History cleared." };
           setLogEntries(prev => [...prev, clearLog]);
           clientHandled = true;
          }
@@ -212,11 +219,13 @@ export default function Home() {
           const exportResultLine = exportLogFile(logEntries);
           const logText = exportResultLine ? exportResultLine.text : "Attempted log export.";
           const logType = exportResultLine?.type === 'error' ? 'E' : 'I';
-          const exportLog: LogEntry = { timestamp, type: logType, text: logText };
+          const logFlag: 0 | 1 = exportResultLine?.type === 'error' ? 1 : 0; // Add flag based on export result
+          const exportLog: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
           setLogEntries(prev => [...prev, exportLog]);
           if(commandLogOutput && exportResultLine){
              if(exportResultLine.type === 'error' || exportResultLine.type === 'info'){
                  exportResultLine.timestamp = timestamp;
+                 exportResultLine.flag = logFlag; // Add flag to output line
              }
              setHistory((prev) => [...prev, commandLogOutput, exportResultLine]);
           }
@@ -229,11 +238,12 @@ export default function Home() {
              type: 'info',
              category: 'internal',
              timestamp: timestamp,
+             flag: 0, // Add flag=0
            };
             if(commandLogOutput){
                setHistory((prev) => [...prev, commandLogOutput, pauseOutput]);
             }
-            const pauseLog: LogEntry = { timestamp, type: 'I', text: "Task paused." };
+            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." };
             setLogEntries(prev => [...prev, pauseLog]);
            setIsRunning(false);
            clientHandled = true;
@@ -259,7 +269,16 @@ export default function Home() {
         initialSuggestions
       });
 
-      const outputToDisplay = executionResult.outputLines.filter(line => line.type !== 'command');
+      // Filter out lines that are just the command itself (already added)
+      // Also ensure lines from execution result have appropriate flags
+      const outputToDisplay = executionResult.outputLines
+          .filter(line => line.id !== commandLogOutput?.id)
+          .map(line => ({
+             ...line,
+             // Set default flag to 0 if missing, especially for non-log types
+             flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? 0 : undefined)
+           }));
+
        if(commandLogOutput){
          setHistory((prev) => [...prev, commandLogOutput, ...outputToDisplay]);
        }
@@ -283,11 +302,14 @@ export default function Home() {
             type: 'error',
             category: 'internal',
             timestamp: timestamp,
+            flag: 1, // Set flag=1 for error
         };
-         const errorLog: LogEntry = { timestamp, type: 'E', text: errorMsg };
+         const errorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
          if (executionResult?.newLogEntries) {
+             // If execution started and potentially updated logs, add error to those
              setLogEntries([...executionResult.newLogEntries, errorLog]);
          } else {
+             // Otherwise, add error log to the current state
              setLogEntries(prev => [...prev, errorLog]);
          }
          // Ensure commandLogOutput exists even if classification failed early due to clipboard error
@@ -297,11 +319,10 @@ export default function Home() {
 
     } finally {
       // Use finalCommandLower for pause check (it's now accessible here)
-      if (finalCommandLower !== 'pause' && !errorOccurred) {
-          setIsRunning(false);
-      } else if (errorOccurred) {
+      if (finalCommandLower !== 'pause') { // No need to check !errorOccurred here, setIsRunning(false) covers both success and error paths now
           setIsRunning(false);
       }
+      // If it was 'pause', isRunning remains true until another command is entered
     }
   };
 

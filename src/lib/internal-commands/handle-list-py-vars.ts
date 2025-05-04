@@ -32,6 +32,7 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'output';
     let outputText: string;
+    let logFlag: 0 | 1 = 0; // Default flag
 
     try {
         // runSql ensures DB is initialized
@@ -46,6 +47,8 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
              outputText = "No variables found in the database.";
              logText = `No variables found when listing. (User: ${userId})`;
              outputType = 'info'; // Use info type for "no results"
+             // logType remains 'I' but could be 'W' if desired for "no results"
+             logFlag = 0; // No error/warning here
         }
     } catch (error) {
         console.error("Error retrieving variables:", error);
@@ -53,9 +56,10 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
         outputType = 'error';
         logText = outputText + ` (User: ${userId})`;
         logType = 'E';
+        logFlag = 1; // Set flag for error
     }
 
-    const logEntry: LogEntry = { timestamp, type: logType, text: logText };
+    const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {

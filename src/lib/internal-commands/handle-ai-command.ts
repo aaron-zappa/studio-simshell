@@ -4,7 +4,8 @@
 import type { OutputLine } from '@/components/output-display';
 import type { LogEntry } from '@/types/log-types';
 import { generateSimpleText } from '@/ai/flows/simple-text-gen-flow'; // Import the AI flow
-import { storeVariableInDb } from '@/lib/variables'; // Import DB functions for storing the answer
+import { storeVariableInDb, getVariableFromDb } from '@/lib/variables'; // Import DB functions
+import { getActiveAiToolsMetadata } from '@/lib/ai-tools'; // Import tool metadata fetcher
 
 // Define the structure for the return value
 interface HandlerResult {
@@ -15,45 +16,114 @@ interface HandlerResult {
 interface HandlerParams {
     userId: number; // Added userId
     userPermissions: string[]; // Added permissions
-    args: string[]; // ['<inputtext>', ...]
+    args: string[]; // ['<inputtext', 'with', '{varname}>', ...]
     timestamp: string;
     currentLogEntries: LogEntry[];
 }
 
 /**
  * Handles the 'ai <inputtext>' internal command.
- * Passes the raw input text and user permissions to the simple text generation AI flow.
- * The AI flow is responsible for using tools (like getVariableValue) and considering permissions.
+ * Substitutes {varname} placeholders with values from the database.
+ * Passes the potentially modified input text and user permissions to the simple text generation AI flow.
  * Stores the AI's final response in the 'ai_answer' variable.
  */
 export const handleAiCommand = async ({ userId, userPermissions, args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
-    const rawInputText = args.join(' ').trim(); // Combine all arguments into the input text
+    let inputText = args.join(' ').trim(); // Combine all arguments into the input text
     let logText: string;
     let logType: 'I' | 'W' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
     let outputText: string;
     let outputLines: OutputLine[] = [];
     let newLogEntries: LogEntry[] = [...currentLogEntries];
+    let logFlag: 0 | 1 = 0; // Default flag
 
-    if (!rawInputText) {
+    if (!inputText) {
         outputText = 'Error: No input text provided for the "ai" command. Usage: ai <inputtext>';
         outputType = 'error';
         logType = 'E';
+        logFlag = 1;
         logText = outputText;
         outputLines.push({ id: `ai-err-input-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
-        newLogEntries.push({ timestamp, type: logType, text: logText });
+        newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
         return { outputLines, newLogEntries };
     }
 
+    // --- Variable Substitution ---
+    const variableRegex = /\{([a-zA-Z_]\w*)\}/g; // Matches {varname}
+    let match;
+    let processedInputText = inputText;
+    let substitutionError = false;
+
+    // Use a loop to handle multiple variable substitutions
+    while ((match = variableRegex.exec(inputText)) !== null) {
+        const variableName = match[1];
+        try {
+             // Check read permission before attempting to fetch
+             if (!userPermissions.includes('read_variables')) {
+                 processedInputText = processedInputText.replace(match[0], `<variable '${variableName}' permission denied>`);
+                 const permDeniedMsg = `Permission denied to read variable '${variableName}' for AI command.`;
+                 if (!substitutionError) { // Log permission denial only once per command run if multiple vars lack perm
+                     logEntries.push({ timestamp, type: 'W', flag: 1, text: permDeniedMsg + ` (User: ${userId})` });
+                 }
+                 substitutionError = true; // Mark that an error occurred
+                 continue; // Move to next match
+             }
+
+
+            const variableDetails = await getVariableFromDb(variableName);
+            if (variableDetails) {
+                processedInputText = processedInputText.replace(match[0], variableDetails.value);
+            } else {
+                // Variable not found - replace with a placeholder
+                processedInputText = processedInputText.replace(match[0], `<variable '${variableName}' not found>`);
+                logEntries.push({ timestamp, type: 'W', flag: 1, text: `Variable '{${variableName}}' not found during AI command preprocessing. (User: ${userId})` });
+                substitutionError = true; // Mark that an error occurred
+            }
+        } catch (dbError) {
+            console.error(`Error retrieving variable '${variableName}' for AI command:`, dbError);
+            processedInputText = processedInputText.replace(match[0], `<variable '${variableName}' db_error>`);
+            logEntries.push({ timestamp, type: 'E', flag: 1, text: `DB error retrieving variable '{${variableName}}' for AI command: ${dbError instanceof Error ? dbError.message : 'Unknown DB error'}. (User: ${userId})` });
+            substitutionError = true; // Mark that an error occurred
+            // Do not stop processing, just mark the error and continue with other substitutions
+        }
+    }
+    // --- End Variable Substitution ---
+
+    // Add substitution error warning to the main output if needed
+     if (substitutionError) {
+        outputLines.push({
+            id: `ai-subst-warn-${timestamp}`,
+            text: "Warning: Some variables could not be substituted. See log for details.",
+            type: 'warning',
+            category: 'internal',
+            timestamp
+        });
+     }
+
+
     try {
         // --- AI Flow Call ---
-        logText = `AI command processing raw input: "${rawInputText}" for user ${userId}.`;
-        newLogEntries.push({ timestamp, type: 'I', text: logText });
+        logText = `AI command processing input: "${processedInputText}" (Original: "${inputText}") for user ${userId}.`;
+        newLogEntries.push({ timestamp, type: 'I', flag: 0, text: logText });
 
-        // Call the AI flow with the raw input text and permissions
+        // Fetch active tool metadata to pass as context
+        let toolContextString: string | undefined = undefined;
+        try {
+             const activeTools = await getActiveAiToolsMetadata();
+             if (activeTools.length > 0) {
+                 toolContextString = activeTools.map(tool =>
+                     `[Tool: @${tool.name}, Args: ${tool.args_description}, Does: ${tool.description}]`
+                 ).join('\n');
+             }
+        } catch (toolError) {
+             console.error("Failed to fetch AI tools for context:", toolError);
+             logEntries.push({ timestamp, type: 'W', flag: 1, text: `Failed to fetch AI tools context for AI command: ${toolError instanceof Error ? toolError.message : 'Unknown error'}. (User: ${userId})` });
+        }
+
+        // Call the AI flow with the processed input text, tool context, and permissions
         const aiResult = await generateSimpleText({
-            inputText: rawInputText,
-            userId: userId, // Pass userId if needed by the flow (optional for now)
+            inputText: processedInputText,
+            toolContext: toolContextString, // Pass tool context
             userPermissions: userPermissions // Pass permissions
         });
         const aiAnswer = aiResult.answer;
@@ -66,8 +136,8 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
                 outputText = `AI response stored successfully in variable 'ai_answer'.`;
                 outputType = 'info';
                 logType = 'I';
-                const finalLogText = `AI command executed successfully for user ${userId}. Response stored in 'ai_answer'. Raw input: "${rawInputText}"`;
-                newLogEntries.push({ timestamp, type: logType, text: finalLogText });
+                const finalLogText = `AI command executed successfully for user ${userId}. Response stored in 'ai_answer'. Processed input: "${processedInputText}"`;
+                newLogEntries.push({ timestamp, type: logType, flag: 0, text: finalLogText });
                 outputLines.push({ id: `ai-success-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
 
                  // Display the AI answer directly as well
@@ -84,9 +154,10 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
                 outputText = `AI generated a response, but failed to store it in variable 'ai_answer': ${dbError instanceof Error ? dbError.message : 'Unknown DB error'}`;
                 outputType = 'error';
                 logType = 'E';
+                logFlag = 1;
                 logText = outputText;
                 outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
-                newLogEntries.push({ timestamp, type: logType, text: logText });
+                newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
                 outputLines.push({
                     id: `ai-answer-fail-${timestamp}`,
                     text: `AI Answer (generated but not stored): ${aiAnswer}`,
@@ -100,9 +171,10 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
              outputText = `AI generated a response, but permission denied to store it in variable 'ai_answer'.`;
              outputType = 'warning'; // Use warning as AI did respond
              logType = 'W';
+             logFlag = 1;
              logText = outputText + ` (User ID: ${userId})`;
              outputLines.push({ id: `ai-store-perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
-             newLogEntries.push({ timestamp, type: logType, text: logText });
+             newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
              // Still display the answer
               outputLines.push({
                 id: `ai-answer-nostore-${timestamp}`,
@@ -118,9 +190,10 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         outputText = `Error processing AI command: ${aiError instanceof Error ? aiError.message : 'Unknown AI error'}`;
         outputType = 'error';
         logType = 'E';
+        logFlag = 1;
         logText = outputText;
         outputLines.push({ id: `ai-err-gen-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
-        newLogEntries.push({ timestamp, type: logType, text: logText });
+        newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
     }
 
     return {
@@ -128,6 +201,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         newLogEntries
     };
 };
+
 
 /**
  * Returns the name of the current file.

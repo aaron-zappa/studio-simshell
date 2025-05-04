@@ -31,6 +31,7 @@ export const handleMode = async ({ args, timestamp, initialSuggestions, currentL
     let logText: string;
     let logType: 'I' | 'W' = 'I';
     let outputType: 'info' | 'error' = 'info';
+    let logFlag: 0 | 1 = 0; // Default flag
 
     if (args.length === 0) {
        logText = `Command category is automatically detected. Available categories: ${Object.keys(initialSuggestions).join(', ')}. Use 'help' for more info.`;
@@ -45,12 +46,13 @@ export const handleMode = async ({ args, timestamp, initialSuggestions, currentL
     } else {
         logText = `Info: '${requestedMode}' is not a recognized category. Categories are automatically detected. Valid categories: ${Object.keys(initialSuggestions).join(', ')}`;
         logType = 'W'; // Warning for invalid request
+        logFlag = 1; // Set flag for warning
         outputType = 'error'; // Keep output as error for user feedback
         outputLines = [{ id: `mode-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
     }
 
     // Create log entry
-    const logEntry: LogEntry = { timestamp, type: logType, text: logText + ` (User: ${userId})` };
+    const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText + ` (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

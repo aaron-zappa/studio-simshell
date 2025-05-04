@@ -51,12 +51,14 @@ export async function executeCommand ({
   const commandLower = commandTrimmed.toLowerCase();
 
   // Command output line now uses the classified mode as its category
+  // Include flag in command output only if it's meant to be logged like an entry
   const commandOutput: OutputLine = {
     id: `cmd-${timestamp}`,
     text: command,
     type: 'command',
     category: mode, // Use the classified mode here
     timestamp: timestamp,
+    // flag: 0 // Typically commands themselves don't have a flag unless logged specially
   };
 
   let outputLines: OutputLine[] = [];
@@ -68,13 +70,13 @@ export async function executeCommand ({
   try {
       userPermissions = await getUserPermissions(userId);
       // Optional: Log fetched permissions for debugging
-      // logEntry = { timestamp, type: 'I', text: `User ${userId} Permissions: ${userPermissions.join(', ')}` };
+      // logEntry = { timestamp, type: 'I', flag: 0, text: `User ${userId} Permissions: ${userPermissions.join(', ')}` };
       // potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
   } catch (permError) {
        console.error("Error fetching user permissions:", permError);
        const errorMsg = `Error fetching user permissions: ${permError instanceof Error ? permError.message : 'Unknown error'}`;
-       outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
-       logEntry = { timestamp, type: 'E', text: errorMsg };
+       outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Add flag=1 for error
+       logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
        potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
        // Return early if permissions couldn't be fetched, as they might be critical
        return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
@@ -87,8 +89,8 @@ export async function executeCommand ({
       // Example: Check if user can execute SQL modify commands
       if (mode === 'sql' && !userPermissions.includes('execute_sql_select') && !userPermissions.includes('execute_sql_modify')) {
           const errorMsg = "Permission denied: You do not have permission to execute SQL queries.";
-          outputLines = [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
-          logEntry = { timestamp, type: 'E', text: errorMsg };
+          outputLines = [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }]; // Add flag=1 for error
+          logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
           potentiallyUpdatedLogs = potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, logEntry] : [...currentLogEntries, logEntry];
           return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
       }
@@ -133,12 +135,12 @@ export async function executeCommand ({
             // Store in DB (pass the string representation for the DB)
             await storeVariableInDb(variableName, String(actualValue), dataType);
             outputLines = []; // Simulate no direct output for assignment
-            logEntry = { timestamp, type: 'I', text: `Stored/Updated internal variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
+            logEntry = { timestamp, type: 'I', flag: 0, text: `Stored/Updated internal variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
          } catch (error) {
             console.error("Error storing variable:", error);
             const errorMsg = `Error storing internal variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
-            outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
-            logEntry = { timestamp, type: 'E', text: errorMsg };
+            outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }]; // Add flag=1 for error
+            logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
          }
       }
       // --- Other Internal Commands ---
@@ -205,12 +207,12 @@ export async function executeCommand ({
               try {
                   await storeVariableInDb(variableName, String(actualValue), dataType);
                   outputLines = []; // No direct output for assignment
-                  logEntry = { timestamp, type: 'I', text: `Stored/Updated Python variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
+                  logEntry = { timestamp, type: 'I', flag: 0, text: `Stored/Updated Python variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
               } catch (error) {
                   console.error("Error storing Python variable:", error);
                   const errorMsg = `Error storing Python variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
-                  outputLines = [{ id: `py-assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python', timestamp }];
-                  logEntry = { timestamp, type: 'E', text: errorMsg };
+                  outputLines = [{ id: `py-assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python', timestamp, flag: 1 }]; // Add flag=1 for error
+                  logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
               }
 
 
@@ -219,14 +221,14 @@ export async function executeCommand ({
          else if (commandLower.startsWith('print(')) {
             const match = commandTrimmed.match(/print\((['"]?)(.*?)\1\)/);
             const printOutput = match ? match[2] : 'Syntax Error in print';
-            const type = match ? 'output' : 'error';
-            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined }];
-            logEntry = { timestamp, type: match ? 'I' : 'E', text: `Python print: ${printOutput}` };
+            const type: OutputLine['type'] = match ? 'output' : 'error';
+            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: type === 'error' ? 1 : 0 }]; // Add flag
+            logEntry = { timestamp, type: match ? 'I' : 'E', flag: match ? 0 : 1, text: `Python print: ${printOutput}` };
          } else {
             await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
             const simOutput = `Simulating Python: ${commandTrimmed} (output placeholder)`;
-            outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'python', timestamp: undefined }]; // timestamp was missing
-            logEntry = { timestamp, type: 'I', text: simOutput };
+            outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'python', timestamp: undefined, flag: 0 }]; // Add flag=0
+            logEntry = { timestamp, type: 'I', flag: 0, text: simOutput };
          }
       }
       else if (mode === 'unix') {
@@ -234,16 +236,16 @@ export async function executeCommand ({
          let simOutput = `Simulating Unix: ${commandTrimmed} (output placeholder)`;
          if (commandLower === 'ls') {
              simOutput = 'file1.txt  directoryA  script.sh';
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
-             logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined, flag: 0 }]; // Add flag=0
+             logEntry = { timestamp, type: 'I', flag: 0, text: `Unix simulation output: ${simOutput}` };
          } else if (commandLower.startsWith('echo ')) {
              // Removed specific "Hello SimShell Demo!" case
              simOutput = commandTrimmed.substring(5); // General echo simulation
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
-             logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined, flag: 0 }]; // Add flag=0
+             logEntry = { timestamp, type: 'I', flag: 0, text: `Unix simulation output: ${simOutput}` };
          } else {
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }]; // Use standard no timestamp format
-             logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined, flag: 0 }]; // Add flag=0
+             logEntry = { timestamp, type: 'I', flag: 0, text: `Unix simulation output: ${simOutput}` };
          }
       }
       else if (mode === 'windows') {
@@ -251,14 +253,14 @@ export async function executeCommand ({
          let simOutput = `Simulating Windows: ${commandTrimmed} (output placeholder)`;
          if (commandLower === 'dir') {
              simOutput = ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free';
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined, flag: 0 }]; // Add flag=0
          } else if (commandLower.startsWith('echo ')) {
              simOutput = commandTrimmed.substring(5);
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined }];
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined, flag: 0 }]; // Add flag=0
          } else {
-             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined }]; // Use standard no timestamp format
+             outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined, flag: 0 }]; // Add flag=0
          }
-         logEntry = { timestamp, type: 'I', text: `Windows simulation output: ${simOutput}` };
+         logEntry = { timestamp, type: 'I', flag: 0, text: `Windows simulation output: ${simOutput}` };
       }
       else if (mode === 'sql') {
          await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50));
@@ -277,25 +279,25 @@ export async function executeCommand ({
            if (results) {
              const formattedTable = await formatResultsAsTable(results); // Await the async function
              const sqlOutput = formattedTable || "Query executed successfully, no results returned.";
-             outputLines = [{ id: `out-${timestamp}`, text: sqlOutput, type: 'output', category: 'sql', timestamp: undefined }];
-             logEntry = { timestamp, type: 'I', text: `SQL query result: ${sqlOutput}` };
+             outputLines = [{ id: `out-${timestamp}`, text: sqlOutput, type: 'output', category: 'sql', timestamp: undefined, flag: 0 }]; // Add flag=0
+             logEntry = { timestamp, type: 'I', flag: 0, text: `SQL query result: ${sqlOutput}` };
            } else if (changes !== null) {
              let infoText = `Query executed successfully. ${changes} row${changes === 1 ? '' : 's'} affected.`;
              if (lastInsertRowid !== null && lastInsertRowid > 0) {
                 infoText += ` Last inserted row ID: ${lastInsertRowid}`;
              }
-             outputLines = [{ id: `out-${timestamp}`, text: infoText, type: 'info', category: 'sql', timestamp }];
-             logEntry = { timestamp, type: 'I', text: infoText };
+             outputLines = [{ id: `out-${timestamp}`, text: infoText, type: 'info', category: 'sql', timestamp, flag: 0 }]; // Add flag=0
+             logEntry = { timestamp, type: 'I', flag: 0, text: infoText };
            } else {
               const successMsg = "Query executed successfully.";
-              outputLines = [{ id: `out-${timestamp}`, text: successMsg, type: 'info', category: 'sql', timestamp }];
-              logEntry = { timestamp, type: 'I', text: successMsg };
+              outputLines = [{ id: `out-${timestamp}`, text: successMsg, type: 'info', category: 'sql', timestamp, flag: 0 }]; // Add flag=0
+              logEntry = { timestamp, type: 'I', flag: 0, text: successMsg };
            }
          } catch (error) {
            console.error("SQL execution error:", error);
            const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
-           outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp }];
-           logEntry = { timestamp, type: 'E', text: `SQL Error: ${errorMsg}` };
+           outputLines = [{ id: `err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 1 }]; // Add flag=1 for error
+           logEntry = { timestamp, type: 'E', flag: 1, text: `SQL Error: ${errorMsg}` };
          }
       }
       else if (mode === 'excel') {
@@ -303,6 +305,7 @@ export async function executeCommand ({
          let excelOutput = `Simulating Excel: ${commandTrimmed} (output placeholder)`;
          let excelLogType: 'I' | 'E' = 'I';
          let outputType: 'output' | 'error' = 'output';
+         let logFlag: 0 | 1 = 0; // Add flag
          if (commandLower.startsWith('sum(')) {
              const numbersMatch = commandTrimmed.match(/sum\(([\d\s,.]+)\)/i);
              if (numbersMatch && numbersMatch[1]) {
@@ -315,28 +318,30 @@ export async function executeCommand ({
                      excelOutput = '#VALUE!';
                      excelLogType = 'E';
                      outputType = 'error';
+                     logFlag = 1; // Set flag for error
                  }
              } else {
                   excelOutput = '#NAME?';
                   excelLogType = 'E';
                   outputType = 'error';
+                  logFlag = 1; // Set flag for error
              }
          }
-         outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: outputType, category: 'excel', timestamp: outputType === 'error' ? timestamp : undefined }];
-         logEntry = { timestamp, type: excelLogType, text: `Excel simulation output: ${excelOutput}` };
+         outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: outputType, category: 'excel', timestamp: outputType === 'error' ? timestamp : undefined, flag: logFlag }]; // Add flag
+         logEntry = { timestamp, type: excelLogType, flag: logFlag, text: `Excel simulation output: ${excelOutput}` };
       }
        else {
          const errorMsg = `Error: Command execution logic not implemented for category '${mode}'.`;
-         outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
-         logEntry = { timestamp, type: 'E', text: errorMsg };
+         outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }]; // Add flag=1 for error
+         logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
        }
 
   } catch (error) // Catch errors from handlers themselves or permission denials
   {
       console.error("Unhandled error during command execution:", error);
       const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
-      logEntry = { timestamp, type: 'E', text: errorMsg };
+      outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }]; // Add flag=1 for error
+      logEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
   }
 
 
@@ -348,7 +353,10 @@ export async function executeCommand ({
        // If internal handler already updated logs, we might need to decide whether to add the generic log too.
         if (logEntry.text.includes('variable') || logEntry.text.startsWith('SQL') || logEntry.text.startsWith('Excel') || logEntry.text.startsWith('Simulating')) {
            // If it's a relevant log, add it even if internal handler modified logs.
-            finalLogEntries = [...finalLogEntries, logEntry];
+           // Avoid duplicates if the internal handler already logged this exact message.
+            if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
+                 finalLogEntries = [...finalLogEntries, logEntry];
+            }
         } else {
             console.warn("Log entry generated but internal handler also modified logs. Generic log ignored.");
         }

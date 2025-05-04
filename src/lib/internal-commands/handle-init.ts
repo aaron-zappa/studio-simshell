@@ -42,12 +42,13 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
     let outputLines: OutputLine[] = [];
     let overallSuccess = true;
     let finalMessage = '';
+    let logFlag: 0 | 1 = 0; // Default flag
 
     try {
         // 1. Initialize Database Table
         await runSql(createTableSql);
         const dbInitMsg = "Database initialized successfully. 'variables' table ensured.";
-        logEntries.push({ timestamp, type: 'I', text: `${dbInitMsg} (User: ${userId})` });
+        logEntries.push({ timestamp, type: 'I', flag: 0, text: `${dbInitMsg} (User: ${userId})` });
         outputLines.push({ id: `init-db-${timestamp}`, text: dbInitMsg, type: 'info', category: 'internal', timestamp });
 
         // 2. Initialize Default Python Variables (excluding clipboard)
@@ -69,21 +70,22 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
             } catch (error) {
                 const errorMsg = `Error storing default variable '${variable.name}': ${error instanceof Error ? error.message : 'Unknown error'}`;
                 console.error(errorMsg);
-                logEntries.push({ timestamp, type: 'E', text: `${errorMsg} (User: ${userId})` });
+                logEntries.push({ timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` });
                 varErrors.push(errorMsg);
                 overallSuccess = false;
+                logFlag = 1; // Set overall flag if any var error occurs
             }
         }
 
         // Handle clipboard initialization feedback (without actual reading)
         const clipboardInitMsg = "Clipboard variable placeholder created. Assign with `clipboard = get()` command (requires clipboard access).";
-        logEntries.push({ timestamp, type: 'I', text: `${clipboardInitMsg} (User: ${userId})` });
+        logEntries.push({ timestamp, type: 'I', flag: 0, text: `${clipboardInitMsg} (User: ${userId})` });
         // Don't add clipboard specific message to direct output, keep it simple
         // outputLines.push({ id: `init-clipboard-${timestamp}`, text: clipboardInitMsg, type: 'info', category: 'internal', timestamp });
 
 
         const varInitMsg = `Initialized ${varsAddedCount} default Python variable(s).`;
-        logEntries.push({ timestamp, type: 'I', text: `${varInitMsg} (User: ${userId})` });
+        logEntries.push({ timestamp, type: 'I', flag: 0, text: `${varInitMsg} (User: ${userId})` });
         outputLines.push({ id: `init-vars-${timestamp}`, text: varInitMsg, type: 'info', category: 'internal', timestamp });
 
         if (varErrors.length > 0) {
@@ -100,13 +102,23 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
     } catch (error) {
         console.error("Error during initialization:", error);
         const errorMsg = `Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        logEntries.push({ timestamp, type: 'E', text: `${errorMsg} (User: ${userId})` });
+        logEntries.push({ timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` });
         outputLines.push({ id: `init-error-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
         overallSuccess = false;
         finalMessage = errorMsg;
+        logFlag = 1; // Set flag for critical init error
     }
 
     const combinedLogEntries = [...currentLogEntries, ...logEntries];
+
+    // Add final summary log entry based on overall success
+    combinedLogEntries.push({
+      timestamp,
+      type: overallSuccess ? 'I' : 'E',
+      flag: logFlag,
+      text: `Overall Initialization Status: ${overallSuccess ? 'Success' : 'Failed with errors'}. ${finalMessage} (User: ${userId})`
+    });
+
 
     return {
         outputLines,

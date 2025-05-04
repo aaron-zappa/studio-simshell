@@ -29,10 +29,11 @@ export const handleCustomCommand = async (params: HandlerParams, action: CustomC
     const outputText = action; // Action is the output for now
     const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
-    // Create log entry
+    // Create log entry with flag=0
     const logEntry: LogEntry = {
         timestamp,
         type: 'I',
+        flag: 0, // Default flag
         text: `Executed custom command '${commandName}'. Output: ${outputText} (User: ${userId})`
     };
     const newLogEntries = [...currentLogEntries, logEntry];

@@ -14,7 +14,7 @@ interface HandlerResult {
 interface HandlerParams {
     userId: number; // Added userId
     userPermissions: string[]; // Added permissions
-    args: string[]; // Expected: ['ai_tool', <name>, 'active', <0|1>]
+    args: string[]; // Expected: ['<name>', 'active', <0|1>] - index.ts passes args starting *after* 'set ai_tool'
     timestamp: string;
     currentLogEntries: LogEntry[];
 }
@@ -32,15 +32,17 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
     let logType: 'I' | 'W' | 'E' = 'I';
     let outputType: 'info' | 'error' = 'info';
     let outputText = '';
+    let logFlag: 0 | 1 = 0; // Default flag
 
     // Permission check moved to central handler
 
-    // Validate arguments: set ai_tool <name> active <0|1>
+    // Validate arguments: <name> active <0|1> (args array starts after 'set ai_tool')
     if (args.length !== 3 || args[1] !== 'active' || (args[2] !== '0' && args[2] !== '1')) {
          // Adjusted args index check based on how index.ts passes args (excluding 'set' and 'ai_tool')
         outputText = `Error: Invalid syntax. Use: set ai_tool <name> active <0|1>`;
         outputType = 'error';
         logType = 'E';
+        logFlag = 1; // Set flag for error
         logText = outputText + ` (User: ${userId}, Command: set ai_tool ${args.join(' ')})`;
         outputLines = [{ id: `set-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     } else {
@@ -61,8 +63,9 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
                 outputLines.push({ id: `set-tool-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
             } else {
                 outputText = `Error: AI tool '${toolName}' not found.`;
-                outputType = 'error';
+                outputType = 'error'; // Changed to error as it's a failed operation
                 logType = 'W'; // Warning because the command was valid but target not found
+                logFlag = 1; // Set flag for warning/error
                 logText = outputText + ` (User: ${userId})`;
                 outputLines.push({ id: `set-tool-notfound-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
             }
@@ -72,12 +75,13 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
             outputType = 'error';
             logText = outputText + ` (User: ${userId})`;
             logType = 'E';
+            logFlag = 1; // Set flag for error
             outputLines.push({ id: `set-tool-db-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         }
     }
 
     // Add log entry regardless of success/failure
-    updatedLogEntries.push({ timestamp, type: logType, text: logText });
+    updatedLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
 
     return {
         outputLines: outputLines,
