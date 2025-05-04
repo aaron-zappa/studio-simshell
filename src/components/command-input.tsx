@@ -12,7 +12,7 @@ import { Terminal } from 'lucide-react';
 
 interface CommandInputProps {
   onSubmit: (command: string) => void;
-  suggestions: string[]; // List of possible commands/subcommands from potentially all modes
+  suggestions: string[]; // List of possible commands/subcommands from *active* modes
   className?: string;
   disabled?: boolean;
 }
@@ -30,6 +30,7 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
     if (value.trim().length > 0 && !disabled) {
       const lowerCaseValue = value.toLowerCase();
       // Filter suggestions based on input, ignoring case
+      // Suggestions passed in are already filtered by active categories
       const filtered = suggestions.filter((suggestion) =>
         suggestion.toLowerCase().startsWith(lowerCaseValue) && suggestion.toLowerCase() !== lowerCaseValue
       );
@@ -44,7 +45,7 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
   const handleSuggestionClick = (suggestion: string) => {
     if (disabled) return;
 
-    // Simplified: just set the suggestion, specific mode logic removed
+    // Simplified: just set the suggestion
     setInputValue(suggestion + " ");
     setIsPopoverOpen(false);
     setFilteredSuggestions([]);
@@ -84,7 +85,7 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
                  <Input
                     ref={inputRef}
                     type="text"
-                    placeholder={disabled ? "Processing..." : "Enter command..."}
+                    placeholder={disabled ? "Processing..." : "Enter command (suggestions based on active categories)..."} // Updated placeholder
                     value={inputValue}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
@@ -108,7 +109,7 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
             >
             <CommandPrimitive shouldFilter={false}>
               <CommandList id="suggestion-list">
-                <CommandEmpty>No matching commands.</CommandEmpty>
+                <CommandEmpty>No matching commands in active categories.</CommandEmpty> {/* Updated empty text */}
                 {filteredSuggestions.map((suggestion) => (
                   <CommandItem
                     key={suggestion}
@@ -136,6 +137,6 @@ export function CommandInput({ onSubmit, suggestions, className, disabled = fals
  * Returns the name of the current file.
  * @returns The filename.
  */
-export function getFilename(): string {
+function getFilename(): string {
     return 'command-input.tsx';
 }

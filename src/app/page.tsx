@@ -46,7 +46,11 @@ export default function Home() {
 
     try {
       // --- Classify Command (AI Call) ---
-      const classificationResult = await classifyCommand({ command });
+      // Pass the currently selected categories to the classification flow
+      const classificationResult = await classifyCommand({
+          command,
+          activeCategories: selectedCategories
+      });
       const category: CommandCategory = classificationResult.category;
       const classificationReasoning = classificationResult.reasoning;
 
@@ -54,13 +58,13 @@ export default function Home() {
          type: 'command',
       };
 
-      // Handle ambiguous or unknown commands
+      // Handle ambiguous or unknown commands based on active categories
       if (category === 'ambiguous' || category === 'unknown') {
         const ambiguousOutput: OutputLine = {
           id: `class-err-${timestamp}`,
           text: category === 'ambiguous'
-              ? `Command is ambiguous. ${classificationReasoning || 'Please specify context or be more specific.'}`
-              : `Command not recognized. ${classificationReasoning || 'Please try again or type "help".'}`,
+              ? `Command is ambiguous within active categories (${selectedCategories.join(', ')}). ${classificationReasoning || 'Please specify context or be more specific.'}`
+              : `Command not recognized within active categories (${selectedCategories.join(', ')}). ${classificationReasoning || 'Please try again or type "help".'}`,
           type: 'error',
           category: 'internal', // Assign a default category for display
         };
@@ -179,14 +183,14 @@ export default function Home() {
         <h1 className="text-2xl font-semibold">SimuShell</h1>
           {/* Category Checkboxes */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="text-sm font-medium mr-2">Show Suggestions For:</span>
+              <span className="text-sm font-medium mr-2">Active Categories:</span>
               {ALL_COMMAND_MODES.map(category => (
                   <div key={category} className="flex items-center space-x-2">
                       <Checkbox
                           id={`category-${category}`}
                           checked={selectedCategories.includes(category)}
                           onCheckedChange={(checked) => handleCategoryChange(category, checked)}
-                          aria-label={`Toggle suggestions for ${category} commands`}
+                          aria-label={`Toggle category ${category}`}
                       />
                       <Label htmlFor={`category-${category}`} className="text-sm font-normal capitalize">
                           {category}
@@ -207,7 +211,7 @@ export default function Home() {
       <footer className="shrink-0">
         <CommandInput
             onSubmit={handleCommandSubmit}
-            suggestions={filteredSuggestionsForInput} // Provide filtered suggestions
+            suggestions={filteredSuggestionsForInput} // Provide filtered suggestions based on selected categories
             disabled={isRunning}
          />
       </footer>
