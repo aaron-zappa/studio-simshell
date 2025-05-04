@@ -11,7 +11,7 @@
 
 import {ai} from '@/ai/ai-instance';
 import {z} from 'genkit';
-import { getVariableValue } from '@/ai/tools/get-variable-tool'; // Import the tool
+// Removed: import { getVariableValue } from '@/ai/tools/get-variable-tool'; // Remove tool import
 
 const SimpleTextGenInputSchema = z.object({
   inputText: z.string().describe('The user\'s input text. Variable values referenced with {varname} may have already been substituted. If a variable was not found, it might appear as `<variable \'varname\' not found>`.'),
@@ -37,16 +37,14 @@ const simpleTextPrompt = ai.definePrompt({
   output: {
     schema: SimpleTextGenOutputSchema,
   },
-  // Provide the tool to the prompt
-  tools: [getVariableValue],
-  // Update prompt instructions
+  // Remove the tool from the prompt
+  // tools: [getVariableValue],
+  // Simplify prompt instructions
   prompt: `Carefully analyze the following user input and generate a helpful response.
 
-Sometimes, the input text might refer to variables using curly braces like {varname}. The system tries to substitute these with their stored values beforehand.
+Sometimes, the input text might refer to variables using curly braces like {varname}. The system tries to substitute these with their stored values beforehand. If a variable was not found during substitution, it might appear as "<variable 'varname' not found>" in the input.
 
-**IMPORTANT:** If you encounter a placeholder like "<variable 'some_variable_name' not found>" in the input, OR if the user's query implicitly requires the value of a variable {varname} that wasn't substituted, you MUST use the 'getVariableValue' tool to retrieve the current value for 'some_variable_name' before formulating your final answer. Only use the tool if obtaining the variable's value is necessary to properly address the user's request. If the tool returns null for the variable, state that the value could not be determined. Do not ask the user to provide the value again if the tool failed.
-
-Respond directly and concisely based on the potentially updated information.
+Respond directly and concisely based on the provided input.
 
 Input:
 {{{inputText}}}`,
@@ -63,6 +61,7 @@ const simpleTextGenFlow = ai.defineFlow<
     outputSchema: SimpleTextGenOutputSchema,
   },
   async (input) => {
+    // Call the prompt without the tool
     const { output } = await simpleTextPrompt(input);
 
     if (!output) {
@@ -70,32 +69,16 @@ const simpleTextGenFlow = ai.defineFlow<
         throw new Error("AI generation failed.");
     }
 
-    // Check if the AI output indicates it couldn't find the variable, even after tool use attempt
-    const variableNotFoundPatterns = [
-        /i need the value of variable/i,
-        /please provide the value/i,
-        /attempt to retrieve it/i,
-        /cannot determine the value of/i, // Added based on user feedback example
-        /value for ['"]?\{?(\w+)\}?['"]? could not be determined/i, // More specific pattern
-    ];
+    // Remove post-processing logic related to the tool
+    // const variableNotFoundPatterns = [ ... ];
+    // let variableName: string | null = null;
+    // const variableMentionRegex = /variable ['"]?\{?(\w+)\}?['"]?/;
+    // const mentionMatch = output.answer.match(variableMentionRegex);
+    // if (mentionMatch) { ... }
+    // const needsValue = variableNotFoundPatterns.some(pattern => pattern.test(output.answer));
+    // if (needsValue) { ... }
 
-    let variableName: string | null = null;
-    const variableMentionRegex = /variable ['"]?\{?(\w+)\}?['"]?/;
-    const mentionMatch = output.answer.match(variableMentionRegex);
-    if (mentionMatch) {
-        variableName = mentionMatch[1];
-    }
-
-    const needsValue = variableNotFoundPatterns.some(pattern => pattern.test(output.answer));
-
-    if (needsValue) {
-        // Modify the output to be more definitive about the failure
-        console.warn(`AI indicated variable value needed but wasn't found/retrieved. Original Answer: "${output.answer}"`);
-        const varNameText = variableName ? `'${variableName}' ` : '';
-        output.answer = `AI could not determine the value for variable ${varNameText}needed to fulfill the request.`;
-    }
-
-
+    // Directly return the AI's output
     return output;
   }
 );
