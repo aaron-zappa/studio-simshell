@@ -24,6 +24,7 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'init', // Added general init command
       'init db', // Keep specific init db as well
       'list py vars', // Added new command
+      'ai <inputtext>', // Added new AI command suggestion
     ],
   python: [
       'print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield ',
@@ -71,6 +72,10 @@ export const useSuggestions = () => {
              // Add format for list py vars
             if (mode === 'internal' && lowerCommand === 'list py vars') {
                  suggestionToAdd = 'list py vars';
+            }
+            // Add format for ai command
+            if (mode === 'internal' && lowerCommand.startsWith('ai')) {
+                 suggestionToAdd = 'ai <inputtext>';
             }
              // Add format for clipboard get (though it's already in initial)
              if (mode === 'python' && lowerCommand === 'clipboard = get()') {

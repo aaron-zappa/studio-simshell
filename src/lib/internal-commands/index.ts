@@ -22,6 +22,7 @@ import { handlePersistDb } from './handle-persist-db';
 import { handleInitDb } from './handle-init-db';
 import { handleInit } from './handle-init'; // Import the new init handler
 import { handleListPyVars } from './handle-list-py-vars'; // Import the new list vars handler
+import { handleAiCommand } from './handle-ai-command'; // Import the new AI command handler
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -105,6 +106,8 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                 return handleListPyVars(params); // Call the new list vars handler
             }
             break; // Fall through if not the exact command
+        case 'ai': // Add case for the new 'ai' command
+            return handleAiCommand(params); // Call the new AI handler
     }
 
     // 2. Custom internal commands

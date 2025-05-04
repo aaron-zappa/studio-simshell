@@ -23,7 +23,7 @@ export const handleHelp = async ({ timestamp, initialSuggestions, currentLogEntr
     // Update help text to include 'init' and 'list py vars' commands
     const helpText = `Command category is automatically detected.
 Available categories: ${Object.keys(initialSuggestions).join(', ')}.
-Available internal commands: help, clear, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause, create sqlite <filename.db>, init, init db, list py vars, show requirements, persist memory db to <filename.db>
+Available internal commands: help, clear, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause, create sqlite <filename.db>, init, init db, list py vars, show requirements, persist memory db to <filename.db>, ai <inputtext>
 Run custom commands by typing their name.
 Note: 'mode' command is informational only.`;
     const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp: undefined }]; // Remove timestamp for non-log output

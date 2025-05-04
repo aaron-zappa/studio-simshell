@@ -110,7 +110,7 @@ const classifyCommandFlow = ai.defineFlow<
             'help', 'clear', 'mode', 'history', 'define', 'refine',
             'add_int_cmd', 'export log', 'pause', 'create sqlite',
             'init', 'init db', 'list py vars', // Added 'list py vars' here
-            'show requirements', 'persist memory db to'
+            'show requirements', 'persist memory db to', 'ai' // Added 'ai' here
         ];
         // Check for simple variable assignment pattern as well
         const assignmentRegex = /^\s*([a-zA-Z_]\w*)\s*=\s*.+\s*$/;
@@ -120,7 +120,7 @@ const classifyCommandFlow = ai.defineFlow<
         }
 
 
-         // Need to handle multi-word command names like 'show requirements' or 'persist memory db to' or 'list py vars'
+         // Need to handle multi-word command names like 'show requirements' or 'persist memory db to' or 'list py vars' or 'ai'
          let matchedInternal = false;
          for (const intCmd of internalCommands) {
              // Check for exact match (handles single and multi-word commands like 'list py vars')
@@ -133,10 +133,10 @@ const classifyCommandFlow = ai.defineFlow<
                  matchedInternal = true;
                  break;
              }
-             // Check for single-word commands that might take args (like help, mode)
+             // Check for single-word commands that might take args (like help, mode, ai)
              if (!intCmd.includes(' ') && commandLower.startsWith(intCmd + ' ')) {
                  // Limit which single-word commands accept args to avoid overly broad matches
-                 if (['help', 'mode', 'define', 'refine', 'add_int_cmd'].includes(intCmd)) { // Refined list
+                 if (['help', 'mode', 'define', 'refine', 'add_int_cmd', 'ai'].includes(intCmd)) { // Refined list including 'ai'
                     matchedInternal = true;
                     break;
                  }
@@ -151,7 +151,7 @@ const classifyCommandFlow = ai.defineFlow<
 
     // If not a clear internal command or assignment (or internal wasn't active), proceed with AI classification
     // Pass the activeCategories to the prompt
-    const {output} = await classifyPrompt(input); // Use classifyPrompt here
+    const { output } = await classifyPrompt(input); // Use classifyPrompt here
 
     // Basic validation or refinement can happen here if needed
     if (!output) {
@@ -192,9 +192,8 @@ const classifyCommandFlow = ai.defineFlow<
   }
 );
 
-// Add the flow to the dev registry
-import {flows} from '@/ai/dev';
-flows.push(classifyCommandFlow);
+// Export the flow directly
+export { classifyCommandFlow };
 
 /**
  * Returns the name of the current file.
