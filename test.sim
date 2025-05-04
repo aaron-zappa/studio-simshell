@@ -1,0 +1,3 @@
+add ai_tool hello2 "<arg:user>" "print hello2 <user>!"
+ai user=peter
+ai @hello2
