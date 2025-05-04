@@ -23,8 +23,8 @@ export default function Home() {
   const [isRunning, setIsRunning] = React.useState<boolean>(false);
   const { toast } = useToast(); // Toast hook for notifications
 
-  // State for selected categories, default to all selected
-  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(ALL_COMMAND_MODES);
+  // State for selected categories, default to only 'sql' selected
+  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['sql']);
 
   // Suggestions hook now returns categorized suggestions
   const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
