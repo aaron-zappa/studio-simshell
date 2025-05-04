@@ -9,11 +9,35 @@ import type { OutputLine } from '@/components/output-display'; // Import OutputL
  */
 export type LogEntry = {
   timestamp: string;
-  short: string; // Added short name field
+  short: string;
   commandName: string;
-  description: string; // Added description field
+  description: string;
   action: CustomCommandAction;
 };
+
+// Define the structure for the requirement array elements
+interface RequiElement {
+  requi_code: keyof LogEntry; // Use keys of LogEntry for type safety
+  requirement: string;
+}
+
+// Array describing the fields (requirements) of a LogEntry
+const requiArr: RequiElement[] = [
+  { requi_code: 'timestamp', requirement: 'ISO string timestamp of when the command was added.' },
+  { requi_code: 'short', requirement: 'Short alias or identifier for the command.' },
+  { requi_code: 'commandName', requirement: 'The full name of the added internal command.' },
+  { requi_code: 'description', requirement: 'A description of what the command does.' },
+  { requi_code: 'action', requirement: 'The action (string) to be executed when the command is run.' },
+];
+
+/**
+ * Returns the array describing the fields required for a LogEntry.
+ * @returns An array of objects, each with 'requi_code' and 'requirement'.
+ */
+export function getRequiArr(): RequiElement[] {
+  return requiArr;
+}
+
 
 /**
  * Appends a new log entry to the log state.
