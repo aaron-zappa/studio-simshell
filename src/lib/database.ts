@@ -14,7 +14,7 @@ let dbInstance: DB | null = null;
 
 /**
  * Gets the singleton in-memory SQLite database instance, creating it if it doesn't exist.
- * Also ensures the necessary tables (like 'variables') are created.
+ * DOES NOT automatically create tables; use 'init db' command for that.
  * @returns The better-sqlite3 Database instance.
  */
 function getDb(): DB {
@@ -26,25 +26,11 @@ function getDb(): DB {
       dbInstance.pragma('journal_mode = WAL');
       console.log('In-memory SQLite database initialized.');
 
-      // --- Ensure 'variables' table exists ---
-      dbInstance.exec(`
-        CREATE TABLE IF NOT EXISTS variables (
-            name VARCHAR(255) NOT NULL PRIMARY KEY,
-            datatype VARCHAR(50) NOT NULL,
-            value TEXT,
-            max REAL,
-            min REAL,
-            default_value TEXT
-        );
-      `);
-      console.log("Ensured 'variables' table exists.");
-      // -----------------------------------------
-
       // Optional: Add a cleanup hook for graceful shutdown if needed, though complex in serverless
       // process.on('exit', () => dbInstance?.close());
 
     } catch (error) {
-        console.error("Failed to initialize in-memory SQLite database or create tables:", error);
+        console.error("Failed to initialize in-memory SQLite database:", error);
         // If initialization fails, subsequent calls might also fail.
         // Re-throwing or handling this more gracefully might be needed.
         throw error; // Re-throw to indicate failure
@@ -59,7 +45,7 @@ function getDb(): DB {
  * This function is NOT exported.
  * @returns The better-sqlite3 Database instance or null.
  */
-function getCurrentDbInstance(): DB | null {
+function getCurrentDbInstanceInternal(): DB | null {
     return dbInstance;
 }
 
@@ -112,16 +98,11 @@ export async function runSql(sql: string, params: any[] = []): Promise<{ results
  * @throws Throws an error if the operation fails.
  */
 export async function persistDbToFile(targetFilename: string): Promise<boolean> {
-    const currentDb = getCurrentDbInstance(); // Use the internal function
+    const currentDb = getCurrentDbInstanceInternal(); // Use the internal function
     if (!currentDb) {
-        // Automatically initialize if trying to persist but not yet created
-        getDb();
-        const newlyInitializedDb = getCurrentDbInstance();
-        if (!newlyInitializedDb) {
-             throw new Error('Failed to initialize in-memory database for persistence.');
-        }
-        // Use the newly initialized DB for the backup
-        return persistDb(newlyInitializedDb, targetFilename);
+        // Do NOT automatically initialize if trying to persist but not yet created.
+        // Require 'create sqlite' or 'init db' first.
+         throw new Error('Database not initialized. Run "create sqlite" or "init db" first before persisting.');
     }
     // Use the existing DB instance
     return persistDb(currentDb, targetFilename);

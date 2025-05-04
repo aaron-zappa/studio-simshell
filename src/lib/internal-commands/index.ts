@@ -18,7 +18,8 @@ import { handleExportLog } from './handle-export-log';
 import { handlePause } from './handle-pause';
 import { handleCreateSqlite } from './handle-create-sqlite';
 import { handleShowRequirements } from './handle-show-requirements';
-import { handlePersistDb } from './handle-persist-db'; // Import new handler
+import { handlePersistDb } from './handle-persist-db';
+import { handleInitDb } from './handle-init-db'; // Import the new handler
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -90,6 +91,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  return await handlePersistDb(params); // Call the new handler
             }
             break; // Fall through if not the exact command
+        case 'init': // Check if it's 'init db'
+            if (commandLower === 'init db') {
+                 return await handleInitDb(params); // Call the new handler
+            }
+            break; // Fall through if not 'init db'
     }
 
     // 2. Custom internal commands
