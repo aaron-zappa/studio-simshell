@@ -59,7 +59,7 @@ const simpleTextPrompt = ai.definePrompt({
     schema: SimpleTextGenOutputSchema,
   },
   // Update prompt to instruct AI on tool simulation
-  prompt: `You are SimuShell AI. Respond to the user's input.
+  prompt: `You are SimShell AI. Respond to the user's input.
 
 User Input:
 {{{inputText}}}

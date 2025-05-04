@@ -194,7 +194,7 @@ export async function executeCommand ({
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
              logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };
          } else if (commandLower.startsWith('echo ')) {
-             // Removed specific "Hello SimuShell Demo!" case
+             // Removed specific "Hello SimShell Demo!" case
              simOutput = commandTrimmed.substring(5); // General echo simulation
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'unix', timestamp: undefined }];
              logEntry = { timestamp, type: 'I', text: `Unix simulation output: ${simOutput}` };

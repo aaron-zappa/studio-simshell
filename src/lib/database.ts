@@ -40,14 +40,14 @@ function ensureDataDirectory(): void {
 
 /**
  * Gets the singleton SQLite database instance.
- * If SIMUSHELL_DB_FILE env var is set and the file exists in ./data, it loads from the file.
+ * If SIMSHELL_DB_FILE env var is set and the file exists in ./data, it loads from the file.
  * Otherwise, it creates/uses an in-memory database.
  * @returns The better-sqlite3 Database instance.
  */
 function getDb(): DB {
   if (!dbInstance) {
     ensureDataDirectory(); // Ensure ./data exists
-    const dbFilename = process.env.SIMUSHELL_DB_FILE;
+    const dbFilename = process.env.SIMSHELL_DB_FILE; // Updated Env Var Name
     let dbPath: string | null = null;
     let mode: 'file' | 'memory' = 'memory';
 
@@ -58,11 +58,11 @@ function getDb(): DB {
             dbPath = potentialPath;
             mode = 'file';
         } else {
-            console.warn(`Database file specified by SIMUSHELL_DB_FILE (${potentialPath}) not found. Falling back to in-memory database.`);
+            console.warn(`Database file specified by SIMSHELL_DB_FILE (${potentialPath}) not found. Falling back to in-memory database.`);
             dbPath = null; // Reset to null to force in-memory
         }
     } else if (dbFilename) {
-         console.warn(`Invalid filename specified in SIMUSHELL_DB_FILE: "${dbFilename}". Falling back to in-memory database.`);
+         console.warn(`Invalid filename specified in SIMSHELL_DB_FILE: "${dbFilename}". Falling back to in-memory database.`);
     }
 
     try {
@@ -206,4 +206,3 @@ export async function getDbStatusAction(): Promise<string> {
 function getFilename(): string {
     return 'database.ts';
 }
-

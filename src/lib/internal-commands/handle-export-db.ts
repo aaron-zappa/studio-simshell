@@ -17,11 +17,11 @@ interface HandlerParams {
 }
 
 // Default filename for export db command
-const DEFAULT_EXPORT_FILENAME = 'simushell_export.db';
+const DEFAULT_EXPORT_FILENAME = 'simshell_export.db'; // Updated default name
 
 /**
  * Handles the 'export db' internal command.
- * Persists the current database state to a default file name ('simushell_export.db') in the 'data' directory.
+ * Persists the current database state to a default file name ('simshell_export.db') in the 'data' directory.
  */
 export const handleExportDb = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     let logText: string;

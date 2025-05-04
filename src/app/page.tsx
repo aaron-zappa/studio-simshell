@@ -96,7 +96,7 @@ export default function Home() {
 
     let finalCommand = commandTrimmed; // Use this variable for execution
     // Declare finalCommandLower outside the try block and initialize
-    let finalCommandLower: string = finalCommand.toLowerCase();
+    let finalCommandLower: string = '';
     let clipboardReadError: string | null = null;
 
     // --- Client-side Pre-processing for Clipboard ---
@@ -117,6 +117,9 @@ export default function Home() {
          finalCommand = ''; // Prevent execution
          finalCommandLower = ''; // Update finalCommandLower here too
        }
+    } else {
+        // If it's not a clipboard command, initialize finalCommandLower
+        finalCommandLower = finalCommand.toLowerCase();
     }
     // --- End Client-side Pre-processing ---
 
@@ -223,7 +226,7 @@ export default function Home() {
            setIsRunning(false);
            clientHandled = true;
          }
-         // Removed the specific 'echo "hello simushell demo!"' handling
+         // Removed the specific 'echo "hello SimShell demo!"' handling
       }
 
 
@@ -308,7 +311,7 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
        <header className="flex items-center justify-between mb-2 flex-wrap gap-4"> {/* Reduced bottom margin */}
-        <h1 className="text-lg font-semibold">SimuShell</h1> {/* Reduced text size */}
+        <h1 className="text-lg font-semibold">SimShell</h1> {/* Reduced text size */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className="text-sm font-medium mr-2">Active Categories:</span>
               {ALL_COMMAND_MODES.map(category => (
@@ -350,4 +353,3 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
-
