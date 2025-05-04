@@ -11,19 +11,22 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     args: string[];
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return Promise<HandlerResult> and make it async
-export const handleDefine = async ({ args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleDefine = async ({ args, timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler
     // TODO: Implement define functionality
     const outputText = `Define command placeholder for: ${args.join(' ')}`;
     const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
     // Create log entry
-    const logEntry: LogEntry = { timestamp, type: 'W', text: `Define command not yet implemented. Args: ${args.join(' ')}` };
+    const logEntry: LogEntry = { timestamp, type: 'W', text: `Define command not yet implemented. Args: ${args.join(' ')} (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return { outputLines: outputLines, newLogEntries };

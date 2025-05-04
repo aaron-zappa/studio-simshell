@@ -11,18 +11,21 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handleHistory = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleHistory = async ({ timestamp, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler (if needed)
     // TODO: Implement fetching history from SQLite database if needed
     const outputText = 'History command placeholder (currently only shows command history in output).';
     const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
     // Create log entry
-    const logEntry: LogEntry = { timestamp, type: 'W', text: 'History command not fully implemented.' };
+    const logEntry: LogEntry = { timestamp, type: 'W', text: `History command not fully implemented. (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

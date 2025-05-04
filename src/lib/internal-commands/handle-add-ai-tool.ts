@@ -12,6 +12,8 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     command: string; // Original command string
     timestamp: string;
     currentLogEntries: LogEntry[];
@@ -22,15 +24,28 @@ interface HandlerParams {
  * Parses arguments and stores the tool's metadata (name, description, args_description)
  * in the 'ai_tools' SQLite table. Newly added tools are active by default.
  * Syntax: add ai_tool <toolname> "<args_description>" "<description>"
+ * Requires 'manage_ai_tools' permission.
  */
 export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerResult> => {
-    const { command, timestamp, currentLogEntries } = params;
+    const { command, timestamp, currentLogEntries, userId, userPermissions } = params;
     let outputLines: OutputLine[] = [];
     let updatedLogEntries = [...currentLogEntries];
     let logText = '';
     let logType: 'I' | 'E' = 'I';
     let outputType: 'info' | 'error' = 'info';
     let outputText = '';
+
+    // Permission Check
+    // if (!userPermissions.includes('manage_ai_tools')) {
+    //     outputText = "Permission denied: Cannot manage AI tools.";
+    //     outputType = 'error';
+    //     logType = 'E';
+    //     logText = outputText + ` (User: ${userId})`;
+    //     outputLines.push({ id: `perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+    //     updatedLogEntries.push({ timestamp, type: logType, text: logText });
+    //     return { outputLines, newLogEntries: updatedLogEntries };
+    // }
+    // Permission check moved to central handler
 
     // Regex for: add ai_tool <toolname> "<args_description>" "<description>"
     const addToolRegex = /^add ai_tool\s+(\S+)\s+"([^"]+)"\s+"([^"]+)"$/i;
@@ -58,14 +73,14 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
             await runSql(insertSql, insertParams);
             outputText = `AI tool metadata stored/updated for: "${toolName}". Args Description: "${toolArgsDescription}", Description: "${toolDescription}". Tool is active by default or retains previous status.`;
             outputType = 'info';
-            logText = outputText;
+            logText = outputText + ` (User: ${userId})`;
             logType = 'I';
             outputLines.push({ id: `add-tool-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         } catch (error) {
             console.error(`Error storing AI tool metadata for '${toolName}':`, error);
             outputText = `Error storing AI tool metadata: ${error instanceof Error ? error.message : 'Unknown DB error'}`;
             outputType = 'error';
-            logText = outputText;
+            logText = outputText + ` (User: ${userId})`;
             logType = 'E';
             outputLines.push({ id: `add-tool-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         }
@@ -73,7 +88,7 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
         // Update syntax error message
         outputText = `Error: Invalid syntax. Use: add ai_tool <toolname> "<args_description>" "<description>"`;
         outputType = 'error';
-        logText = outputText;
+        logText = outputText + ` (User: ${userId}, Command: ${command})`;
         logType = 'E';
         outputLines = [{ id: `add-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     }

@@ -14,6 +14,8 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[];
 }
@@ -21,8 +23,10 @@ interface HandlerParams {
 /**
  * Handles the 'list py vars' command.
  * Retrieves and displays all variables stored in the database.
+ * Requires 'read_variables' permission.
  */
-export const handleListPyVars = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler
     const sql = 'SELECT name, datatype, value FROM variables ORDER BY name';
     let logText: string;
     let logType: 'I' | 'E' = 'I';
@@ -37,17 +41,17 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries }: Handler
              // formatResultsAsTable is now async
              const formattedTable = await formatResultsAsTable(results);
              outputText = formattedTable || "No variables found."; // formatResultsAsTable returns null on empty input, but we check length > 0
-             logText = `Listed ${results.length} variable(s) from database.`;
+             logText = `Listed ${results.length} variable(s) from database. (User: ${userId})`;
         } else {
              outputText = "No variables found in the database.";
-             logText = "No variables found when listing.";
+             logText = `No variables found when listing. (User: ${userId})`;
              outputType = 'info'; // Use info type for "no results"
         }
     } catch (error) {
         console.error("Error retrieving variables:", error);
         outputText = `Error retrieving variables: ${error instanceof Error ? error.message : 'Unknown error'}`;
         outputType = 'error';
-        logText = outputText;
+        logText = outputText + ` (User: ${userId})`;
         logType = 'E';
     }
 

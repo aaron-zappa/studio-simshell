@@ -12,6 +12,8 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     timestamp: string;
     commandName: string; // Needed for logging
     currentLogEntries: LogEntry[]; // Pass current logs
@@ -19,7 +21,9 @@ interface HandlerParams {
 
 // Update function signature to return HandlerResult
 export const handleCustomCommand = async (params: HandlerParams, action: CustomCommandAction): Promise<HandlerResult> => {
-    const { timestamp, commandName, currentLogEntries } = params;
+    const { timestamp, commandName, currentLogEntries, userId, userPermissions } = params;
+    // Permission check moved to central handler
+
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
 
     const outputText = action; // Action is the output for now
@@ -29,7 +33,7 @@ export const handleCustomCommand = async (params: HandlerParams, action: CustomC
     const logEntry: LogEntry = {
         timestamp,
         type: 'I',
-        text: `Executed custom command '${commandName}'. Output: ${outputText}`
+        text: `Executed custom command '${commandName}'. Output: ${outputText} (User: ${userId})`
     };
     const newLogEntries = [...currentLogEntries, logEntry];
 

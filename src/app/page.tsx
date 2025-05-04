@@ -18,6 +18,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils'; // Import cn
 import { getDbStatusAction } from '@/lib/database'; // Import the status action
 
+// Simulate user context - Replace with actual authentication later
+const SIMULATED_USER_ID = 2; // Example: 'dev' user
+
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
   const [logEntries, setLogEntries] = React.useState<LogEntry[]>([]);
@@ -246,6 +249,7 @@ export default function Home() {
       }
 
       executionResult = await executeCommand({
+        userId: SIMULATED_USER_ID, // Pass the simulated user ID
         command: finalCommand, // Pass the final command (potentially with clipboard content)
         mode: category as CommandMode,
         addSuggestion,

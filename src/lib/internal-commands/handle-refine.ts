@@ -11,19 +11,22 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     args: string[];
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handleRefine = async ({ args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleRefine = async ({ args, timestamp, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler
     // TODO: Implement refine functionality
     const outputText = `Refine command placeholder for: ${args.join(' ')}`;
     const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
 
     // Create log entry
-    const logEntry: LogEntry = { timestamp, type: 'W', text: `Refine command not yet implemented. Args: ${args.join(' ')}` };
+    const logEntry: LogEntry = { timestamp, type: 'W', text: `Refine command not yet implemented. Args: ${args.join(' ')} (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

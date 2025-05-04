@@ -12,12 +12,15 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     args: string[]; // Includes 'memory', 'db', 'to', '<filename.db>'
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
-export const handlePersistDb = async ({ args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handlePersistDb = async ({ args, timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler
     let logText: string;
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
@@ -29,7 +32,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries }: Ha
         outputText = 'Error: Invalid syntax. Use: persist memory db to <filename.db>';
         outputType = 'error';
         logType = 'E';
-        logText = outputText;
+        logText = outputText + ` (User: ${userId}, Command: persist ${args.join(' ')})`;
     } else {
         const targetFilename = args[3];
         try {
@@ -37,20 +40,20 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries }: Ha
             if (success) {
                 outputText = `Successfully persisted in-memory database to file: data/${targetFilename}`;
                 outputType = 'info';
-                logText = outputText;
+                logText = outputText + ` (User: ${userId})`;
             } else {
                  // This case might not be reachable if persistDbToFile throws on failure
                 outputText = 'Failed to persist database for an unknown reason.';
                 outputType = 'error';
                 logType = 'E';
-                logText = outputText;
+                logText = outputText + ` (User: ${userId})`;
             }
         } catch (error) {
             console.error("Error during database persistence:", error);
             outputText = `Error persisting database: ${error instanceof Error ? error.message : 'Unknown error'}`;
             outputType = 'error';
             logType = 'E';
-            logText = outputText;
+            logText = outputText + ` (User: ${userId})`;
         }
     }
 

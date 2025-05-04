@@ -14,6 +14,8 @@ interface HandlerResult {
 
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     args: string[];
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
@@ -24,7 +26,8 @@ interface HandlerParams {
  * Displays the NEW log entry structure (timestamp, type, text) as CSV.
  */
 // Update function signature to return HandlerResult
-export const handleShowRequirements = async ({ timestamp, args, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleShowRequirements = async ({ timestamp, args, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
+    // No specific permission check needed for this informational command
     let outputText = '';
     let outputType: OutputLine['type'] = 'output';
     let logText: string = '';
@@ -57,13 +60,13 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
         }).join('\n');
 
         outputText = header + '\n' + rows + `\n(${requirements.length} requirement${requirements.length === 1 ? '' : 's'} found)`;
-        logText = `Displayed log requirements. Found ${requirements.length}.`;
+        logText = `Displayed log requirements. Found ${requirements.length}. (User: ${userId})`;
 
     } catch (error) {
         console.error("Error generating requirements CSV:", error);
         outputText = `Error generating requirements list: ${error instanceof Error ? error.message : 'Unknown error'}`;
         outputType = 'error';
-        logText = outputText;
+        logText = outputText + ` (User: ${userId})`;
         logType = 'E';
     }
 
@@ -78,7 +81,7 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
         text: outputText,
         type: outputType,
         category: 'internal',
-        timestamp: timestamp // Add timestamp here
+        timestamp: outputType === 'error' || outputType === 'info' ? timestamp : undefined // Add timestamp for errors/info
     }];
 
     // Create log entry

@@ -11,18 +11,21 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     commandName: string;
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handleNotFound = async ({ commandName, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleNotFound = async ({ commandName, timestamp, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
+    // No permission check needed for error message
     const outputText = `Internal command not found: ${commandName}`;
     const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'error', category: 'internal', timestamp }];
 
     // Create log entry
-    const logEntry: LogEntry = { timestamp, type: 'W', text: `Attempted unknown internal command: ${commandName}` };
+    const logEntry: LogEntry = { timestamp, type: 'W', text: `Attempted unknown internal command: ${commandName} (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

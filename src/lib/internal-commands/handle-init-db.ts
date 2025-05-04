@@ -12,16 +12,21 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 /**
  * Handles the 'init db' command.
- * Creates essential tables: 'variables', 'ai_tools', 'users', 'roles', 'user_roles', 'permissions', 'role_permissions'.
+ * Creates essential tables and adds sample RBAC data.
+ * Requires admin-level permission (e.g., 'manage_roles_permissions').
  */
-export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler
     const createStatements = [
+        // Table Creation (Ensure order respects foreign keys if PRAGMA foreign_keys=ON is used)
         `CREATE TABLE IF NOT EXISTS variables (
             name VARCHAR(255) NOT NULL PRIMARY KEY,
             datatype VARCHAR(50) NOT NULL,
@@ -66,51 +71,92 @@ export const handleInitDb = async ({ timestamp, currentLogEntries }: HandlerPara
         );`,
         // Optionally enable foreign key support if needed (can impact performance slightly)
         // `PRAGMA foreign_keys = ON;`
+
+        // -- Sample Data Insertion (Ignoring potential conflicts for simplicity) --
+        // Permissions
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('read_variables');`,
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('manage_variables');`, // Create, update, delete
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('execute_sql_select');`,
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('execute_sql_modify');`, // INSERT, UPDATE, DELETE
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('use_ai_tools');`,
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('manage_ai_tools');`, // Add, activate/deactivate
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('manage_users');`,
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('manage_roles_permissions');`,
+
+        // Roles
+        `INSERT OR IGNORE INTO roles (role_name) VALUES ('administrator');`,
+        `INSERT OR IGNORE INTO roles (role_name) VALUES ('developer');`,
+        `INSERT OR IGNORE INTO roles (role_name) VALUES ('basic_user');`,
+
+        // Role-Permission Assignments
+        // Admin gets all
+        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r, permissions p WHERE r.role_name = 'administrator';`,
+        // Developer gets variable management, SQL execution, AI tool usage/management
+        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('manage_variables', 'execute_sql_select', 'execute_sql_modify', 'use_ai_tools', 'manage_ai_tools') WHERE r.role_name = 'developer';`,
+        // Basic user gets read variables and use AI tools
+        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('read_variables', 'use_ai_tools') WHERE r.role_name = 'basic_user';`,
+
+        // Users
+        `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('admin', 'dummy_hash');`, // Replace with real hashing
+        `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('dev', 'dummy_hash');`,
+        `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('user', 'dummy_hash');`,
+
+        // User-Role Assignments
+        `INSERT OR IGNORE INTO user_roles (user_id, role_id) SELECT u.user_id, r.role_id FROM users u JOIN roles r ON r.role_name = 'administrator' WHERE u.username = 'admin';`,
+        `INSERT OR IGNORE INTO user_roles (user_id, role_id) SELECT u.user_id, r.role_id FROM users u JOIN roles r ON r.role_name = 'developer' WHERE u.username = 'dev';`,
+        `INSERT OR IGNORE INTO user_roles (user_id, role_id) SELECT u.user_id, r.role_id FROM users u JOIN roles r ON r.role_name = 'basic_user' WHERE u.username = 'user';`,
     ];
 
-    let logText: string = 'Initializing database tables... ';
+    let logText: string = 'Initializing database tables and sample data... ';
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
     let outputLines: OutputLine[] = [];
-    let successfulCreations: string[] = [];
+    let successfulStatements: number = 0;
     let errors: string[] = [];
 
     try {
         // runSql already ensures the DB is initialized via getDb()
         for (const sql of createStatements) {
-             const tableNameMatch = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/i);
-             const tableName = tableNameMatch ? tableNameMatch[1] : 'PRAGMA statement';
+             // Simple way to identify the statement type for logging
+             let statementType = 'Unknown';
+             if (sql.toUpperCase().startsWith('CREATE TABLE')) statementType = 'Table Creation';
+             else if (sql.toUpperCase().startsWith('INSERT')) statementType = 'Sample Data Insertion';
+             else if (sql.toUpperCase().startsWith('PRAGMA')) statementType = 'Pragma Setting';
+
             try {
                 await runSql(sql);
-                successfulCreations.push(tableName);
-                 outputLines.push({ id: `init-tbl-${tableName}-${timestamp}`, text: `Ensured '${tableName}' table exists.`, type: 'info', category: 'internal', timestamp });
+                successfulStatements++;
+                // Optionally add detailed success output, but keep it concise for init
+                // outputLines.push({ id: `init-ok-${statementType}-${successfulStatements}-${timestamp}`, text: `OK: ${statementType} - ${sql.substring(0, 40)}...`, type: 'info', category: 'internal', timestamp });
             } catch (error) {
-                const errorMsg = `Error creating/ensuring table '${tableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+                const errorMsg = `Error during DB init (${statementType}): ${error instanceof Error ? error.message : 'Unknown error'} (SQL: ${sql.substring(0, 60)}...)`;
                  console.error(errorMsg);
                  errors.push(errorMsg);
                  logType = 'E';
                  outputType = 'error';
-                 outputLines.push({ id: `init-err-${tableName}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
+                 // Add specific error line to output
+                 outputLines.push({ id: `init-err-${statementType}-${errors.length}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
             }
         }
 
-        if (errors.length > 0) {
-            logText += `Completed with errors. ${successfulCreations.length} tables OK, ${errors.length} errors.`;
-        } else {
-             logText += `Successfully ensured ${successfulCreations.length} tables exist.`;
-             outputType = 'info'; // Ensure output type is info if no errors
-        }
+        const finalSummaryText = `DB Initialization: ${successfulStatements} statements executed successfully. ${errors.length} errors encountered.`;
+        logText += finalSummaryText;
+        // Add a final summary line to the output
+        outputLines.push({ id: `init-summary-${timestamp}`, text: finalSummaryText, type: outputType, category: 'internal', timestamp });
+
 
     } catch (error) // Catch errors from getDb() itself
     {
-        console.error("Error during database initialization (pre-table creation):", error);
+        console.error("Error during database initialization (pre-statement execution):", error);
         logText = `Critical Error during DB initialization: ${error instanceof Error ? error.message : 'Unknown error'}`;
         logType = 'E';
         outputType = 'error';
+        // Ensure outputLines has the critical error message
         outputLines = [{ id: `init-db-crit-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
     }
 
-    const logEntry: LogEntry = { timestamp, type: logType, text: logText };
+    // Add user ID to the main log entry
+    const logEntry: LogEntry = { timestamp, type: logType, text: logText + ` (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {

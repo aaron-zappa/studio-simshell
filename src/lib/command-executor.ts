@@ -10,9 +10,10 @@ import { runSql } from '@/lib/database';
 import { formatResultsAsTable } from '@/lib/formatting';
 import { handleInternalCommand } from '@/lib/internal-commands'; // Import the central internal command handler
 import { storeVariableInDb } from '@/lib/variables'; // Import variable storing function
-// Removed: import { readClipboardText } from '@/lib/clipboard'; // Import clipboard function - Cannot be used in Server Action
+import { getUserPermissions } from '@/lib/permissions'; // Import permission fetching
 
 interface ExecuteCommandParams {
+  userId: number; // Add user ID
   command: string;
   mode: CommandMode; // This is now the *classified category* passed from the client
   addSuggestion: (mode: CommandMode, command: string) => void; // Potentially problematic in Server Action
@@ -30,11 +31,13 @@ interface ExecuteCommandResult {
 
 /**
  * Executes a command based on the *classified mode/category* and returns output lines.
+ * Fetches user permissions and potentially modifies AI behavior based on them.
  * Delegates internal command handling to a separate module.
  * Handles variable assignments if classified as 'internal'.
  * This is intended to be used as a Server Action.
  */
 export async function executeCommand ({
+    userId, // Receive user ID
     command,
     mode, // mode is the classified category
     addSuggestion,
@@ -60,14 +63,48 @@ export async function executeCommand ({
   let potentiallyUpdatedLogs: LogEntry[] | undefined = undefined; // Track log changes
   let logEntry: LogEntry | null = null; // Variable to hold a potential new log entry
 
+  // --- Fetch User Permissions ---
+  let userPermissions: string[] = [];
+  try {
+      userPermissions = await getUserPermissions(userId);
+      // Optional: Log fetched permissions for debugging
+      // logEntry = { timestamp, type: 'I', text: `User ${userId} Permissions: ${userPermissions.join(', ')}` };
+      // potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
+  } catch (permError) {
+       console.error("Error fetching user permissions:", permError);
+       const errorMsg = `Error fetching user permissions: ${permError instanceof Error ? permError.message : 'Unknown error'}`;
+       outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
+       logEntry = { timestamp, type: 'E', text: errorMsg };
+       potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
+       // Return early if permissions couldn't be fetched, as they might be critical
+       return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
+  }
+
+
   // --- Dispatch based on Classified Mode ---
   try {
+      // --- Permission Check Example (Apply where needed) ---
+      // Example: Check if user can execute SQL modify commands
+      if (mode === 'sql' && !userPermissions.includes('execute_sql_select') && !userPermissions.includes('execute_sql_modify')) {
+          const errorMsg = "Permission denied: You do not have permission to execute SQL queries.";
+          outputLines = [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
+          logEntry = { timestamp, type: 'E', text: errorMsg };
+          potentiallyUpdatedLogs = potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, logEntry] : [...currentLogEntries, logEntry];
+          return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
+      }
+      // Add more permission checks for other modes/actions as needed
+
       // --- Internal Variable Assignment Handling ---
-      // If classified as internal and matches assignment pattern
       const assignmentRegex = /^\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$/;
       const assignmentMatch = commandTrimmed.match(assignmentRegex);
 
       if (mode === 'internal' && assignmentMatch) {
+         // Permission check for managing variables
+         if (!userPermissions.includes('manage_variables')) {
+             const errorMsg = "Permission denied: Cannot manage internal variables.";
+             throw new Error(errorMsg); // Throw to be caught by the main catch block
+         }
+
          const variableName = assignmentMatch[1];
          const valueString = assignmentMatch[2].trim();
          let dataType = 'unknown';
@@ -109,6 +146,8 @@ export async function executeCommand ({
         const commandName = commandLower.split(' ')[0];
         // Internal commands are handled by a dedicated module
         const internalResult = await handleInternalCommand({
+            userId, // Pass userId to internal command handler
+            userPermissions, // Pass permissions
             command: commandTrimmed,
             commandLower,
             commandName,
@@ -126,8 +165,12 @@ export async function executeCommand ({
       // --- Other Category Handlers ---
       else if (mode === 'python') {
          // Handle Python variable assignment (different from internal)
-         // The command should arrive here with the clipboard value already substituted by the client
-         if (assignmentMatch) {
+         // Permission check for managing python variables (assuming same perm as internal for now)
+          if (assignmentMatch) {
+              if (!userPermissions.includes('manage_variables')) {
+                  const errorMsg = "Permission denied: Cannot manage Python variables.";
+                  throw new Error(errorMsg);
+              }
              const variableName = assignmentMatch[1];
              const valueString = assignmentMatch[2].trim();
              let dataType = 'unknown';
@@ -220,6 +263,15 @@ export async function executeCommand ({
       else if (mode === 'sql') {
          await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50));
          try {
+           // Check permissions based on query type (basic example)
+           const isSelectQuery = commandTrimmed.trim().toUpperCase().startsWith('SELECT');
+           if (isSelectQuery && !userPermissions.includes('execute_sql_select')) {
+               throw new Error("Permission denied: Cannot execute SELECT queries.");
+           }
+           if (!isSelectQuery && !userPermissions.includes('execute_sql_modify')) {
+                throw new Error("Permission denied: Cannot execute modifying SQL queries (INSERT, UPDATE, DELETE, etc.).");
+           }
+
            const { results, changes, lastInsertRowid } = await runSql(commandTrimmed);
 
            if (results) {
@@ -279,9 +331,10 @@ export async function executeCommand ({
          logEntry = { timestamp, type: 'E', text: errorMsg };
        }
 
-  } catch (error) { // Catch errors from handlers themselves
+  } catch (error) // Catch errors from handlers themselves or permission denials
+  {
       console.error("Unhandled error during command execution:", error);
-      const errorMsg = `Internal Server Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
       outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }];
       logEntry = { timestamp, type: 'E', text: errorMsg };
   }
@@ -293,8 +346,8 @@ export async function executeCommand ({
       finalLogEntries = [...currentLogEntries, logEntry];
   } else if (finalLogEntries && logEntry) {
        // If internal handler already updated logs, we might need to decide whether to add the generic log too.
-        if (logEntry.text.includes('variable')) {
-           // If it's a variable assignment log, add it even if internal handler modified logs.
+        if (logEntry.text.includes('variable') || logEntry.text.startsWith('SQL') || logEntry.text.startsWith('Excel') || logEntry.text.startsWith('Simulating')) {
+           // If it's a relevant log, add it even if internal handler modified logs.
             finalLogEntries = [...finalLogEntries, logEntry];
         } else {
             console.warn("Log entry generated but internal handler also modified logs. Generic log ignored.");

@@ -13,6 +13,8 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     args: string[]; // ['<inputtext>', ...]
     timestamp: string;
     currentLogEntries: LogEntry[];
@@ -20,11 +22,11 @@ interface HandlerParams {
 
 /**
  * Handles the 'ai <inputtext>' internal command.
- * Passes the raw input text to the simple text generation AI flow.
- * The AI flow is now responsible for using tools (like getVariableValue) if needed.
+ * Passes the raw input text and user permissions to the simple text generation AI flow.
+ * The AI flow is responsible for using tools (like getVariableValue) and considering permissions.
  * Stores the AI's final response in the 'ai_answer' variable.
  */
-export const handleAiCommand = async ({ args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleAiCommand = async ({ userId, userPermissions, args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
     const rawInputText = args.join(' ').trim(); // Combine all arguments into the input text
     let logText: string;
     let logType: 'I' | 'W' | 'E' = 'I';
@@ -45,43 +47,66 @@ export const handleAiCommand = async ({ args, timestamp, currentLogEntries }: Ha
 
     try {
         // --- AI Flow Call ---
-        logText = `AI command processing raw input: "${rawInputText}".`;
+        logText = `AI command processing raw input: "${rawInputText}" for user ${userId}.`;
         newLogEntries.push({ timestamp, type: 'I', text: logText });
 
-        // Call the AI flow with the raw input text
-        const aiResult = await generateSimpleText({ inputText: rawInputText });
+        // Call the AI flow with the raw input text and permissions
+        const aiResult = await generateSimpleText({
+            inputText: rawInputText,
+            userId: userId, // Pass userId if needed by the flow (optional for now)
+            userPermissions: userPermissions // Pass permissions
+        });
         const aiAnswer = aiResult.answer;
 
         // Store the AI answer in the database variable 'ai_answer'
-        try {
-            await storeVariableInDb('ai_answer', aiAnswer, 'string');
-            outputText = `AI response stored successfully in variable 'ai_answer'.`;
-            outputType = 'info';
-            logType = 'I';
-            const finalLogText = `AI command executed successfully. Response stored in 'ai_answer'. Raw input: "${rawInputText}"`;
-            newLogEntries.push({ timestamp, type: logType, text: finalLogText });
-            outputLines.push({ id: `ai-success-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+        // Check permission before storing
+        if (userPermissions.includes('manage_variables')) {
+            try {
+                await storeVariableInDb('ai_answer', aiAnswer, 'string');
+                outputText = `AI response stored successfully in variable 'ai_answer'.`;
+                outputType = 'info';
+                logType = 'I';
+                const finalLogText = `AI command executed successfully for user ${userId}. Response stored in 'ai_answer'. Raw input: "${rawInputText}"`;
+                newLogEntries.push({ timestamp, type: logType, text: finalLogText });
+                outputLines.push({ id: `ai-success-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
 
-             // Display the AI answer directly as well
-             outputLines.push({
-                id: `ai-answer-${timestamp}`,
-                text: `AI Answer: ${aiAnswer}`, // Prefix to clarify it's the answer
-                type: 'output', // Display as regular output
-                category: 'internal', // Keep category as internal since it's the result of an internal command
-                timestamp: undefined // Don't format as a log line
-             });
+                 // Display the AI answer directly as well
+                 outputLines.push({
+                    id: `ai-answer-${timestamp}`,
+                    text: `AI Answer: ${aiAnswer}`, // Prefix to clarify it's the answer
+                    type: 'output', // Display as regular output
+                    category: 'internal', // Keep category as internal since it's the result of an internal command
+                    timestamp: undefined // Don't format as a log line
+                 });
 
-        } catch (dbError) {
-            console.error("Error storing AI answer in DB:", dbError);
-            outputText = `AI generated a response, but failed to store it in variable 'ai_answer': ${dbError instanceof Error ? dbError.message : 'Unknown DB error'}`;
-            outputType = 'error';
-            logType = 'E';
-            logText = outputText;
-            outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
-            newLogEntries.push({ timestamp, type: logType, text: logText });
-            outputLines.push({
-                id: `ai-answer-fail-${timestamp}`,
-                text: `AI Answer (generated but not stored): ${aiAnswer}`,
+            } catch (dbError) {
+                console.error("Error storing AI answer in DB:", dbError);
+                outputText = `AI generated a response, but failed to store it in variable 'ai_answer': ${dbError instanceof Error ? dbError.message : 'Unknown DB error'}`;
+                outputType = 'error';
+                logType = 'E';
+                logText = outputText;
+                outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+                newLogEntries.push({ timestamp, type: logType, text: logText });
+                outputLines.push({
+                    id: `ai-answer-fail-${timestamp}`,
+                    text: `AI Answer (generated but not stored): ${aiAnswer}`,
+                    type: 'output',
+                    category: 'internal',
+                    timestamp: undefined
+                 });
+            }
+        } else {
+            // User lacks permission to store the variable
+             outputText = `AI generated a response, but permission denied to store it in variable 'ai_answer'.`;
+             outputType = 'warning'; // Use warning as AI did respond
+             logType = 'W';
+             logText = outputText + ` (User ID: ${userId})`;
+             outputLines.push({ id: `ai-store-perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+             newLogEntries.push({ timestamp, type: logType, text: logText });
+             // Still display the answer
+              outputLines.push({
+                id: `ai-answer-nostore-${timestamp}`,
+                text: `AI Answer (not stored): ${aiAnswer}`,
                 type: 'output',
                 category: 'internal',
                 timestamp: undefined

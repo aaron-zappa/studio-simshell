@@ -12,6 +12,8 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     args: string[]; // Expected: ['ai_tool', <name>, 'active', <0|1>]
     timestamp: string;
     currentLogEntries: LogEntry[];
@@ -20,9 +22,10 @@ interface HandlerParams {
 /**
  * Handles the 'set ai_tool <name> active <0|1>' internal command.
  * Updates the 'isactive' status of a specified AI tool in the database.
+ * Requires 'manage_ai_tools' permission.
  */
 export const handleSetAiToolActive = async (params: HandlerParams): Promise<HandlerResult> => {
-    const { args, timestamp, currentLogEntries } = params;
+    const { args, timestamp, currentLogEntries, userId, userPermissions } = params;
     let outputLines: OutputLine[] = [];
     let updatedLogEntries = [...currentLogEntries];
     let logText = '';
@@ -30,16 +33,19 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
     let outputType: 'info' | 'error' = 'info';
     let outputText = '';
 
+    // Permission check moved to central handler
+
     // Validate arguments: set ai_tool <name> active <0|1>
-    if (args.length !== 4 || args[0] !== 'ai_tool' || args[2] !== 'active' || (args[3] !== '0' && args[3] !== '1')) {
+    if (args.length !== 3 || args[1] !== 'active' || (args[2] !== '0' && args[2] !== '1')) {
+         // Adjusted args index check based on how index.ts passes args (excluding 'set' and 'ai_tool')
         outputText = `Error: Invalid syntax. Use: set ai_tool <name> active <0|1>`;
         outputType = 'error';
         logType = 'E';
-        logText = outputText;
+        logText = outputText + ` (User: ${userId}, Command: set ai_tool ${args.join(' ')})`;
         outputLines = [{ id: `set-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     } else {
-        const toolName = args[1];
-        const isActiveValue = parseInt(args[3], 10); // 0 or 1
+        const toolName = args[0]; // Tool name is the first arg after 'set ai_tool'
+        const isActiveValue = parseInt(args[2], 10); // 0 or 1 is the third arg
 
         const updateSql = `UPDATE ai_tools SET isactive = ? WHERE name = ?;`;
         const updateParams = [isActiveValue, toolName];
@@ -50,21 +56,21 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
             if (changes !== null && changes > 0) {
                 outputText = `AI tool '${toolName}' set to ${isActiveValue === 1 ? 'active' : 'inactive'}.`;
                 outputType = 'info';
-                logText = outputText;
+                logText = outputText + ` (User: ${userId})`;
                 logType = 'I';
                 outputLines.push({ id: `set-tool-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
             } else {
                 outputText = `Error: AI tool '${toolName}' not found.`;
                 outputType = 'error';
                 logType = 'W'; // Warning because the command was valid but target not found
-                logText = outputText;
+                logText = outputText + ` (User: ${userId})`;
                 outputLines.push({ id: `set-tool-notfound-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
             }
         } catch (error) {
             console.error(`Error updating AI tool status for '${toolName}':`, error);
             outputText = `Error updating AI tool status: ${error instanceof Error ? error.message : 'Unknown DB error'}`;
             outputType = 'error';
-            logText = outputText;
+            logText = outputText + ` (User: ${userId})`;
             logType = 'E';
             outputLines.push({ id: `set-tool-db-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         }

@@ -14,6 +14,8 @@ interface HandlerResult {
 
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     command: string; // Original command string
     timestamp: string;
     addSuggestion: (mode: CommandMode, command: string) => void; // Client-side function, problematic
@@ -24,13 +26,28 @@ interface HandlerParams {
 
 // Make the function async
 export const handleAddCommand = async (params: HandlerParams): Promise<HandlerResult> => {
-    const { command, timestamp, addSuggestion, addCustomCommand, currentLogEntries, initialSuggestions } = params;
+    const { command, timestamp, addSuggestion, addCustomCommand, currentLogEntries, initialSuggestions, userPermissions, userId } = params;
     let outputLines: OutputLine[] = [];
     let updatedLogEntries = [...currentLogEntries]; // Start with a copy of current logs
+
+    // Check permission (example: manage_ai_tools)
+    // if (!userPermissions.includes('manage_ai_tools')) {
+    //     const errorMsg = "Permission denied: Cannot add internal commands.";
+    //     return {
+    //         outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', text: `${errorMsg} (User: ${userId})` }],
+    //     };
+    // }
+    // Permission check commented out for now as it relies on manage_ai_tools which might be too restrictive
 
     // Updated Regex for: add_int_cmd <short> <name> "<description>" <whatToDo>
     const addCmdRegex = /^add_int_cmd\s+(\S+)\s+(\S+)\s+"([^"]+)"\s+(.+)$/i;
     const match = command.match(addCmdRegex);
+
+    let logType: 'I' | 'E' = 'I';
+    let logText = '';
+    let outputType: 'info' | 'error' = 'info';
+    let outputText = '';
 
     if (match && match[1] && match[2] && match[3] && match[4]) {
         const newCommandShort = match[1];
@@ -39,7 +56,11 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
         const newCommandAction = match[4].trim();
 
         if (initialSuggestions.internal.includes(newCommandName.toLowerCase())) {
-            outputLines = [{ id: `out-${timestamp}`, text: `Error: Cannot redefine built-in command "${newCommandName}".`, type: 'error', category: 'internal', timestamp }];
+            outputText = `Error: Cannot redefine built-in command "${newCommandName}".`;
+            outputType = 'error';
+            logType = 'E';
+            logText = outputText;
+            outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
         } else {
             // Note: Calling these client-side functions from a server action is problematic.
             try {
@@ -49,28 +70,29 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
                 console.warn("addSuggestion/addCustomCommand called in server context, may not behave as expected.", e)
             }
 
-            // Create log entry in the new format
-            const logText = `Added internal command: "${newCommandName}" (short: ${newCommandShort}). Desc: "${newCommandDescription}". Action: "${newCommandAction}".`;
-            const logEntry: LogEntry = {
-                timestamp: new Date().toISOString(),
-                type: 'I', // Info type
-                text: logText,
-            };
+            // Format log and output text
+            logText = `Added internal command: "${newCommandName}" (short: ${newCommandShort}). Desc: "${newCommandDescription}". Action: "${newCommandAction}". (User: ${userId})`;
+            outputText = `Added internal command: "${newCommandName}" (short: ${newCommandShort}). Description: "${newCommandDescription}". Action: "${newCommandAction}". Logged to session log.`;
+            outputType = 'info';
+            logType = 'I';
 
-            // Update the log entries array directly
-            updatedLogEntries.push(logEntry);
-
-            // Provide feedback (same text as log entry for consistency)
-            outputLines.push({ id: `out-${timestamp}`, text: logText, type: 'info', category: 'internal', timestamp });
+            outputLines.push({ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
         }
     } else {
-        outputLines = [{ id: `out-${timestamp}`, text: `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`, type: 'error', category: 'internal', timestamp }];
+        outputText = `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`;
+        outputType = 'error';
+        logType = 'E';
+        logText = outputText + ` (User: ${userId}, Command: ${command})`;
+        outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
     }
+
+     // Add the log entry
+    updatedLogEntries.push({ timestamp, type: logType, text: logText });
 
     // Return output and the potentially updated log entries
     return {
         outputLines: outputLines,
-        newLogEntries: updatedLogEntries.length > currentLogEntries.length ? updatedLogEntries : undefined
+        newLogEntries: updatedLogEntries
     };
 };
 

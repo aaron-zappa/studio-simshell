@@ -12,6 +12,8 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
@@ -22,8 +24,10 @@ const DEFAULT_EXPORT_FILENAME = 'simshell_export.db'; // Updated default name
 /**
  * Handles the 'export db' internal command.
  * Persists the current database state to a default file name ('simshell_export.db') in the 'data' directory.
+ * Requires 'execute_sql_modify' permission.
  */
-export const handleExportDb = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleExportDb = async ({ timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler
     let logText: string;
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
@@ -37,20 +41,20 @@ export const handleExportDb = async ({ timestamp, currentLogEntries }: HandlerPa
             // Slightly rephrased success message
             outputText = `Database successfully exported to: data/${targetFilename}`;
             outputType = 'info';
-            logText = outputText;
+            logText = outputText + ` (User: ${userId})`;
         } else {
              // This case might not be reachable if persistDbToFile throws on failure
             outputText = `Failed to export database to ${targetFilename} for an unknown reason.`;
             outputType = 'error';
             logType = 'E';
-            logText = outputText;
+            logText = outputText + ` (User: ${userId})`;
         }
     } catch (error) {
         console.error("Error during database export:", error);
         outputText = `Error exporting database to ${targetFilename}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         outputType = 'error';
         logType = 'E';
-        logText = outputText;
+        logText = outputText + ` (User: ${userId})`;
     }
 
     const logEntry: LogEntry = { timestamp, type: logType, text: logText };

@@ -11,18 +11,21 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     timestamp: string;
     // currentLogEntries: LogEntry[]; // Needed if we were to trigger export server-side (not current approach)
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handleExportLog = async ({ timestamp }: HandlerParams): Promise<HandlerResult> => {
+export const handleExportLog = async ({ timestamp, userId }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler (if needed, but likely not for this info msg)
     // Actual export is handled client-side due to browser APIs.
     // This server-side handler provides informational feedback.
     const outputText = 'Log export is handled client-side. Check your downloads if you ran it there.';
     const outputLines = [{ id: `log-export-info-${timestamp}`, text: outputText, type: 'info', category: 'internal', timestamp }];
 
-    // No log entry is generated server-side for this, as the action is client-side.
+    // No server-side log generated here, as the action is client-side.
     // The client-side part in page.tsx logs the attempt/result.
     return { outputLines: outputLines };
 };

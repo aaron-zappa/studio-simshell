@@ -11,12 +11,15 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
 
 // Update function signature to return HandlerResult and make it async
-export const handlePause = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handlePause = async ({ timestamp, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
+    // No permission check needed for this informational command
     // 'pause' logic is primarily client-side to interact with the running state.
     // This server-side handler might provide confirmation if needed, but the core stop logic is client-side.
     const outputText = `'pause' command acknowledged server-side (actual stop is client-side).`;

@@ -13,6 +13,8 @@ interface HandlerResult {
 
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     args: string[];
     timestamp: string;
     initialSuggestions: Record<string, string[]>;
@@ -22,7 +24,8 @@ interface HandlerParams {
 // Mode switching is now handled by AI classification before executeCommand is called.
 // This handler becomes informational or could be removed.
 // Update function signature to return HandlerResult and make it async
-export const handleMode = async ({ args, timestamp, initialSuggestions, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleMode = async ({ args, timestamp, initialSuggestions, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
+    // No specific permission needed for this info command
     const requestedMode = args[0] as CommandMode;
     let outputLines: OutputLine[];
     let logText: string;
@@ -47,7 +50,7 @@ export const handleMode = async ({ args, timestamp, initialSuggestions, currentL
     }
 
     // Create log entry
-    const logEntry: LogEntry = { timestamp, type: logType, text: logText };
+    const logEntry: LogEntry = { timestamp, type: logType, text: logText + ` (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
     // Return the result object

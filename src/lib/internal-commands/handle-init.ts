@@ -14,6 +14,8 @@ interface HandlerResult {
 }
 
 interface HandlerParams {
+    userId: number; // Added userId
+    userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
 }
@@ -22,8 +24,10 @@ interface HandlerParams {
  * Handles the 'init' command.
  * Initializes the database ('variables' table) and sets some default Python variables.
  * DOES NOT handle clipboard, as that requires client-side API access.
+ * Requires admin-level permission (e.g., 'manage_roles_permissions').
  */
-export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleInit = async ({ timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check moved to central handler
     const createTableSql = `
         CREATE TABLE IF NOT EXISTS variables (
             name VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -43,7 +47,7 @@ export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams
         // 1. Initialize Database Table
         await runSql(createTableSql);
         const dbInitMsg = "Database initialized successfully. 'variables' table ensured.";
-        logEntries.push({ timestamp, type: 'I', text: dbInitMsg });
+        logEntries.push({ timestamp, type: 'I', text: `${dbInitMsg} (User: ${userId})` });
         outputLines.push({ id: `init-db-${timestamp}`, text: dbInitMsg, type: 'info', category: 'internal', timestamp });
 
         // 2. Initialize Default Python Variables (excluding clipboard)
@@ -65,7 +69,7 @@ export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams
             } catch (error) {
                 const errorMsg = `Error storing default variable '${variable.name}': ${error instanceof Error ? error.message : 'Unknown error'}`;
                 console.error(errorMsg);
-                logEntries.push({ timestamp, type: 'E', text: errorMsg });
+                logEntries.push({ timestamp, type: 'E', text: `${errorMsg} (User: ${userId})` });
                 varErrors.push(errorMsg);
                 overallSuccess = false;
             }
@@ -73,13 +77,13 @@ export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams
 
         // Handle clipboard initialization feedback (without actual reading)
         const clipboardInitMsg = "Clipboard variable placeholder created. Assign with `clipboard = get()` command (requires clipboard access).";
-        logEntries.push({ timestamp, type: 'I', text: clipboardInitMsg });
+        logEntries.push({ timestamp, type: 'I', text: `${clipboardInitMsg} (User: ${userId})` });
         // Don't add clipboard specific message to direct output, keep it simple
         // outputLines.push({ id: `init-clipboard-${timestamp}`, text: clipboardInitMsg, type: 'info', category: 'internal', timestamp });
 
 
         const varInitMsg = `Initialized ${varsAddedCount} default Python variable(s).`;
-        logEntries.push({ timestamp, type: 'I', text: varInitMsg });
+        logEntries.push({ timestamp, type: 'I', text: `${varInitMsg} (User: ${userId})` });
         outputLines.push({ id: `init-vars-${timestamp}`, text: varInitMsg, type: 'info', category: 'internal', timestamp });
 
         if (varErrors.length > 0) {
@@ -96,7 +100,7 @@ export const handleInit = async ({ timestamp, currentLogEntries }: HandlerParams
     } catch (error) {
         console.error("Error during initialization:", error);
         const errorMsg = `Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        logEntries.push({ timestamp, type: 'E', text: errorMsg });
+        logEntries.push({ timestamp, type: 'E', text: `${errorMsg} (User: ${userId})` });
         outputLines.push({ id: `init-error-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
         overallSuccess = false;
         finalMessage = errorMsg;
