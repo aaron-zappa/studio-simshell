@@ -50,6 +50,10 @@ export const useSuggestions = () => {
             if (mode === 'internal' && lowerCommand.startsWith('persist memory db to')) {
                  suggestionToAdd = 'persist memory db to <filename.db>';
             }
+             // Add format for create sqlite
+            if (mode === 'internal' && lowerCommand.startsWith('create sqlite')) {
+                 suggestionToAdd = 'create sqlite <filename.db>';
+            }
 
 
             if (!modeSuggestions.some(s => s.toLowerCase() === suggestionToAdd.toLowerCase())) {

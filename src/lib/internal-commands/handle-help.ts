@@ -20,10 +20,10 @@ interface HandlerParams {
 
 // Update function signature to return HandlerResult and make it async
 export const handleHelp = async ({ timestamp, initialSuggestions }: HandlerParams): Promise<HandlerResult> => {
-    // Update help text to reflect new 'add_int_cmd' format and 'create sqlite'
+    // Update help text to include 'persist memory db to' command
     const helpText = `Command category is automatically detected.
 Available categories: ${Object.keys(initialSuggestions).join(', ')}.
-Available internal commands: help, clear, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause, create sqlite <filename.db>, show requirements
+Available internal commands: help, clear, history, define, refine, add_int_cmd <short> <name> "<description>" <whatToDo>, export log, pause, create sqlite <filename.db>, show requirements, persist memory db to <filename.db>
 Run custom commands by typing their name.
 Note: 'mode' command is informational only.`;
     const outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal' }];
@@ -40,4 +40,3 @@ Note: 'mode' command is informational only.`;
 function getFilename(): string {
     return 'handle-help.ts';
 }
-
