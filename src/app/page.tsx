@@ -186,6 +186,7 @@ export default function Home() {
                           id={`category-${category}`}
                           checked={selectedCategories.includes(category)}
                           onCheckedChange={(checked) => handleCategoryChange(category, checked)}
+                          aria-label={`Toggle suggestions for ${category} commands`}
                       />
                       <Label htmlFor={`category-${category}`} className="text-sm font-normal capitalize">
                           {category}
