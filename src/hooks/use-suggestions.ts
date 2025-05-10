@@ -1,52 +1,45 @@
 // src/hooks/use-suggestions.ts
 // src/hooks/use-suggestions.ts
-'use client';
-
-import * as React from 'react'; // Added missing React import
+import * as React from 'react';
 import type { CommandMode } from '@/types/command-types';
 import type { CustomCommands } from './use-custom-commands';
+import { internalCommandDefinitions } from '@/lib/internal-commands-definitions'; // Import new definitions
+
+// Generate initial internal suggestions from definitions
+const initialInternalSuggestions = internalCommandDefinitions.map(cmd => {
+    let suggestion = cmd.name;
+    if (cmd.argsFormat) {
+        suggestion += ` ${cmd.argsFormat}`;
+    } else if (cmd.exampleUsage && cmd.exampleUsage.startsWith(cmd.name)) {
+        // Fallback to example usage if argsFormat is missing but exampleUsage provides argument structure
+        suggestion = cmd.exampleUsage;
+    }
+    return suggestion;
+});
+
 
 // Initial suggestions, will be mutable
 const initialSuggestionsData: Record<CommandMode, string[]> = {
-  internal: [
-      'help',
-      'clear',
-      // 'mode', // Removed as it's informational now
-      'history',
-      'define',
-      'refine',
-      'add int_cmd <short> <name> "<description>" <whatToDo>', // Updated old command suggestion
-      'add ai_tool <toolname> "<args_description>" "<description>"', // Corrected AI tool suggestion order
-      'set ai_tool <name> active <0|1>', // Added new set command suggestion
-      'set sim_mode <0|1>', // Added new set sim_mode command suggestion
-      'export log',
-      'export db', // Added export db suggestion
-      'pause',
-      'create sqlite <filename.db>',
-      'show requirements',
-      'persist memory db to <filename.db>',
-      'init', // Added general init command
-      'init db', // Keep specific init db as well
-      'list py vars', // Added new command
-      'ai <inputtext with {varname}>', // Updated AI command suggestion
-    ],
+  internal: initialInternalSuggestions,
   python: [
-      'print(', 'def ', 'import ', 'class ', 'if ', 'else:', 'elif ', 'for ', 'while ', 'try:', 'except:', 'return ', 'yield ',
-      'clipboard = get()' // Add clipboard suggestion here
+      'print("text")', 'variable = value', 'def function_name():', 'import module_name', 'class ClassName:', 'if condition:', 'else:', 'elif condition:', 'for item in iterable:', 'while condition:', 'try:', 'except Exception as e:', 'return value', 'yield value',
+      'clipboard = get()'
     ],
-  unix: ['ls', 'cd', 'pwd', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'grep', 'echo', 'man', 'sudo'],
-  windows: ['dir', 'cd', 'cls', 'mkdir', 'rmdir', 'copy', 'move', 'type', 'findstr', 'echo', 'help'],
-  sql: ['SELECT', 'INSERT INTO', 'UPDATE', 'DELETE FROM', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'WHERE', 'FROM', 'JOIN', 'GROUP BY', 'ORDER BY', 'SELECT 1;', 'SELECT * FROM INFORMATION_SCHEMA.TABLES', 'SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = \'your_table_name\''],
-  excel: ['SUM(', 'AVERAGE(', 'COUNT(', 'MAX(', 'MIN(', 'IF(', 'VLOOKUP(', 'HLOOKUP(', 'INDEX(', 'MATCH('],
+  unix: ['ls', 'cd <directory>', 'pwd', 'mkdir <directory_name>', 'rm <file_or_directory>', 'cp <source> <destination>', 'mv <source> <destination>', 'cat <file>', 'grep "<pattern>" <file>', 'echo "<text>"', 'man <command>', 'sudo <command>'],
+  windows: ['dir [drive:][path][filename]', 'cd [drive:][path]', 'cls', 'mkdir [drive:]path', 'rmdir [drive:]path', 'copy <source> <destination>', 'move <source> <destination>', 'type [drive:][path]filename', 'findstr /C:"string" <filename>', 'echo [message]', 'help [command]'],
+  sql: ['SELECT * FROM <table_name>;', 'INSERT INTO <table_name> (column1, column2) VALUES (value1, value2);', 'UPDATE <table_name> SET column1 = value1 WHERE condition;', 'DELETE FROM <table_name> WHERE condition;', 'CREATE TABLE <table_name> (column1 datatype, column2 datatype);', 'ALTER TABLE <table_name> ADD column_name datatype;', 'DROP TABLE <table_name>;', 'SELECT 1;', 'SELECT * FROM INFORMATION_SCHEMA.TABLES;', "SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'your_table_name';"],
+  excel: ['SUM(A1:B5)', 'AVERAGE(C1:C10)', 'COUNT(D1:D100)', 'MAX(E1:E50)', 'MIN(F1:F20)', 'IF(logical_test, value_if_true, value_if_false)', 'VLOOKUP(lookup_value, table_array, col_index_num, [range_lookup])', 'HLOOKUP(lookup_value, table_array, row_index_num, [range_lookup])', 'INDEX(array, row_num, [column_num])', 'MATCH(lookup_value, lookup_array, [match_type])'],
   typescript: [
-    'console.log(', 'let x = ', 'const y: string = ', 'type MyType = ', 'interface MyInterface ', 'function add(a: number, b: number): number', 'import { } from ', 'export const '
+    'console.log("message");', 'let variableName: type = value;', 'const constantName: type = value;', 'type CustomType = { property: type };', 'interface MyInterface { method(): void; }', 'function functionName(param: type): returnType { /* ... */ }', 'import { member } from "module";', 'export const exportedValue = 123;'
   ],
 };
 
 
 export const useSuggestions = () => {
     const [suggestions, setSuggestions] = React.useState(initialSuggestionsData);
-    const initialSuggestions = React.useMemo(() => initialSuggestionsData, []);
+    // Make initialSuggestionsData available directly for help command if needed,
+    // but primary source for internal commands in help should be internalCommandDefinitions.
+    const getInitialSuggestions = React.useCallback(() => initialSuggestionsData, []);
 
 
     // Add suggestion still needs a mode context
@@ -54,56 +47,20 @@ export const useSuggestions = () => {
         setSuggestions(prev => {
             const modeSuggestions = prev[mode] || [];
             const lowerCommand = command.toLowerCase();
-            let suggestionToAdd = lowerCommand;
+            let suggestionToAdd = command; // Use original casing for suggestion text
 
-            // Special format for add_int_cmd suggestion itself
-            if (mode === 'internal' && lowerCommand.startsWith('add int_cmd')) {
-                suggestionToAdd = 'add int_cmd <short> <name> "<description>" <whatToDo>';
+            // For internal commands, try to find its definition to format the suggestion
+            if (mode === 'internal') {
+                const cmdDef = internalCommandDefinitions.find(def => def.name === lowerCommand);
+                if (cmdDef) {
+                    suggestionToAdd = cmdDef.name;
+                     if (cmdDef.argsFormat) {
+                        suggestionToAdd += ` ${cmdDef.argsFormat}`;
+                    } else if (cmdDef.exampleUsage && cmdDef.exampleUsage.startsWith(cmdDef.name)) {
+                        suggestionToAdd = cmdDef.exampleUsage;
+                    }
+                }
             }
-            // Corrected format for add_ai_tool suggestion
-             if (mode === 'internal' && lowerCommand.startsWith('add ai_tool')) {
-                 suggestionToAdd = 'add ai_tool <toolname> "<args_description>" "<description>"'; // Corrected order
-             }
-             // Format for set ai_tool active
-             if (mode === 'internal' && lowerCommand.startsWith('set ai_tool ')) {
-                suggestionToAdd = 'set ai_tool <name> active <0|1>';
-             }
-             // Format for set sim_mode
-             if (mode === 'internal' && lowerCommand.startsWith('set sim_mode ')) {
-                suggestionToAdd = 'set sim_mode <0|1>';
-             }
-            // Add format for persist memory db to
-            if (mode === 'internal' && lowerCommand.startsWith('persist memory db to')) {
-                 suggestionToAdd = 'persist memory db to <filename.db>';
-            }
-             // Add format for create sqlite
-            if (mode === 'internal' && lowerCommand.startsWith('create sqlite')) {
-                 suggestionToAdd = 'create sqlite <filename.db>';
-            }
-            // Add format for init db
-            if (mode === 'internal' && lowerCommand === 'init db') {
-                suggestionToAdd = 'init db';
-            }
-            // Add format for init
-            if (mode === 'internal' && lowerCommand === 'init') {
-                suggestionToAdd = 'init';
-            }
-             // Add format for list py vars
-            if (mode === 'internal' && lowerCommand === 'list py vars') {
-                 suggestionToAdd = 'list py vars';
-            }
-             // Add format for export db
-            if (mode === 'internal' && lowerCommand === 'export db') {
-                 suggestionToAdd = 'export db';
-            }
-            // Add format for ai command
-            if (mode === 'internal' && lowerCommand.startsWith('ai')) {
-                 suggestionToAdd = 'ai <inputtext with {varname}>'; // Updated suggestion text
-            }
-             // Add format for clipboard get (though it's already in initial)
-             if (mode === 'python' && lowerCommand === 'clipboard = get()') {
-                  suggestionToAdd = 'clipboard = get()';
-             }
 
 
             if (!modeSuggestions.some(s => s.toLowerCase() === suggestionToAdd.toLowerCase())) {
@@ -116,10 +73,8 @@ export const useSuggestions = () => {
         });
     }, []);
 
-    // Removed getAllSuggestions as filtering is now handled in page.tsx
 
-
-    return { suggestions, addSuggestion, initialSuggestions }; // Return categorized suggestions
+    return { suggestions, addSuggestion, initialSuggestions: getInitialSuggestions() };
 };
 
 /**
@@ -127,6 +82,6 @@ export const useSuggestions = () => {
  * This function is not exported to avoid being treated as a Server Action.
  * @returns The filename.
  */
- function getFilename(): string {
+function getFilename(): string {
      return 'use-suggestions.ts';
  }

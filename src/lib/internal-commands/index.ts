@@ -4,8 +4,9 @@
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/types/log-types'; // Import the new LogEntry type
+import type { LogEntry } from '@/types/log-types';
 import type { CommandMode } from '@/types/command-types';
+import { internalCommandDefinitions } from '@/lib/internal-commands-definitions'; // Can be used for permission checks
 
 // Import individual command handlers
 import { handleHelp } from './handle-help';
@@ -14,43 +15,42 @@ import { handleHistory } from './handle-history';
 import { handleDefine } from './handle-define';
 import { handleRefine } from './handle-refine';
 import { handleAddCommand } from './handle-add-command';
-import { handleAddAiTool } from './handle-add-ai-tool'; // Import new handler
+import { handleAddAiTool } from './handle-add-ai-tool';
 import { handleExportLog } from './handle-export-log';
-import { handleExportDb } from './handle-export-db'; // Import new handler
+import { handleExportDb } from './handle-export-db';
 import { handlePause } from './handle-pause';
 import { handleCreateSqlite } from './handle-create-sqlite';
 import { handleShowRequirements } from './handle-show-requirements';
 import { handlePersistDb } from './handle-persist-db';
 import { handleInitDb } from './handle-init-db';
-import { handleInit } from './handle-init'; // Import the new init handler
-import { handleListPyVars } from './handle-list-py-vars'; // Import the new list vars handler
-import { handleAiCommand } from './handle-ai-command'; // Import the new AI command handler
-import { handleSetAiToolActive } from './handle-set-ai-tool-active'; // Import the new set tool active handler
-import { handleSetSimMode } from './handle-set-sim-mode'; // Import new handler for sim_mode
+import { handleInit } from './handle-init';
+import { handleListPyVars } from './handle-list-py-vars';
+import { handleAiCommand } from './handle-ai-command';
+import { handleSetAiToolActive } from './handle-set-ai-tool-active';
+import { handleSetSimMode } from './handle-set-sim-mode';
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
 interface InternalCommandHandlerParams {
-    userId: number; // Add user ID
-    userPermissions: string[]; // Add permissions list
+    userId: number;
+    userPermissions: string[];
     command: string;
     commandLower: string;
     commandName: string;
     args: string[];
     timestamp: string;
-    addSuggestion: (mode: CommandMode, command: string) => void; // Client-side, problematic
-    addCustomCommand: (name: string, action: CustomCommandAction) => void; // Client-side, problematic
-    getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Potentially problematic in Server Action
-    currentLogEntries: LogEntry[]; // Pass current logs (uses new LogEntry type)
+    addSuggestion: (mode: CommandMode, command: string) => void;
+    addCustomCommand: (name: string, action: CustomCommandAction) => void;
+    getCustomCommandAction: (name: string) => CustomCommandAction | undefined;
+    currentLogEntries: LogEntry[];
     initialSuggestions: Record<string, string[]>;
-    overridePermissionChecks?: boolean; // Optional flag to bypass checks
+    overridePermissionChecks?: boolean;
 }
 
-// Define the structure for the return value, including potential log updates and toast info
 interface HandlerResult {
     outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (uses new LogEntry type)
-    toastInfo?: { message: string; variant?: 'default' | 'destructive' }; // Added for toast notifications
+    newLogEntries?: LogEntry[];
+    toastInfo?: { message: string; variant?: 'default' | 'destructive' };
 }
 
 
@@ -60,18 +60,25 @@ interface HandlerResult {
  * Includes permission checks for relevant commands, can be overridden.
  */
 export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<HandlerResult> => {
-    const { commandName, commandLower, args, getCustomCommandAction, userPermissions, timestamp, userId, overridePermissionChecks } = params; // Destructure args
+    const { commandName, commandLower, args, getCustomCommandAction, userPermissions, timestamp, userId, overridePermissionChecks } = params;
+
+    // Find command definition for permission check
+    const commandDef = internalCommandDefinitions.find(def => def.name === commandName);
 
     const permissionDenied = (requiredPermission: string): HandlerResult => {
         const errorMsg = `Permission denied: Requires '${requiredPermission}' permission.`;
         return {
             outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-            // Include flag=0 for permission denied error log
             newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }],
-            toastInfo: undefined // Ensure toastInfo is undefined for permission denied
+            toastInfo: undefined
         };
     };
 
+    // Centralized permission check using commandDef (except for help which is always allowed)
+    if (commandName !== 'help' && commandDef && commandDef.requiredPermission && !overridePermissionChecks && !userPermissions.includes(commandDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
+        return permissionDenied(commandDef.requiredPermission);
+    }
+    
     // Experimental @bat command handling
     if (commandName.startsWith('@bat:')) {
         // TODO: Implement actual script execution logic here (with strict permission checks)
@@ -84,119 +91,99 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
     }
 
 
-    // 1. Built-in commands (prioritized)
+    // Dispatch to specific handlers
     switch (commandName) {
         case 'help':
-            return handleHelp(params);
+            return handleHelp(params); // Help has its own internal permission filtering for display
         case 'clear':
-            // Special case handled entirely client-side in handleCommandSubmit
-            return { outputLines: [], toastInfo: undefined }; // Return empty result
+            return { outputLines: [], toastInfo: undefined };
         case 'mode':
             return handleMode(params);
         case 'history':
-            // No specific permission needed for placeholder history
+            // `commandDef` check above handles permission for 'history' if defined
             return handleHistory(params);
         case 'define':
-             // Placeholder - Add permission check if implemented
             return handleDefine(params);
         case 'refine':
-             // Placeholder - Add permission check if implemented
             return handleRefine(params);
         case 'add_int_cmd':
-             if (commandLower.startsWith('add_int_cmd ')) {
-                 if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools'); // Assuming same permission for simplicity
-                 return handleAddCommand(params); // Handles regular internal commands
+             if (commandLower.startsWith('add_int_cmd ')) { // Ensure it's the full command
+                 // Permission already checked if commandDef for 'add_int_cmd' has requiredPermission
+                 return handleAddCommand(params);
              }
              break;
         case 'add_ai_tool':
              if (commandLower.startsWith('add_ai_tool ')) {
-                 if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
-                 return handleAddAiTool(params); // Handles defining AI tools
+                 return handleAddAiTool(params);
              }
              break;
         case 'set':
              if (commandLower.startsWith('set ai_tool ')) {
-                 if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
-                 // Pass args starting *after* 'set ai_tool' to the handler
+                 // Find 'set_ai_tool' in definitions for permission or define it as a sub-command
+                 const setAiToolDef = internalCommandDefinitions.find(d => d.name === 'set_ai_tool');
+                 if (setAiToolDef?.requiredPermission && !overridePermissionChecks && !userPermissions.includes(setAiToolDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
+                     return permissionDenied(setAiToolDef.requiredPermission);
+                 }
                  return handleSetAiToolActive({ ...params, args: args.slice(2) });
              } else if (commandLower.startsWith('set sim_mode ')) {
-                // Assuming 'manage_variables' permission is appropriate, or create a new one
-                 if (!overridePermissionChecks && !userPermissions.includes('manage_variables')) return permissionDenied('manage_variables');
-                 return handleSetSimMode({ ...params, args: args.slice(2) }); // Pass args after 'set sim_mode'
+                 const setSimModeDef = internalCommandDefinitions.find(d => d.name === 'set_sim_mode');
+                 if (setSimModeDef?.requiredPermission && !overridePermissionChecks && !userPermissions.includes(setSimModeDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
+                    return permissionDenied(setSimModeDef.requiredPermission);
+                 }
+                 return handleSetSimMode({ ...params, args: args.slice(2) });
              }
-             break; // Fall through if not a recognized 'set' command
+             break;
         case 'export':
              if (commandLower === 'export log') {
-                 // Export log is client-side, server handler is informational (no specific perm needed here)
                 return handleExportLog(params);
              } else if (commandLower === 'export db') {
-                 if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify'); // Exporting DB might be sensitive
-                // Export db triggers persistence with a default name
+                 const exportDbDef = internalCommandDefinitions.find(d => d.name === 'export_db');
+                 if (exportDbDef?.requiredPermission && !overridePermissionChecks && !userPermissions.includes(exportDbDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
+                    return permissionDenied(exportDbDef.requiredPermission);
+                 }
                 return handleExportDb(params);
              }
-             break; // Fall through if not 'export log' or 'export db'
+             break;
         case 'pause':
-            // Pause is mostly client-side, server handler is informational
             return handlePause(params);
-        case 'create':
-            if (commandLower.startsWith('create sqlite')) {
-                 // Creating might be admin-level
-                 if (!overridePermissionChecks && !userPermissions.includes('manage_users')) return permissionDenied('manage_users'); // Example: Restrict to admin
-                 return handleCreateSqlite(params); // Returns HandlerResult
-            }
-            break; // Fall through if not 'create sqlite'
-        case 'show':
-            if (commandLower.startsWith('show requirements')) {
-                // Generally safe, no specific perm needed
-                 return handleShowRequirements(params); // This now returns HandlerResult
-            }
-            break; // Fall through if not 'show requirements'
-        case 'persist':
-            if (commandLower.startsWith('persist memory db to ')) {
-                 if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify'); // Persisting DB might be sensitive
-                 return handlePersistDb(params); // Call the new handler
-            }
-            break; // Fall through if not the exact command
+        case 'create_sqlite': // Changed from 'create'
+            // Permission handled by commandDef check at the start if 'create_sqlite' is defined
+            return handleCreateSqlite(params);
+        case 'show_requirements': // Changed from 'show'
+            return handleShowRequirements(params);
+        case 'persist_memory_db_to': // Changed from 'persist'
+            return handlePersistDb(params);
         case 'init':
+            // Special handling for 'init' vs 'init db'
             if (commandLower === 'init db') {
-                 // DB Init is likely an admin task
-                 if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) return permissionDenied('manage_roles_permissions');
-                 return handleInitDb(params); // Call the specific handler
-            } else if (commandLower === 'init' && args.length === 0) { // Check for 'init' without args
-                 // General Init might also be admin
-                 if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) return permissionDenied('manage_roles_permissions');
-                 return handleInit(params); // Call the new general init handler
+                 const initDbDef = internalCommandDefinitions.find(d => d.name === 'init_db');
+                 if (initDbDef?.requiredPermission && !overridePermissionChecks && !userPermissions.includes(initDbDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
+                    return permissionDenied(initDbDef.requiredPermission);
+                 }
+                 return handleInitDb(params);
+            } else if (commandLower === 'init' && args.length === 0) {
+                 const initDef = internalCommandDefinitions.find(d => d.name === 'init');
+                 if (initDef?.requiredPermission && !overridePermissionChecks && !userPermissions.includes(initDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
+                    return permissionDenied(initDef.requiredPermission);
+                 }
+                 return handleInit(params);
             }
-            break; // Fall through if not 'init' or 'init db'
-        case 'list':
-            if (commandLower === 'list py vars') {
-                if (!overridePermissionChecks && !userPermissions.includes('read_variables')) return permissionDenied('read_variables');
-                return handleListPyVars(params); // Call the new list vars handler
-            }
-            break; // Fall through if not the exact command
+            break;
+        case 'list_py_vars': // Changed from 'list'
+            return handleListPyVars(params);
         case 'ai':
-            if (!overridePermissionChecks && !userPermissions.includes('use_ai_tools')) return permissionDenied('use_ai_tools');
-            return handleAiCommand(params); // Call the new AI handler, this can return toastInfo
+            return handleAiCommand(params);
     }
 
-     // Check again for 'export db' specifically in case it wasn't caught by the switch (e.g., due to casing)
-     if (commandLower === 'export db') {
-          if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify');
-         return handleExportDb(params);
-     }
-
-
-    // 2. Custom internal commands (defined via 'add_int_cmd')
     const customAction = getCustomCommandAction(params.commandName);
     if (customAction !== undefined) {
-        // Basic check - maybe custom commands require a general 'execute_custom' perm?
-        // if (!overridePermissionChecks && !userPermissions.includes('execute_custom')) return permissionDenied('execute_custom');
-        // handleCustomCommand now returns HandlerResult
+        // For custom commands, we might need a generic 'execute_custom_command' permission
+        // Or, their definition (if stored) could include specific permissions.
+        // For now, assuming custom commands bypass the commandDef check above or are caught by it if named like a base command.
         return handleCustomCommand(params, customAction);
     }
 
-    // 3. Command not found
-    return handleNotFound(params); // This now returns HandlerResult
+    return handleNotFound(params);
 };
 
 async function executeScriptFile(): Promise<HandlerResult> {
