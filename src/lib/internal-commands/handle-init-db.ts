@@ -21,7 +21,7 @@ interface HandlerParams {
 
 /**
  * Handles the 'init db' command.
- * Creates essential tables and adds sample RBAC data.
+ * Creates essential tables including new command definition tables, and adds sample RBAC data.
  * Requires admin-level permission (e.g., 'manage_roles_permissions').
  */
 export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
@@ -79,15 +79,32 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
             FOREIGN KEY (role_id) REFERENCES roles (role_id) ON DELETE CASCADE,
             FOREIGN KEY (permission_id) REFERENCES permissions (permission_id) ON DELETE CASCADE
         );`,
-        // New table for command definitions
-        `CREATE TABLE IF NOT EXISTS commands (
-            command_name TEXT NOT NULL,
+        // New command definition structure
+        `DROP TABLE IF EXISTS commands;`, // Drop old commands table if it exists
+        `CREATE TABLE IF NOT EXISTS command_metadata (
+            command_name TEXT NOT NULL PRIMARY KEY,
             command_description TEXT,
+            result_description TEXT,
+            result_type TEXT,
+            result_min REAL,
+            result_max REAL,
+            result_length INTEGER
+        );`,
+        `CREATE TABLE IF NOT EXISTS command_input_arguments (
+            argument_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            command_name TEXT NOT NULL,
             argument_name TEXT NOT NULL,
             argument_type TEXT NOT NULL,
             argument_purpose TEXT,
             argument_default_value TEXT,
-            PRIMARY KEY (command_name, argument_name)
+            argument_min REAL,
+            argument_max REAL,
+            argument_length INTEGER,
+            is_required BOOLEAN DEFAULT 1,
+            position INTEGER,
+            FOREIGN KEY (command_name) REFERENCES command_metadata (command_name) ON DELETE CASCADE,
+            UNIQUE (command_name, argument_name),
+            UNIQUE (command_name, position)
         );`,
         // Optionally enable foreign key support if needed (can impact performance slightly)
         // `PRAGMA foreign_keys = ON;`
@@ -150,8 +167,9 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         // runSql already ensures the DB is initialized via getDb()
         for (const sql of createStatements) {
              // Simple way to identify the statement type for logging
-             let statementType = 'Unknown';
+             let statementType = 'Unknown DDL/DML';
              if (sql.toUpperCase().startsWith('CREATE TABLE')) statementType = 'Table Creation';
+             else if (sql.toUpperCase().startsWith('DROP TABLE')) statementType = 'Table Drop';
              else if (sql.toUpperCase().startsWith('INSERT')) statementType = 'Sample Data Insertion';
              else if (sql.toUpperCase().startsWith('PRAGMA')) statementType = 'Pragma Setting';
 
