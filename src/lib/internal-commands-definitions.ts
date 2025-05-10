@@ -35,7 +35,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
   {
     name: 'history',
     description: 'Placeholder command. Intended to show command history (currently only shows in output area).',
-    requiredPermission: 'view_history', // Example permission
+    requiredPermission: 'view_history', 
   },
   {
     name: 'define',
@@ -44,7 +44,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     argsDetails: [
       { name: 'term_to_define', description: 'The term or concept you want a definition for.' },
     ],
-    requiredPermission: 'use_ai_tools', // Example if it uses AI
+    requiredPermission: 'use_ai_tools', 
   },
   {
     name: 'refine',
@@ -53,7 +53,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     argsDetails: [
       { name: 'text_to_refine', description: 'The text or concept to refine.' },
     ],
-    requiredPermission: 'use_ai_tools', // Example if it uses AI
+    requiredPermission: 'use_ai_tools', 
   },
   {
     name: 'add_int_cmd',
@@ -66,7 +66,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
       { name: 'action_to_perform', description: 'The text that will be output when the command is run (must be in quotes).' },
     ],
     exampleUsage: 'add_int_cmd mycmd greet "Greets the user" "Hello from my custom command!"',
-    requiredPermission: 'manage_ai_tools', // Assuming this permission covers custom commands
+    requiredPermission: 'manage_ai_tools', 
   },
   {
     name: 'add_ai_tool',
@@ -81,7 +81,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     requiredPermission: 'manage_ai_tools',
   },
   {
-    name: 'set_ai_tool',
+    name: 'set_ai_tool', // This is the base command name for setting AI tool properties
     description: 'Sets properties for an existing AI tool, such as its active status.',
     argsFormat: '<tool_name> active <0|1>',
     argsDetails: [
@@ -122,7 +122,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     argsDetails: [
         { name: 'filename.db', description: 'Optional. This argument is currently ignored as the database is always in-memory.', optional: true },
     ],
-    requiredPermission: 'manage_users', // Example: admin-level
+    requiredPermission: 'manage_users', 
   },
   {
     name: 'init',

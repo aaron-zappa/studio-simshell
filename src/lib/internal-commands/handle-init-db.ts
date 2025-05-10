@@ -4,6 +4,7 @@
 import type { OutputLine } from '@/components/output-display';
 import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 import { runSql } from '@/lib/database';
+import { internalCommandDefinitions } from '@/lib/internal-commands-definitions'; // Import command definitions
 
 // Define the structure for the return value, including potential log updates
 interface HandlerResult {
@@ -22,6 +23,7 @@ interface HandlerParams {
 /**
  * Handles the 'init db' command.
  * Creates essential tables including new command definition tables, and adds sample RBAC data.
+ * Populates command_metadata and command_input_arguments from internalCommandDefinitions.
  * Requires admin-level permission (e.g., 'manage_roles_permissions').
  */
 export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
@@ -119,6 +121,8 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('manage_ai_tools');`, // Add, activate/deactivate
         `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('manage_users');`,
         `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('manage_roles_permissions');`,
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('view_history');`, // For 'history' command
+        `INSERT OR IGNORE INTO permissions (permission_name) VALUES ('execute_python_code');`, // For Python execution
 
         // Roles
         `INSERT OR IGNORE INTO roles (role_name) VALUES ('administrator');`,
@@ -129,9 +133,9 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         // Admin gets all
         `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r, permissions p WHERE r.role_name = 'administrator';`,
         // Developer gets variable management, SQL execution, AI tool usage/management, AND manage_roles_permissions
-        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('manage_variables', 'execute_sql_select', 'execute_sql_modify', 'use_ai_tools', 'manage_ai_tools', 'manage_roles_permissions') WHERE r.role_name = 'developer';`,
+        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('manage_variables', 'execute_sql_select', 'execute_sql_modify', 'use_ai_tools', 'manage_ai_tools', 'manage_roles_permissions', 'view_history', 'execute_python_code') WHERE r.role_name = 'developer';`,
         // Basic user gets read variables, use AI tools, AND manage_roles_permissions
-        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('read_variables', 'use_ai_tools', 'manage_roles_permissions') WHERE r.role_name = 'basic_user';`,
+        `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT r.role_id, p.permission_id FROM roles r JOIN permissions p ON p.permission_name IN ('read_variables', 'use_ai_tools', 'manage_roles_permissions', 'view_history') WHERE r.role_name = 'basic_user';`,
 
         // Users
         `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('admin', 'dummy_hash');`, // Replace with real hashing
@@ -145,7 +149,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         `INSERT OR IGNORE INTO user_roles (user_id, role_id) SELECT u.user_id, r.role_id FROM users u JOIN roles r ON r.role_name = 'developer' WHERE u.username = 'dev';`,
         `INSERT OR IGNORE INTO user_roles (user_id, role_id) SELECT u.user_id, r.role_id FROM users u JOIN roles r ON r.role_name = 'basic_user' WHERE u.username = 'user';`,
     ];
-    
+
     const createPeterAdminStatement = `
     INSERT OR IGNORE INTO user_roles (user_id, role_id)
     SELECT u.user_id, r.role_id
@@ -166,50 +170,98 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
     try {
         // runSql already ensures the DB is initialized via getDb()
         for (const sql of createStatements) {
-             // Simple way to identify the statement type for logging
-             let statementType = 'Unknown DDL/DML';
-             if (sql.toUpperCase().startsWith('CREATE TABLE')) statementType = 'Table Creation';
-             else if (sql.toUpperCase().startsWith('DROP TABLE')) statementType = 'Table Drop';
-             else if (sql.toUpperCase().startsWith('INSERT')) statementType = 'Sample Data Insertion';
-             else if (sql.toUpperCase().startsWith('PRAGMA')) statementType = 'Pragma Setting';
+            let statementType = 'Unknown DDL/DML';
+            if (sql.toUpperCase().startsWith('CREATE TABLE')) statementType = 'Table Creation';
+            else if (sql.toUpperCase().startsWith('DROP TABLE')) statementType = 'Table Drop';
+            else if (sql.toUpperCase().startsWith('INSERT')) statementType = 'Sample Data Insertion';
+            else if (sql.toUpperCase().startsWith('PRAGMA')) statementType = 'Pragma Setting';
 
             try {
                 await runSql(sql);
                 successfulStatements++;
-                // Optionally add detailed success output, but keep it concise for init
-                // outputLines.push({ id: `init-ok-${statementType}-${successfulStatements}-${timestamp}`, text: `OK: ${statementType} - ${sql.substring(0, 40)}...`, type: 'info', category: 'internal', timestamp, flag: 0 });
             } catch (error) {
                 const errorMsg = `Error during DB init (${statementType}): ${error instanceof Error ? error.message : 'Unknown error'} (SQL: ${sql.substring(0, 60)}...)`;
-                 console.error(errorMsg);
-                 errors.push(errorMsg);
-                 logType = 'E';
-                 outputType = 'error';
-                 logFlag = 0; // Set flag to 0 for error
-                 // Add specific error line to output
-                 outputLines.push({ id: `init-err-${statementType}-${errors.length}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
+                console.error(errorMsg);
+                errors.push(errorMsg);
+                logType = 'E';
+                outputType = 'error';
+                logFlag = 0;
+                outputLines.push({ id: `init-err-${statementType}-${errors.length}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
             }
         }
 
-        const finalSummaryText = `DB Initialization: ${successfulStatements} statements executed successfully. ${errors.length} errors encountered.`;
-        logText += finalSummaryText;
-        // Add a final summary line to the output
-        // Determine final output type based on errors
+        const initialSummaryText = `DB Initialization (Tables & RBAC): ${successfulStatements} statements executed successfully. ${errors.length} errors encountered.`;
+        logText += initialSummaryText;
+        outputLines.push({ id: `init-summary-rbac-${timestamp}`, text: initialSummaryText, type: errors.length > 0 ? 'error' : 'info', category: 'internal', timestamp, flag: errors.length > 0 ? 0 : 0 });
+
+        // --- Populate command_metadata and command_input_arguments ---
+        outputLines.push({ id: `init-cmd-meta-start-${timestamp}`, text: "Populating command metadata...", type: 'info', category: 'internal', timestamp, flag: 0 });
+        let cmdMetaSuccessCount = 0;
+        let cmdMetaErrorCount = 0;
+
+        for (const cmdDef of internalCommandDefinitions) {
+            // Insert into command_metadata
+            const cmdMetaSql = `
+                INSERT OR IGNORE INTO command_metadata 
+                (command_name, command_description, result_description, result_type, result_min, result_max, result_length) 
+                VALUES (?, ?, NULL, NULL, NULL, NULL, NULL);
+            `;
+            const cmdMetaParams = [cmdDef.name, cmdDef.description];
+            try {
+                await runSql(cmdMetaSql, cmdMetaParams);
+                cmdMetaSuccessCount++;
+
+                // Insert into command_input_arguments if argsDetails exists
+                if (cmdDef.argsDetails && cmdDef.argsDetails.length > 0) {
+                    for (let i = 0; i < cmdDef.argsDetails.length; i++) {
+                        const argDetail = cmdDef.argsDetails[i];
+                        const argSql = `
+                            INSERT OR IGNORE INTO command_input_arguments 
+                            (command_name, argument_name, argument_type, argument_purpose, argument_default_value, argument_min, argument_max, argument_length, is_required, position) 
+                            VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?);
+                        `;
+                        // Defaulting argument_type to 'string' for now
+                        const argParams = [
+                            cmdDef.name,
+                            argDetail.name,
+                            'string', 
+                            argDetail.description,
+                            argDetail.optional ? 0 : 1,
+                            i + 1 // position
+                        ];
+                        await runSql(argSql, argParams);
+                        // Note: success/error count for args could be more granular if needed
+                    }
+                }
+            } catch (error) {
+                const errorMsg = `Error populating metadata for command '${cmdDef.name}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+                console.error(errorMsg);
+                errors.push(errorMsg); // Add to overall errors
+                cmdMetaErrorCount++;
+                logType = 'E'; // Ensure overall log type reflects error
+                logFlag = 0;   // Ensure overall flag reflects error
+                outputLines.push({ id: `init-cmd-meta-err-${cmdDef.name}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
+            }
+        }
+        
+        const cmdMetaSummaryText = `Command Metadata Population: ${cmdMetaSuccessCount} commands processed. ${cmdMetaErrorCount} errors.`;
+        logText += ` | ${cmdMetaSummaryText}`;
+        outputLines.push({ id: `init-cmd-meta-summary-${timestamp}`, text: cmdMetaSummaryText, type: cmdMetaErrorCount > 0 ? 'error' : 'info', category: 'internal', timestamp, flag: cmdMetaErrorCount > 0 ? 0 : 0 });
+        
+        // Determine final overall output type based on any errors encountered
         outputType = errors.length > 0 ? 'error' : 'info';
-        outputLines.push({ id: `init-summary-${timestamp}`, text: finalSummaryText, type: outputType, category: 'internal', timestamp, flag: outputType === 'error' ? 0 : 0 });
 
 
-    } catch (error) // Catch errors from getDb() itself
+    } catch (error) // Catch errors from getDb() itself or initial setup
     {
         console.error("Error during database initialization (pre-statement execution):", error);
         logText = `Critical Error during DB initialization: ${error instanceof Error ? error.message : 'Unknown error'}`;
         logType = 'E';
         outputType = 'error';
-        logFlag = 0; // Set flag to 0 for error
-        // Ensure outputLines has the critical error message
+        logFlag = 0;
         outputLines = [{ id: `init-db-crit-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp, flag: 0 }];
     }
 
-    // Add user ID and flag to the main log entry
     const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText + ` (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
