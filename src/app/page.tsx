@@ -5,11 +5,12 @@
 import * as React from 'react';
 import { CommandInput } from '@/components/command-input';
 import { OutputDisplay, type OutputLine } from '@/components/output-display';
-import { SqlInputPanel } from '@/components/sql-input-panel'; // Import the new SQL input panel
-import { Button } from "@/components/ui/button"; // Import Button
+import { SqlInputPanel } from '@/components/sql-input-panel';
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"; // Import Accordion components
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
 import { useCustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions';
 import { executeCommand } from '@/lib/command-executor';
@@ -20,10 +21,11 @@ import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-comma
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 import { getDbStatusAction } from '@/lib/database';
-import { executeSqlScript } from '@/lib/sql-script-runner'; // Import the SQL script runner
-import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow'; // Import the flow
+import { executeSqlScript } from '@/lib/sql-script-runner';
+import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow';
+import { getSqlScriptFiles } from '@/lib/file-actions'; // Import new server action
 
-const SIMULATED_USER_ID = 1; // Assuming admin for now
+const SIMULATED_USER_ID = 1;
 
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
@@ -34,6 +36,9 @@ export default function Home() {
   const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal', 'python']);
   const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
   const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
+
+  const [sqlScriptFiles, setSqlScriptFiles] = React.useState<string[]>([]);
+  const [selectedSqlScript, setSelectedSqlScript] = React.useState<string>("");
 
   React.useEffect(() => {
     const fetchDbStatus = async () => {
@@ -48,7 +53,7 @@ export default function Home() {
                 statusType = 'error';
                 logType = 'E';
             } else {
-                logFlag = 0; // Ensure flag is 0 for success
+                logFlag = 0;
             }
 
 
@@ -78,7 +83,25 @@ export default function Home() {
         }
     };
     fetchDbStatus();
-  }, []);
+
+    const fetchSqlFiles = async () => {
+      try {
+        const files = await getSqlScriptFiles();
+        setSqlScriptFiles(files);
+        if (files.length > 0) {
+          setSelectedSqlScript(files[0]); // Select the first file by default
+        }
+      } catch (error) {
+        console.error("Failed to fetch SQL script files:", error);
+        toast({
+          title: "Error",
+          description: "Could not load SQL script files.",
+          variant: "destructive",
+        });
+      }
+    };
+    fetchSqlFiles();
+  }, [toast]);
 
   const handleCategoryChange = (category: CommandMode, checked: boolean | 'indeterminate') => {
     setSelectedCategories(prev =>
@@ -113,7 +136,7 @@ export default function Home() {
         const scriptFilename = scriptMatch[1];
         const commandLogOutput: OutputLine = {
             id: `cmd-sql-script-${timestamp}`,
-            text: commandTrimmed, // Log the @sql: command itself
+            text: commandTrimmed, 
             type: 'command',
             category: 'sql',
             timestamp: timestamp,
@@ -191,7 +214,7 @@ export default function Home() {
                 getCustomCommandAction,
                 currentLogEntries: logEntries,
                 initialSuggestions,
-                overridePermissionChecks: true, // Assuming override for direct SQL panel for now
+                overridePermissionChecks: true, 
             });
 
             const outputToDisplay = executionResult.outputLines
@@ -240,7 +263,7 @@ export default function Home() {
   const handleListAllTablesClick = async () => {
     try {
         const { sqlQuery } = await listAllTablesQuery();
-        await handleDirectSqlSubmit(sqlQuery); // Submit the query from the flow
+        await handleDirectSqlSubmit(sqlQuery);
     } catch (error) {
         console.error("Error executing list all tables flow:", error);
         const timestamp = new Date().toISOString();
@@ -254,7 +277,7 @@ export default function Home() {
             id: `list-tables-error-${timestamp}`,
             text: errorMsg,
             type: 'error',
-            category: 'internal', // Or 'sql' if more appropriate
+            category: 'internal', 
             timestamp: timestamp,
             flag: 0,
         };
@@ -263,12 +286,24 @@ export default function Home() {
     }
   };
 
+  const handleRunSelectedScript = async () => {
+    if (selectedSqlScript) {
+      await handleDirectSqlSubmit(`@sql:${selectedSqlScript}`);
+    } else {
+      toast({
+        title: "No Script Selected",
+        description: "Please select an SQL script from the dropdown.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   const handleCommandSubmit = async (originalCommand: string) => {
     const commandTrimmed = originalCommand.trim();
     const timestamp = new Date().toISOString();
     let commandLogOutput: OutputLine | null = null;
-    let finalCommandLower = ''; // Initialize here
+    let finalCommandLower = ''; 
     setIsRunning(true);
 
     let finalCommand = commandTrimmed;
@@ -278,16 +313,16 @@ export default function Home() {
     if (clipboardGetRegex.test(commandTrimmed)) {
        try {
          const clipboardContent = await readClipboard();
-         const escapedContent = clipboardContent.replace(/"/g, '\\"'); // Basic escaping for quotes
+         const escapedContent = clipboardContent.replace(/"/g, '\\"'); 
          finalCommand = `clipboard = "${escapedContent}"`;
        } catch (error) {
          console.error("Clipboard read error:", error);
          clipboardReadError = error instanceof Error ? error.message : 'Unknown clipboard error';
-         finalCommand = ''; // Prevent execution if clipboard fails
+         finalCommand = ''; 
        }
     }
     
-    finalCommandLower = finalCommand.toLowerCase(); // Set finalCommandLower after potential modification
+    finalCommandLower = finalCommand.toLowerCase(); 
 
 
     let classificationResult: { category: CommandCategory; reasoning?: string | undefined } | null = null;
@@ -302,38 +337,36 @@ export default function Home() {
       if (clipboardReadError) {
         throw new Error(clipboardReadError);
       }
-      if (!finalCommand && clipboardGetRegex.test(commandTrimmed)) { // Only throw if it was a clipboard command that failed
+      if (!finalCommand && clipboardGetRegex.test(commandTrimmed)) { 
          commandLogOutput = {
              id: `cmd-clipboard-skip-${timestamp}`,
-             text: originalCommand, // Log the original command
+             text: originalCommand, 
              type: 'command',
-             category: 'python', // Assume python for clipboard = get()
+             category: 'python', 
              timestamp: timestamp
          };
          setHistory((prev) => [...prev, commandLogOutput]);
          throw new Error("Command execution skipped: Clipboard operation failed.");
       }
        if (!finalCommand && !clipboardGetRegex.test(commandTrimmed) && commandTrimmed.length > 0) {
-          // This case should ideally not be reached if finalCommand is only empty due to clipboard error
-          // but as a fallback for any other way finalCommand might be empty with an original command.
            commandLogOutput = {
              id: `cmd-empty-final-${timestamp}`,
              text: originalCommand,
              type: 'command',
-             category: 'internal', // Default to internal if category unknown
+             category: 'internal', 
              timestamp: timestamp
            };
            setHistory((prev) => [...prev, commandLogOutput]);
            throw new Error("Command execution skipped: Processed command is empty.");
        }
-       if (!finalCommand && commandTrimmed.length === 0) { // No command was entered
+       if (!finalCommand && commandTrimmed.length === 0) { 
             setIsRunning(false);
             return;
        }
 
 
       classificationResult = await classifyCommand({
-          command: finalCommand, // Use the potentially modified command for classification
+          command: finalCommand, 
           activeCategories: selectedCategories
       });
       const category: CommandCategory = classificationResult.category;
@@ -341,7 +374,7 @@ export default function Home() {
 
       commandLogOutput = {
          id: `cmd-${timestamp}`,
-         text: originalCommand, // Log the original command here
+         text: originalCommand, 
          type: 'command',
          category: (category === 'ambiguous' || category === 'unknown') ? 'internal' : category,
          timestamp: timestamp
@@ -361,8 +394,8 @@ export default function Home() {
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         const classificationLog: LogEntry = {
             timestamp,
-            type: 'W', // Warning for ambiguous/unknown
-            flag: 1,   // Flag 1 for this type of warning
+            type: 'W', 
+            flag: 1,   
             text: `Command classification: ${category}. Reasoning: ${classificationReasoning || 'N/A'}. Original: '${originalCommand}', Processed: '${finalCommand}', Active: ${selectedCategories.join(', ')}`
         };
         setLogEntries(prev => [...prev, classificationLog]);
@@ -379,20 +412,18 @@ export default function Home() {
           clientHandled = true;
          }
          else if (finalCommandLower === 'export log') {
-          const exportResultLine = exportLogFile(logEntries); // exportLogFile now returns OutputLine or null
+          const exportResultLine = exportLogFile(logEntries); 
            const logText = exportResultLine ? exportResultLine.text : "Log export action attempted.";
            const logType: LogEntry['type'] = exportResultLine?.type === 'error' ? 'E' : 'I';
-           const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 0 : 0; // Error flag 0
+           const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 0 : 0; 
            const exportLog: LogEntry = { timestamp, type: logType, flag: logFlagVal, text: logText };
            setLogEntries(prev => [...prev, exportLog]);
 
           if(commandLogOutput && exportResultLine){
-             // Ensure timestamp and flag are set for the output line
-             exportResultLine.timestamp = timestamp; // Use current execution timestamp
-             exportResultLine.flag = logFlagVal;    // Use determined flag
+             exportResultLine.timestamp = timestamp; 
+             exportResultLine.flag = logFlagVal;    
              setHistory((prev) => [...prev, commandLogOutput, exportResultLine]);
           } else if (commandLogOutput) {
-             // If exportResultLine is null (e.g., no logs), just show command
              setHistory((prev) => [...prev, commandLogOutput]);
           }
           clientHandled = true;
@@ -400,44 +431,42 @@ export default function Home() {
          else if (finalCommandLower === 'pause') {
            const pauseOutput: OutputLine = {
              id: `pause-${timestamp}`,
-             text: 'task stopped', // Changed from "Task paused."
+             text: 'task stopped', 
              type: 'info',
              category: 'internal',
-             timestamp: timestamp, // Set timestamp
-             flag: 0, // Set flag
+             timestamp: timestamp, 
+             flag: 0, 
            };
             if(commandLogOutput){
                setHistory((prev) => [...prev, commandLogOutput, pauseOutput]);
             }
-            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." }; // Log still says "Task paused."
+            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." }; 
             setLogEntries(prev => [...prev, pauseLog]);
-           // setIsRunning(false); // This will be handled in finally
-           clientHandled = true; // Mark as client handled
+           clientHandled = true; 
          }
       }
 
       if (clientHandled) {
-         if (finalCommandLower !== 'pause') setIsRunning(false); // Reset if not pause
+         if (finalCommandLower !== 'pause') setIsRunning(false); 
          return;
       }
 
       executionResult = await executeCommand({
         userId: SIMULATED_USER_ID,
-        command: finalCommand, // Use the processed command
+        command: finalCommand, 
         mode: category as CommandMode,
         addSuggestion, 
         addCustomCommand, 
         getCustomCommandAction, 
         currentLogEntries: logEntries, 
         initialSuggestions,
-        overridePermissionChecks: true, // Pass the override flag
+        overridePermissionChecks: true, 
       });
 
       const outputToDisplay = executionResult.outputLines
-          .filter(line => line.id !== commandLogOutput?.id) // Avoid duplicating command log
+          .filter(line => line.id !== commandLogOutput?.id) 
           .map(line => ({
              ...line,
-             // Ensure flag is explicitly set for log-style lines
              flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
            }));
 
@@ -446,7 +475,6 @@ export default function Home() {
        }
 
        if (executionResult.newLogEntries) {
-          // Filter out duplicate log entries before adding
           const uniqueNewLogs = executionResult.newLogEntries.filter(
               newLog => !logEntries.some(existing => existing.timestamp === newLog.timestamp && existing.text === newLog.text)
           );
@@ -462,7 +490,7 @@ export default function Home() {
 
 
     } catch (error) {
-        errorOccurred = true; // Set error occurred flag
+        errorOccurred = true; 
         console.error("Error during command handling:", error);
         const errorMsg = `Failed to process command: ${error instanceof Error ? error.message : 'Unknown error'}`;
         toast({
@@ -475,26 +503,22 @@ export default function Home() {
             text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
             type: 'error',
             category: 'internal',
-            timestamp: timestamp, // Set timestamp for error
-            flag: 0, // Set flag for error
+            timestamp: timestamp, 
+            flag: 0, 
         };
-         const errorLog: LogEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag for error log
-         // Ensure logs are updated even if executionResult is null
+         const errorLog: LogEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; 
          if (executionResult && executionResult.newLogEntries) {
              setLogEntries([...executionResult.newLogEntries, errorLog]);
          } else {
              setLogEntries(prev => [...prev, errorLog]);
          }
-         // Ensure commandLogOutput is created if it wasn't (e.g. error before classification)
          const cmdLog = commandLogOutput || { id: `cmd-err-${timestamp}`, text: originalCommand, type: 'command', category: 'internal', timestamp: timestamp };
          setHistory((prev) => [...prev, cmdLog, errorOutput]);
 
     } finally {
-      // Use finalCommandLower for pause check
       if (finalCommandLower === 'pause' && !errorOccurred) {
-          // isRunning is intentionally kept true for 'pause'
       } else {
-          setIsRunning(false); // Set to false for all other cases (non-pause, or if an error occurred)
+          setIsRunning(false); 
       }
     }
   };
@@ -542,7 +566,7 @@ export default function Home() {
           <AccordionContent className="pt-2">
             <div className="flex flex-col space-y-2">
               <SqlInputPanel onSubmit={handleDirectSqlSubmit} disabled={isRunning} />
-              <div className="flex space-x-2">
+              <div className="flex items-center space-x-2 flex-wrap gap-y-2">
                 <Button 
                   onClick={handleListAllTablesClick} 
                   disabled={isRunning}
@@ -551,21 +575,36 @@ export default function Home() {
                 >
                   List All Tables
                 </Button>
-                <Button 
-                  onClick={() => handleDirectSqlSubmit('@sql:list_all_tables.sql')} 
-                  disabled={isRunning}
-                  variant="outline"
-                  size="sm"
-                >
-                  Run list_all_tables.sql
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Select value={selectedSqlScript} onValueChange={setSelectedSqlScript} disabled={isRunning || sqlScriptFiles.length === 0}>
+                    <SelectTrigger className="w-[200px] h-9 text-sm" disabled={isRunning || sqlScriptFiles.length === 0}>
+                      <SelectValue placeholder="Select script" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sqlScriptFiles.map((file) => (
+                        <SelectItem key={file} value={file}>
+                          {file}
+                        </SelectItem>
+                      ))}
+                      {sqlScriptFiles.length === 0 && <SelectItem value="no-scripts" disabled>No scripts found</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    onClick={handleRunSelectedScript} 
+                    disabled={isRunning || !selectedSqlScript}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Run Selected Script
+                  </Button>
+                </div>
               </div>
             </div>
           </AccordionContent>
         </AccordionItem>
       </Accordion>
 
-       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2"> {/* Adjusted flex-grow */}
+       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2"> 
         <OutputDisplay history={history} className="h-full" />
       </main>
 
@@ -588,4 +627,3 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
-
