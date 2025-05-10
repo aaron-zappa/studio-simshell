@@ -6,6 +6,7 @@ import * as React from 'react';
 import { CommandInput } from '@/components/command-input';
 import { OutputDisplay, type OutputLine } from '@/components/output-display';
 import { SqlInputPanel } from '@/components/sql-input-panel'; // Import the new SQL input panel
+import { Button } from "@/components/ui/button"; // Import Button
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"; // Import Accordion components
@@ -20,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 import { getDbStatusAction } from '@/lib/database';
 import { executeSqlScript } from '@/lib/sql-script-runner'; // Import the SQL script runner
+import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow'; // Import the flow
 
 const SIMULATED_USER_ID = 1; // Assuming admin for now
 
@@ -235,6 +237,32 @@ export default function Home() {
     setIsRunning(false);
   };
 
+  const handleListAllTablesClick = async () => {
+    try {
+        const { sqlQuery } = await listAllTablesQuery();
+        await handleDirectSqlSubmit(sqlQuery); // Submit the query from the flow
+    } catch (error) {
+        console.error("Error executing list all tables flow:", error);
+        const timestamp = new Date().toISOString();
+        const errorMsg = `Failed to list tables: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        toast({
+            title: "List Tables Error",
+            description: errorMsg,
+            variant: "destructive",
+        });
+        const errorOutput: OutputLine = {
+            id: `list-tables-error-${timestamp}`,
+            text: errorMsg,
+            type: 'error',
+            category: 'internal', // Or 'sql' if more appropriate
+            timestamp: timestamp,
+            flag: 0,
+        };
+        setHistory((prev) => [...prev, errorOutput]);
+        setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorMsg }]);
+    }
+  };
+
 
   const handleCommandSubmit = async (originalCommand: string) => {
     const commandTrimmed = originalCommand.trim();
@@ -397,10 +425,10 @@ export default function Home() {
         userId: SIMULATED_USER_ID,
         command: finalCommand, // Use the processed command
         mode: category as CommandMode,
-        addSuggestion, // Problematic in server actions
-        addCustomCommand, // Problematic in server actions
-        getCustomCommandAction, // Problematic in server actions
-        currentLogEntries: logEntries, // Pass current log entries
+        addSuggestion, 
+        addCustomCommand, 
+        getCustomCommandAction, 
+        currentLogEntries: logEntries, 
         initialSuggestions,
         overridePermissionChecks: true, // Pass the override flag
       });
@@ -512,7 +540,27 @@ export default function Home() {
         <AccordionItem value="sql-panel">
           <AccordionTrigger className="text-sm font-medium hover:no-underline">SQL Direct Execution Panel</AccordionTrigger>
           <AccordionContent className="pt-2">
-            <SqlInputPanel onSubmit={handleDirectSqlSubmit} disabled={isRunning} />
+            <div className="flex flex-col space-y-2">
+              <SqlInputPanel onSubmit={handleDirectSqlSubmit} disabled={isRunning} />
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={handleListAllTablesClick} 
+                  disabled={isRunning}
+                  variant="outline"
+                  size="sm"
+                >
+                  List All Tables
+                </Button>
+                <Button 
+                  onClick={() => handleDirectSqlSubmit('@sql:list_all_tables.sql')} 
+                  disabled={isRunning}
+                  variant="outline"
+                  size="sm"
+                >
+                  Run list_all_tables.sql
+                </Button>
+              </div>
+            </div>
           </AccordionContent>
         </AccordionItem>
       </Accordion>
