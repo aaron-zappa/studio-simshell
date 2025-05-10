@@ -2,7 +2,7 @@
 // src/lib/internal-commands/handle-help.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { CommandMode } from '@/types/command-types';
+import type { CommandMode, ALL_COMMAND_MODES } from '@/types/command-types';
 import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 import { getUserPermissions } from '@/lib/permissions'; // To check permissions for showing commands
 
@@ -56,8 +56,10 @@ export const handleHelp = async ({ userId, timestamp, initialSuggestions, curren
         userPermissions = permResult;
     } else if (permResult.code === 'DB_NOT_INITIALIZED') {
          // If DB not initialized, show a minimal help message
-         helpText = `Database not initialized. Please run 'init db' to set up tables and permissions.`;
-         outputLines.push({ id: `help-init-prompt-${timestamp}`, text: helpText, type: 'info', category: 'internal', timestamp });
+         helpText = `Database not initialized. Please run 'init db' to set up tables and permissions.
+Available categories: ${ALL_COMMAND_MODES.join(', ')}.
+Use checkboxes to select active categories. Type 'help' for more info after DB initialization.`;
+         outputLines.push({ id: `help-init-prompt-${timestamp}`, text: helpText, type: 'info', category: 'internal', timestamp, flag: 0 });
          logText = `Displayed minimal help (DB not initialized). (User: ${userId})`;
          logType = 'I';
          logFlag = 0;
@@ -65,8 +67,10 @@ export const handleHelp = async ({ userId, timestamp, initialSuggestions, curren
          return { outputLines, newLogEntries: [...currentLogEntries, logEntry] };
     } else {
          // Handle other permission fetching errors
-         helpText = `Error fetching user permissions: ${permResult.error}. Cannot display full help.`;
-         outputLines.push({ id: `help-perm-error-${timestamp}`, text: helpText, type: 'error', category: 'internal', timestamp });
+         helpText = `Error fetching user permissions: ${permResult.error}. Cannot display full help.
+Available categories: ${ALL_COMMAND_MODES.join(', ')}.
+Use checkboxes to select active categories. Type 'help' for more info.`;
+         outputLines.push({ id: `help-perm-error-${timestamp}`, text: helpText, type: 'error', category: 'internal', timestamp, flag: 0 });
          logText = `Error displaying help due to permission fetch error: ${permResult.error}. (User: ${userId})`;
          logType = 'E';
          logFlag = 0;
@@ -78,13 +82,14 @@ export const handleHelp = async ({ userId, timestamp, initialSuggestions, curren
     helpText = `Command category is automatically detected based on input and active categories.
 @bat:<filename><.bat/.sh/.sim>(experimental).
 
-Available categories: ${Object.keys(initialSuggestions).join(', ')}.
+Available categories: ${ALL_COMMAND_MODES.join(', ')}.
 
 --- Command Suggestions by Category ---`;
 
     // Iterate through categories and their suggestions
-    for (const category in initialSuggestions) {
-        const suggestions = initialSuggestions[category as CommandMode];
+    // Ensure consistent order of categories in help
+    for (const category of ALL_COMMAND_MODES) {
+        const suggestions = initialSuggestions[category];
         if (suggestions && suggestions.length > 0) {
             // Add bold category heading
             helpText += `\n\n**${category.charAt(0).toUpperCase() + category.slice(1)}**`;
@@ -95,7 +100,7 @@ Available categories: ${Object.keys(initialSuggestions).join(', ')}.
                     // Extract the base command name (first word)
                     const baseCommand = suggestion.split(' ')[0].toLowerCase();
                     const requiredPermission = commandPermissions[baseCommand];
-                    if (requiredPermission && !userPermissions.includes(requiredPermission)) {
+                    if (requiredPermission && !userPermissions.includes(requiredPermission) && !userPermissions.includes('override_all_permissions')) {
                         showSuggestion = false;
                     }
                 }

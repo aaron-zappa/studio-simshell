@@ -35,8 +35,11 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
     ],
   unix: ['ls', 'cd', 'pwd', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'grep', 'echo', 'man', 'sudo'],
   windows: ['dir', 'cd', 'cls', 'mkdir', 'rmdir', 'copy', 'move', 'type', 'findstr', 'echo', 'help'],
-  sql: ['SELECT', 'INSERT INTO', 'UPDATE', 'DELETE FROM', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'WHERE', 'FROM', 'JOIN', 'GROUP BY', 'ORDER BY', 'SELECT 1;'], // Added SELECT 1;
+  sql: ['SELECT', 'INSERT INTO', 'UPDATE', 'DELETE FROM', 'CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'WHERE', 'FROM', 'JOIN', 'GROUP BY', 'ORDER BY', 'SELECT 1;', 'SELECT * FROM INFORMATION_SCHEMA.TABLES', 'SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = \'your_table_name\''],
   excel: ['SUM(', 'AVERAGE(', 'COUNT(', 'MAX(', 'MIN(', 'IF(', 'VLOOKUP(', 'HLOOKUP(', 'INDEX(', 'MATCH('],
+  typescript: [
+    'console.log(', 'let x = ', 'const y: string = ', 'type MyType = ', 'interface MyInterface ', 'function add(a: number, b: number): number', 'import { } from ', 'export const '
+  ],
 };
 
 

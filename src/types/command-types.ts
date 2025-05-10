@@ -4,10 +4,10 @@
  * Defines the possible modes/categories for the command shell.
  * This is used both for initial suggestions and for the result of AI classification.
  */
-export type CommandMode = 'internal' | 'python' | 'unix' | 'windows' | 'sql' | 'excel';
+export type CommandMode = 'internal' | 'python' | 'unix' | 'windows' | 'sql' | 'excel' | 'typescript';
 
 // Array containing all possible command modes
-export const ALL_COMMAND_MODES: CommandMode[] = ['internal', 'python', 'unix', 'windows', 'sql', 'excel'];
+export const ALL_COMMAND_MODES: CommandMode[] = ['internal', 'python', 'unix', 'windows', 'sql', 'excel', 'typescript'];
 
 
 // Note: The CommandCategory type from the classification flow also includes 'ambiguous' and 'unknown'.

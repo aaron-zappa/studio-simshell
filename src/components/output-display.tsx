@@ -31,6 +31,7 @@ const getCategoryStyle = (category?: OutputLine['category']): string => {
     case 'windows': return 'text-blue-500'; // Example: Blue for Windows (using Tailwind directly for simplicity)
     case 'sql': return 'text-purple-500'; // Example: Purple for SQL
     case 'excel': return 'text-green-700 dark:text-green-400'; // Example: Dark Green for Excel
+    case 'typescript': return 'text-sky-500'; // Example: Sky Blue for TypeScript
     default: return '';
   }
 };

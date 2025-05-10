@@ -15,7 +15,7 @@ import type { CommandMode } from '@/types/command-types'; // Import CommandMode
 import { ALL_COMMAND_MODES } from '@/types/command-types'; // Import ALL_COMMAND_MODES
 
 // Define the possible categories, including ambiguous and unknown (for output)
-const CommandCategorySchema = z.enum(['internal', 'python', 'unix', 'windows', 'sql', 'excel', 'ambiguous', 'unknown']);
+const CommandCategorySchema = z.enum(['internal', 'python', 'unix', 'windows', 'sql', 'excel', 'typescript', 'ambiguous', 'unknown']);
 export type CommandCategory = z.infer<typeof CommandCategorySchema>;
 
 // Define a schema for the executable modes (for input)
@@ -80,6 +80,7 @@ Analyze the command based on its syntax, keywords, and typical usage patterns ON
 - windows: Common Windows Command Prompt or PowerShell commands (e.g., 'dir C:\\', 'cd %USERPROFILE%', 'echo %VAR%', 'Copy-Item'). Note that 'echo' and 'cd' can also be Unix.
 - sql: SQL queries (e.g., 'SELECT * FROM users WHERE id = 1;', 'INSERT INTO products (...) VALUES (...)', 'CREATE TABLE ...', 'SELECT 1;').
 - excel: Excel-like formulas (e.g., 'SUM(A1:B5)', 'VLOOKUP(...)').
+- typescript: TypeScript code snippets, type definitions, or expressions (e.g., 'console.log("hello")', 'let x: number = 10;', 'type User = { id: number; }', 'interface Product { name: string; }').
 
 **User Command:**
 \`\`\`

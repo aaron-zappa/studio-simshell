@@ -359,6 +359,29 @@ export async function executeCommand ({
          outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: outputType, category: 'excel', timestamp: outputType === 'error' ? timestamp : undefined, flag: logFlag }]; // Add flag
          logEntry = { timestamp, type: excelLogType, flag: logFlag, text: `Excel simulation output: ${excelOutput}` };
       }
+      else if (mode === 'typescript') {
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 300 + 50));
+        let simOutput = `Simulating TypeScript: ${commandTrimmed} (output placeholder)`;
+        let tsLogType: 'I' | 'E' = 'I';
+        let tsOutputType: 'output' | 'error' = 'output';
+        let tsLogFlag: 0 | 1 = 0;
+
+        if (commandLower.startsWith('console.log(')) {
+            const match = commandTrimmed.match(/console\.log\((['"]?)(.*?)\1\)/);
+            simOutput = match ? `Output: ${match[2]}` : 'Syntax Error in console.log';
+            tsOutputType = match ? 'output' : 'error';
+            if (!match) {
+                 tsLogType = 'E';
+                 tsLogFlag = 0;
+            }
+        } else if (commandLower.includes('=')) { // Very basic check for assignment
+            simOutput = `Simulating TypeScript: ${commandTrimmed} (Variable notionally assigned)`;
+        } else if (commandLower.startsWith('type ') || commandLower.startsWith('interface ')) {
+            simOutput = `Simulating TypeScript: ${commandTrimmed} (Type/Interface notionally defined)`;
+        }
+        outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: tsOutputType, category: 'typescript', timestamp: tsOutputType === 'error' ? timestamp : undefined, flag: tsLogFlag }];
+        logEntry = { timestamp, type: tsLogType, flag: tsLogFlag, text: `TypeScript simulation: ${simOutput}` };
+      }
        else {
          const errorMsg = `Error: Command execution logic not implemented for category '${mode}'.`;
          outputLines = [{ id: `err-unknown-mode-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
@@ -380,7 +403,7 @@ export async function executeCommand ({
       finalLogEntries = [...currentLogEntries, logEntry];
   } else if (finalLogEntries && logEntry) {
        // If internal handler already updated logs, we might need to decide whether to add the generic log too.
-        if (logEntry.text.includes('variable') || logEntry.text.startsWith('SQL') || logEntry.text.startsWith('Excel') || logEntry.text.startsWith('Simulating') || logEntry.text.startsWith('Python print')) {
+        if (logEntry.text.includes('variable') || logEntry.text.startsWith('SQL') || logEntry.text.startsWith('Excel') || logEntry.text.startsWith('Simulating') || logEntry.text.startsWith('Python print') || logEntry.text.startsWith('TypeScript simulation')) {
            // If it's a relevant log, add it even if internal handler modified logs.
            // Avoid duplicates if the internal handler already logged this exact message.
             if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
