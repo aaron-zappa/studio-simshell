@@ -141,7 +141,11 @@ export default function Home() {
 
 
     let classificationResult: { category: CommandCategory; reasoning?: string | undefined } | null = null;
-    let executionResult: { outputLines: OutputLine[]; newLogEntries?: LogEntry[] | undefined } | null = null;
+    let executionResult: {
+        outputLines: OutputLine[];
+        newLogEntries?: LogEntry[] | undefined;
+        toastInfo?: { message: string; variant?: 'default' | 'destructive' } | undefined; // Added toastInfo
+    } | null = null;
     let errorOccurred = false;
 
     try {
@@ -286,6 +290,16 @@ export default function Home() {
        if (executionResult.newLogEntries) {
           setLogEntries(executionResult.newLogEntries);
        }
+
+       // Check for toast notification request from AI
+       if (executionResult.toastInfo) {
+            toast({
+                title: "AI Notification",
+                description: executionResult.toastInfo.message,
+                variant: executionResult.toastInfo.variant || 'default',
+            });
+       }
+
 
     } catch (error) {
         errorOccurred = true;

@@ -46,10 +46,11 @@ interface InternalCommandHandlerParams {
     overridePermissionChecks?: boolean; // Optional flag to bypass checks
 }
 
-// Define the structure for the return value, including potential log updates
+// Define the structure for the return value, including potential log updates and toast info
 interface HandlerResult {
     outputLines: OutputLine[];
     newLogEntries?: LogEntry[]; // Optional: Only if logs were modified (uses new LogEntry type)
+    toastInfo?: { message: string; variant?: 'default' | 'destructive' }; // Added for toast notifications
 }
 
 
@@ -67,6 +68,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
             // Include flag=0 for permission denied error log
             newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }],
+            toastInfo: undefined // Ensure toastInfo is undefined for permission denied
         };
     };
 
@@ -76,7 +78,8 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         console.warn("Experimental @bat command received, but execution is not yet implemented.");
         return {
             outputLines: [{ id: `bat-warn-${params.timestamp}`, text: `Experimental command @bat: not yet implemented.`, type: 'warning', category: 'internal', timestamp: params.timestamp, flag: 1 }],
-            newLogEntries: [...params.currentLogEntries, { timestamp: params.timestamp, type: 'W', flag: 1, text: `Experimental @bat command not implemented: ${params.command} (User: ${userId})` }]
+            newLogEntries: [...params.currentLogEntries, { timestamp: params.timestamp, type: 'W', flag: 1, text: `Experimental @bat command not implemented: ${params.command} (User: ${userId})` }],
+            toastInfo: undefined
         };
     }
 
@@ -87,7 +90,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleHelp(params);
         case 'clear':
             // Special case handled entirely client-side in handleCommandSubmit
-            return { outputLines: [] }; // Return empty result
+            return { outputLines: [], toastInfo: undefined }; // Return empty result
         case 'mode':
             return handleMode(params);
         case 'history':
@@ -173,7 +176,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             break; // Fall through if not the exact command
         case 'ai':
             if (!overridePermissionChecks && !userPermissions.includes('use_ai_tools')) return permissionDenied('use_ai_tools');
-            return handleAiCommand(params); // Call the new AI handler
+            return handleAiCommand(params); // Call the new AI handler, this can return toastInfo
     }
 
      // Check again for 'export db' specifically in case it wasn't caught by the switch (e.g., due to casing)
@@ -198,7 +201,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
 
 async function executeScriptFile(): Promise<HandlerResult> {
     return {
-        outputLines: [], newLogEntries: []
+        outputLines: [], newLogEntries: [], toastInfo: undefined
     };
 }
 /**

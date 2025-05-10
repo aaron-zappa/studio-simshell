@@ -3,7 +3,7 @@
 'use server';
 import type { OutputLine } from '@/components/output-display';
 import type { LogEntry } from '@/types/log-types';
-import { generateSimpleText } from '@/ai/flows/simple-text-gen-flow'; // Import the AI flow
+import { generateSimpleText, type SimpleTextGenOutput } from '@/ai/flows/simple-text-gen-flow'; // Import the AI flow and its output type
 import { storeVariableInDb, getVariableFromDb } from '@/lib/variables'; // Import DB functions
 import { getActiveAiToolsMetadata } from '@/lib/ai-tools'; // Import tool metadata fetcher
 
@@ -11,6 +11,7 @@ import { getActiveAiToolsMetadata } from '@/lib/ai-tools'; // Import tool metada
 interface HandlerResult {
     outputLines: OutputLine[];
     newLogEntries?: LogEntry[];
+    toastInfo?: { message: string; variant?: 'default' | 'destructive' }; // Added for toast notifications
 }
 
 interface HandlerParams {
@@ -23,10 +24,11 @@ interface HandlerParams {
 }
 
 /**
- * Handles the 'ai <inputtext>' internal command.
+ * Handles the 'ai &lt;inputtext&gt;' internal command.
  * Substitutes {varname} placeholders with values from the database.
  * Passes the potentially modified input text and user permissions to the simple text generation AI flow.
  * Stores the AI's final response in the 'ai_answer' variable.
+ * Can trigger toast notifications based on AI's output.
  */
 export const handleAiCommand = async ({ userId, userPermissions, args, timestamp, currentLogEntries, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
     let inputText = args.join(' ').trim(); // Combine all arguments into the input text
@@ -37,16 +39,18 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
     let outputLines: OutputLine[] = [];
     let newLogEntries: LogEntry[] = [...currentLogEntries];
     let logFlag: 0 | 1 = 0; // Default flag
+    let toastInfo: HandlerResult['toastInfo'] = undefined;
+
 
     if (!inputText) {
-        outputText = 'Error: No input text provided for the "ai" command. Usage: ai <inputtext>';
+        outputText = 'Error: No input text provided for the "ai" command. Usage: ai &lt;inputtext&gt;';
         outputType = 'error';
         logType = 'E';
         logFlag = 0; // Set flag to 0 for error
         logText = outputText;
         outputLines.push({ id: `ai-err-input-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
         newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
-        return { outputLines, newLogEntries };
+        return { outputLines, newLogEntries, toastInfo };
     }
 
     // --- Variable Substitution ---
@@ -108,27 +112,21 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         logText = `AI command processing input: "${processedInputText}" (Original: "${inputText}") for user ${userId}.`;
         newLogEntries.push({ timestamp, type: 'I', flag: 0, text: logText });
 
-        // Fetch active tool metadata to pass as context
-        let toolContextString: string | undefined = undefined;
-        try {
-             const activeTools = await getActiveAiToolsMetadata();
-             if (activeTools.length > 0) {
-                 toolContextString = activeTools.map(tool =>
-                     `[Tool: @${tool.name}, Args: ${tool.args_description}, Does: ${tool.description}]`
-                 ).join('\n');
-             }
-        } catch (toolError) {
-             console.error("Failed to fetch AI tools for context:", toolError);
-             newLogEntries.push({ timestamp, type: 'W', flag: 1, text: `Failed to fetch AI tools context for AI command: ${toolError instanceof Error ? toolError.message : 'Unknown error'}. (User: ${userId})` });
-        }
-
-        // Call the AI flow with the processed input text, tool context, and permissions
-        const aiResult = await generateSimpleText({
+        // Call the AI flow with the processed input text and user permissions
+        const aiResult: SimpleTextGenOutput = await generateSimpleText({ // Ensure aiResult is typed
             inputText: processedInputText,
-            // toolContext: toolContextString, // Tool context removed for now as per user request
-            userPermissions: userPermissions // Pass permissions
+            userPermissions: userPermissions
         });
         const aiAnswer = aiResult.answer;
+
+        // Check if AI requested a toast
+        if (aiResult.toastMessage) {
+            toastInfo = {
+                message: aiResult.toastMessage,
+                variant: aiResult.toastVariant || 'default'
+            };
+        }
+
 
         // Store the AI answer in the database variable 'ai_answer'
         // Check permission before storing
@@ -200,7 +198,8 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
 
     return {
         outputLines,
-        newLogEntries
+        newLogEntries,
+        toastInfo // Include toastInfo in the return
     };
 };
 

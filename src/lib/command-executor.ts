@@ -23,10 +23,11 @@ interface ExecuteCommandParams {
   initialSuggestions: Record<string, string[]>;
 }
 
-// Define the return type to include potentially updated log entries
+// Define the return type to include potentially updated log entries and toast info
 interface ExecuteCommandResult {
   outputLines: OutputLine[];
   newLogEntries?: LogEntry[]; // Include new log entries if they were modified (uses new LogEntry type)
+  toastInfo?: { message: string; variant?: 'default' | 'destructive' }; // Added for toast notifications
 }
 
 /**
@@ -64,6 +65,8 @@ export async function executeCommand ({
   let outputLines: OutputLine[] = [];
   let potentiallyUpdatedLogs: LogEntry[] | undefined = undefined; // Track log changes
   let logEntry: LogEntry | null = null; // Variable to hold a potential new log entry
+  let toastInfoFromResult: ExecuteCommandResult['toastInfo'] = undefined;
+
 
   // --- Fetch User Permissions ---
   let userPermissions: string[] = [];
@@ -91,7 +94,7 @@ export async function executeCommand ({
                logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
                potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
                // Return early if permissions couldn't be fetched, as they might be critical
-               return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
+               return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs, toastInfo: toastInfoFromResult };
           }
       } else {
           // If it's 'help' or 'init db', skip strict permission fetching for now
@@ -112,7 +115,7 @@ export async function executeCommand ({
             outputLines = [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
             logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
             potentiallyUpdatedLogs = potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, logEntry] : [...currentLogEntries, logEntry];
-            return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
+            return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs, toastInfo: toastInfoFromResult };
           }
       }
       // Add more permission checks for other modes/actions as needed
@@ -185,6 +188,7 @@ export async function executeCommand ({
         });
          outputLines = internalResult.outputLines;
          potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
+         toastInfoFromResult = internalResult.toastInfo; // Capture toast info
       }
       // --- Other Category Handlers ---
       else if (mode === 'python') {
@@ -241,11 +245,11 @@ export async function executeCommand ({
          }
          // --- Other Python Commands (Simulation) ---
          else if (commandLower.startsWith('print(')) {
-            const match = commandTrimmed.match(/print\((['"]?)(.*?)\1\)/);
-            const printOutput = match ? match[2] : 'Syntax Error in print';
-            const type: OutputLine['type'] = match ? 'output' : 'error';
-            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: type === 'error' ? 0 : 0 }]; // Set flag to 0 for error
-            logEntry = { timestamp, type: match ? 'I' : 'E', flag: match ? 0 : 0, text: `Python print: ${printOutput}` }; // Set flag to 0 for error
+            const matchPrint = commandTrimmed.match(/print\((['"]?)(.*?)\1\)/);
+            const printOutput = matchPrint ? matchPrint[2] : 'Syntax Error in print';
+            const type: OutputLine['type'] = matchPrint ? 'output' : 'error';
+            outputLines = [{ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: 0 }]; // Set flag to 0 for error
+            logEntry = { timestamp, type: matchPrint ? 'I' : 'E', flag: matchPrint ? 0 : 0, text: `Python print: ${printOutput}` }; // Set flag to 0 for error
          } else {
             await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100)); // Simulate delay
             const simOutput = `Simulating Python: ${commandTrimmed} (output placeholder)`;
@@ -274,7 +278,7 @@ export async function executeCommand ({
          await new Promise(resolve => setTimeout(resolve, Math.random() * 900 + 150));
          let simOutput = `Simulating Windows: ${commandTrimmed} (output placeholder)`;
          if (commandLower === 'dir') {
-             simOutput = ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n<DIR>          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free';
+             simOutput = ' Volume in drive C has no label.\n Volume Serial Number is XXXX-YYYY\n\n Directory of C:\\Users\\User\n\nfile1.txt\n&lt;DIR&gt;          directoryA\nscript.bat\n               3 File(s) ... bytes\n               1 Dir(s)  ... bytes free';
              outputLines = [{ id: `out-${timestamp}`, text: simOutput, type: 'output', category: 'windows', timestamp: undefined, flag: 0 }]; // Add flag=0
          } else if (commandLower.startsWith('echo ')) {
              simOutput = commandTrimmed.substring(5);
@@ -333,7 +337,7 @@ export async function executeCommand ({
          await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100));
          let excelOutput = `Simulating Excel: ${commandTrimmed} (output placeholder)`;
          let excelLogType: 'I' | 'E' = 'I';
-         let outputType: 'output' | 'error' = 'output';
+         let outputTypeExcel: OutputLine['type'] = 'output';
          let logFlag: 0 | 1 = 0; // Add flag
          if (commandLower.startsWith('sum(')) {
              const numbersMatch = commandTrimmed.match(/sum\(([\d\s,.]+)\)/i);
@@ -342,21 +346,21 @@ export async function executeCommand ({
                      const numbers = numbersMatch[1].split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
                      const sum = numbers.reduce((acc, val) => acc + val, 0);
                      excelOutput = `${sum}`;
-                     outputType = 'output';
+                     outputTypeExcel = 'output';
                  } catch (e) {
                      excelOutput = '#VALUE!';
                      excelLogType = 'E';
-                     outputType = 'error';
+                     outputTypeExcel = 'error';
                      logFlag = 0; // Set flag to 0 for error
                  }
              } else {
                   excelOutput = '#NAME?';
                   excelLogType = 'E';
-                  outputType = 'error';
+                  outputTypeExcel = 'error';
                   logFlag = 0; // Set flag to 0 for error
              }
          }
-         outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: outputType, category: 'excel', timestamp: outputType === 'error' ? timestamp : undefined, flag: logFlag }]; // Add flag
+         outputLines = [{ id: `out-${timestamp}`, text: excelOutput, type: outputTypeExcel, category: 'excel', timestamp: outputTypeExcel === 'error' ? timestamp : undefined, flag: logFlag }]; // Add flag
          logEntry = { timestamp, type: excelLogType, flag: logFlag, text: `Excel simulation output: ${excelOutput}` };
       }
       else if (mode === 'typescript') {
@@ -367,10 +371,10 @@ export async function executeCommand ({
         let tsLogFlag: 0 | 1 = 0;
 
         if (commandLower.startsWith('console.log(')) {
-            const match = commandTrimmed.match(/console\.log\((['"]?)(.*?)\1\)/);
-            simOutput = match ? `Output: ${match[2]}` : 'Syntax Error in console.log';
-            tsOutputType = match ? 'output' : 'error';
-            if (!match) {
+            const matchConsoleLog = commandTrimmed.match(/console\.log\((['"]?)(.*?)\1\)/);
+            simOutput = matchConsoleLog ? `Output: ${matchConsoleLog[2]}` : 'Syntax Error in console.log';
+            tsOutputType = matchConsoleLog ? 'output' : 'error';
+            if (!matchConsoleLog) {
                  tsLogType = 'E';
                  tsLogFlag = 0;
             }
@@ -430,6 +434,7 @@ export async function executeCommand ({
   return {
     outputLines: [commandOutput, ...outputLines],
     newLogEntries: finalLogEntries, // Return updated logs if they changed
+    toastInfo: toastInfoFromResult, // Propagate toast info
   };
 }
 
