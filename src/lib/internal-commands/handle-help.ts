@@ -2,7 +2,7 @@
 // src/lib/internal-commands/handle-help.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { CommandMode, ALL_COMMAND_MODES } from '@/types/command-types';
+import { type CommandMode, ALL_COMMAND_MODES } from '@/types/command-types'; // Corrected import
 import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
 import { getUserPermissions } from '@/lib/permissions'; // To check permissions for showing commands
 
@@ -79,7 +79,7 @@ Use checkboxes to select active categories. Type 'help' for more info.`;
     }
 
 
-    helpText = `Command category is automatically detected based on input and active categories.
+    helpText = `Command category is automatically detected.
 @bat:<filename><.bat/.sh/.sim>(experimental).
 
 Available categories: ${ALL_COMMAND_MODES.join(', ')}.
