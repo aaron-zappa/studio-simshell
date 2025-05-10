@@ -16,6 +16,7 @@ interface HandlerParams {
     userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
+    overridePermissionChecks?: boolean;
 }
 
 /**
@@ -23,8 +24,16 @@ interface HandlerParams {
  * Creates essential tables and adds sample RBAC data.
  * Requires admin-level permission (e.g., 'manage_roles_permissions').
  */
-export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
-    // Permission check moved to central handler
+export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check bypassed if overridePermissionChecks is true
+    // if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) {
+    //     const errorMsg = "Permission denied: Cannot initialize database (admin operation).";
+    //     return {
+    //         outputLines: [{ id: `init-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //     };
+    // }
+
     const createStatements = [
         // Table Creation (Ensure order respects foreign keys if PRAGMA foreign_keys=ON is used)
         `CREATE TABLE IF NOT EXISTS variables (
@@ -129,7 +138,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
                 await runSql(sql);
                 successfulStatements++;
                 // Optionally add detailed success output, but keep it concise for init
-                // outputLines.push({ id: `init-ok-${statementType}-${successfulStatements}-${timestamp}`, text: `OK: ${statementType} - ${sql.substring(0, 40)}...`, type: 'info', category: 'internal', timestamp });
+                // outputLines.push({ id: `init-ok-${statementType}-${successfulStatements}-${timestamp}`, text: `OK: ${statementType} - ${sql.substring(0, 40)}...`, type: 'info', category: 'internal', timestamp, flag: 0 });
             } catch (error) {
                 const errorMsg = `Error during DB init (${statementType}): ${error instanceof Error ? error.message : 'Unknown error'} (SQL: ${sql.substring(0, 60)}...)`;
                  console.error(errorMsg);
@@ -138,7 +147,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
                  outputType = 'error';
                  logFlag = 0; // Set flag to 0 for error
                  // Add specific error line to output
-                 outputLines.push({ id: `init-err-${statementType}-${errors.length}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
+                 outputLines.push({ id: `init-err-${statementType}-${errors.length}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
             }
         }
 
@@ -147,7 +156,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         // Add a final summary line to the output
         // Determine final output type based on errors
         outputType = errors.length > 0 ? 'error' : 'info';
-        outputLines.push({ id: `init-summary-${timestamp}`, text: finalSummaryText, type: outputType, category: 'internal', timestamp });
+        outputLines.push({ id: `init-summary-${timestamp}`, text: finalSummaryText, type: outputType, category: 'internal', timestamp, flag: outputType === 'error' ? 0 : 0 });
 
 
     } catch (error) // Catch errors from getDb() itself
@@ -158,7 +167,7 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         outputType = 'error';
         logFlag = 0; // Set flag to 0 for error
         // Ensure outputLines has the critical error message
-        outputLines = [{ id: `init-db-crit-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
+        outputLines = [{ id: `init-db-crit-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp, flag: 0 }];
     }
 
     // Add user ID and flag to the main log entry

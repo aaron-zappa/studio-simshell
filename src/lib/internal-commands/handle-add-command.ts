@@ -22,15 +22,23 @@ interface HandlerParams {
     addCustomCommand: (name: string, action: CustomCommandAction) => void; // Client-side function, problematic
     currentLogEntries: LogEntry[]; // Pass current logs (uses new LogEntry type)
     initialSuggestions: Record<string, string[]>;
+    overridePermissionChecks?: boolean;
 }
 
 // Make the function async
 export const handleAddCommand = async (params: HandlerParams): Promise<HandlerResult> => {
-    const { command, timestamp, addSuggestion, addCustomCommand, currentLogEntries, initialSuggestions, userPermissions, userId } = params;
+    const { command, timestamp, addSuggestion, addCustomCommand, currentLogEntries, initialSuggestions, userPermissions, userId, overridePermissionChecks } = params;
     let outputLines: OutputLine[] = [];
     let updatedLogEntries = [...currentLogEntries]; // Start with a copy of current logs
 
-    // Permission check moved to central handler
+    // Permission check bypassed if overridePermissionChecks is true
+    // if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) { // Assuming same permission for simplicity
+    //     const errorMsg = "Permission denied: Cannot add internal commands.";
+    //     return {
+    //         outputLines: [{ id: `add-cmd-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //     };
+    // }
 
     // Updated Regex for: add_int_cmd <short> <name> "<description>" <whatToDo>
     const addCmdRegex = /^add_int_cmd\s+(\S+)\s+(\S+)\s+"([^"]+)"\s+(.+)$/i;
@@ -54,7 +62,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
             logType = 'E';
             logFlag = 0; // Set flag to 0 for error
             logText = outputText;
-            outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
+            outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 }];
         } else {
             // Note: Calling these client-side functions from a server action is problematic.
             try {
@@ -70,7 +78,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
             outputType = 'info';
             logType = 'I';
 
-            outputLines.push({ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+            outputLines.push({ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
         }
     } else {
         outputText = `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`;
@@ -78,7 +86,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
         logType = 'E';
         logFlag = 0; // Set flag to 0 for error
         logText = outputText + ` (User: ${userId}, Command: ${command})`;
-        outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
+        outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 }];
     }
 
      // Add the log entry

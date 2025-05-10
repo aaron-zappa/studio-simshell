@@ -67,31 +67,37 @@ export async function executeCommand ({
 
   // --- Fetch User Permissions ---
   let userPermissions: string[] = [];
-  // Special case: Allow 'help' and 'init db' even if permissions can't be fetched (e.g., DB not ready)
-  if (commandLower !== 'help' && commandLower !== 'init db') {
-      const permResult = await getUserPermissions(userId);
+  // Bypass permission fetching for now if we are overriding checks
+  const OVERRIDE_PERMISSION_CHECKS = true; // Set to true to bypass checks
 
-      if (Array.isArray(permResult)) {
-          userPermissions = permResult;
-          // Optional: Log fetched permissions for debugging
-          // logEntry = { timestamp, type: 'I', flag: 0, text: `User ${userId} Permissions: ${userPermissions.join(', ')}` };
-          // potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
-      } else {
-          // Handle error fetching permissions
-           console.error("Error fetching user permissions:", permResult.error);
-           const errorMsg = permResult.code === 'DB_NOT_INITIALIZED'
-                ? "Permission check skipped: Database RBAC tables not initialized. Please run 'init db'."
-                : `Error fetching user permissions: ${permResult.error}`;
-           outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }); // Set flag to 0 for error
-           logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
-           potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
-           // Return early if permissions couldn't be fetched, as they might be critical
-           return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
-      }
+  if (OVERRIDE_PERMISSION_CHECKS) {
+    userPermissions = ['override_all_permissions']; // Give a dummy permission
+    logEntry = { timestamp, type: 'W', flag: 1, text: `WARNING: All permission checks are currently bypassed for user ${userId}.` };
+    potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
   } else {
-      // If it's 'help' or 'init db', skip strict permission fetching for now
-       logEntry = { timestamp, type: 'I', flag: 0, text: `Permission check skipped for '${commandLower}'.` };
-       potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
+      // Special case: Allow 'help' and 'init db' even if permissions can't be fetched (e.g., DB not ready)
+      if (commandLower !== 'help' && commandLower !== 'init db') {
+          const permResult = await getUserPermissions(userId);
+
+          if (Array.isArray(permResult)) {
+              userPermissions = permResult;
+          } else {
+              // Handle error fetching permissions
+               console.error("Error fetching user permissions:", permResult.error);
+               const errorMsg = permResult.code === 'DB_NOT_INITIALIZED'
+                    ? "Permission check skipped: Database RBAC tables not initialized. Please run 'init db'."
+                    : `Error fetching user permissions: ${permResult.error}`;
+               outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }); // Set flag to 0 for error
+               logEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag to 0 for error
+               potentiallyUpdatedLogs = [...currentLogEntries, logEntry];
+               // Return early if permissions couldn't be fetched, as they might be critical
+               return { outputLines: [commandOutput, ...outputLines], newLogEntries: potentiallyUpdatedLogs };
+          }
+      } else {
+          // If it's 'help' or 'init db', skip strict permission fetching for now
+           logEntry = { timestamp, type: 'I', flag: 0, text: `Permission check skipped for '${commandLower}'.` };
+           potentiallyUpdatedLogs = potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, logEntry] : [...currentLogEntries, logEntry];
+      }
   }
 
 
@@ -99,7 +105,7 @@ export async function executeCommand ({
   try {
       // --- Permission Check Example (Apply where needed) ---
       // Example: Check if user can execute SQL modify commands
-      if (mode === 'sql' && !userPermissions.includes('execute_sql_select') && !userPermissions.includes('execute_sql_modify')) {
+      if (!OVERRIDE_PERMISSION_CHECKS && mode === 'sql' && !userPermissions.includes('execute_sql_select') && !userPermissions.includes('execute_sql_modify')) {
           // Allow 'help'/'init db' check again, though it should be caught by the initial skip
           if (commandLower !== 'help' && commandLower !== 'init db') {
             const errorMsg = "Permission denied: You do not have permission to execute SQL queries.";
@@ -117,7 +123,7 @@ export async function executeCommand ({
 
       if (mode === 'internal' && assignmentMatch) {
          // Permission check for managing variables
-         if (!userPermissions.includes('manage_variables')) {
+         if (!OVERRIDE_PERMISSION_CHECKS && !userPermissions.includes('manage_variables')) {
              const errorMsg = "Permission denied: Cannot manage internal variables.";
              throw new Error(errorMsg); // Throw to be caught by the main catch block
          }
@@ -173,8 +179,9 @@ export async function executeCommand ({
             addSuggestion: addSuggestion,
             addCustomCommand: addCustomCommand,
             getCustomCommandAction: getCustomCommandAction,
-            currentLogEntries: currentLogEntries,
-            initialSuggestions: initialSuggestions
+            currentLogEntries: potentiallyUpdatedLogs || currentLogEntries, // Pass logs that might include the override warning
+            initialSuggestions: initialSuggestions,
+            overridePermissionChecks: OVERRIDE_PERMISSION_CHECKS // Pass the override flag
         });
          outputLines = internalResult.outputLines;
          potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
@@ -184,7 +191,7 @@ export async function executeCommand ({
          // Handle Python variable assignment (different from internal)
          // Permission check for managing python variables (assuming same perm as internal for now)
           if (assignmentMatch) {
-              if (!userPermissions.includes('manage_variables')) {
+              if (!OVERRIDE_PERMISSION_CHECKS && !userPermissions.includes('manage_variables')) {
                   const errorMsg = "Permission denied: Cannot manage Python variables.";
                   throw new Error(errorMsg);
               }
@@ -282,10 +289,10 @@ export async function executeCommand ({
          try {
            // Check permissions based on query type (basic example)
            const isSelectQuery = commandTrimmed.trim().toUpperCase().startsWith('SELECT');
-           if (isSelectQuery && !userPermissions.includes('execute_sql_select')) {
+           if (!OVERRIDE_PERMISSION_CHECKS && isSelectQuery && !userPermissions.includes('execute_sql_select')) {
                throw new Error("Permission denied: Cannot execute SELECT queries.");
            }
-           if (!isSelectQuery && !userPermissions.includes('execute_sql_modify')) {
+           if (!OVERRIDE_PERMISSION_CHECKS && !isSelectQuery && !userPermissions.includes('execute_sql_modify')) {
                 throw new Error("Permission denied: Cannot execute modifying SQL queries (INSERT, UPDATE, DELETE, etc.).");
            }
 
@@ -383,8 +390,14 @@ export async function executeCommand ({
              if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
                  finalLogEntries = [...finalLogEntries, logEntry];
             }
-        } else {
-            console.warn("Log entry generated but internal handler also modified logs. Generic log ignored: ", logEntry.text);
+        } else if (logEntry.type === 'W' && logEntry.text.includes('WARNING: All permission checks are currently bypassed')) {
+            // Ensure the bypass warning is logged
+             if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
+                 finalLogEntries = [...finalLogEntries, logEntry];
+            }
+        }
+        else {
+            // console.warn("Log entry generated but internal handler also modified logs. Generic log ignored: ", logEntry.text);
         }
   }
 

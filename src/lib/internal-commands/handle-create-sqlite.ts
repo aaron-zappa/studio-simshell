@@ -17,10 +17,19 @@ interface HandlerParams {
     args: string[];
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
+    overridePermissionChecks?: boolean;
 }
 
-export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
-    // Permission check moved to central handler
+export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check bypassed if overridePermissionChecks is true
+    // if (!overridePermissionChecks && !userPermissions.includes('manage_users')) {
+    //     const errorMsg = "Permission denied: Cannot create SQLite database (admin operation).";
+    //     return {
+    //         outputLines: [{ id: `create-sqlite-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //     };
+    // }
+
     let logText = '';
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
@@ -45,7 +54,7 @@ export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, u
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {
-         outputLines: [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }],
+         outputLines: [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag }],
          newLogEntries: newLogEntries
     };
 };

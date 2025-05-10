@@ -19,6 +19,7 @@ interface HandlerParams {
     args: string[]; // ['<inputtext', 'with', '{varname}>', ...]
     timestamp: string;
     currentLogEntries: LogEntry[];
+    overridePermissionChecks?: boolean;
 }
 
 /**
@@ -27,7 +28,7 @@ interface HandlerParams {
  * Passes the potentially modified input text and user permissions to the simple text generation AI flow.
  * Stores the AI's final response in the 'ai_answer' variable.
  */
-export const handleAiCommand = async ({ userId, userPermissions, args, timestamp, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleAiCommand = async ({ userId, userPermissions, args, timestamp, currentLogEntries, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
     let inputText = args.join(' ').trim(); // Combine all arguments into the input text
     let logText: string;
     let logType: 'I' | 'W' | 'E' = 'I';
@@ -43,7 +44,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         logType = 'E';
         logFlag = 0; // Set flag to 0 for error
         logText = outputText;
-        outputLines.push({ id: `ai-err-input-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+        outputLines.push({ id: `ai-err-input-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
         newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
         return { outputLines, newLogEntries };
     }
@@ -59,7 +60,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         const variableName = match[1];
         try {
              // Check read permission before attempting to fetch
-             if (!userPermissions.includes('read_variables')) {
+             if (!overridePermissionChecks && !userPermissions.includes('read_variables')) {
                  processedInputText = processedInputText.replace(match[0], `<variable '${variableName}' permission denied>`);
                  const permDeniedMsg = `Permission denied to read variable '${variableName}' for AI command.`;
                  if (!substitutionError) { // Log permission denial only once per command run if multiple vars lack perm
@@ -96,7 +97,8 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
             text: "Warning: Some variables could not be substituted. See log for details.",
             type: 'warning',
             category: 'internal',
-            timestamp
+            timestamp,
+            flag: 1
         });
      }
 
@@ -123,14 +125,14 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         // Call the AI flow with the processed input text, tool context, and permissions
         const aiResult = await generateSimpleText({
             inputText: processedInputText,
-            toolContext: toolContextString, // Pass tool context
+            // toolContext: toolContextString, // Tool context removed for now as per user request
             userPermissions: userPermissions // Pass permissions
         });
         const aiAnswer = aiResult.answer;
 
         // Store the AI answer in the database variable 'ai_answer'
         // Check permission before storing
-        if (userPermissions.includes('manage_variables')) {
+        if (overridePermissionChecks || userPermissions.includes('manage_variables')) {
             try {
                 await storeVariableInDb('ai_answer', aiAnswer, 'string');
                 outputText = `AI response stored successfully in variable 'ai_answer'.`;
@@ -138,7 +140,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
                 logType = 'I';
                 const finalLogText = `AI command executed successfully for user ${userId}. Response stored in 'ai_answer'. Processed input: "${processedInputText}"`;
                 newLogEntries.push({ timestamp, type: logType, flag: 0, text: finalLogText });
-                outputLines.push({ id: `ai-success-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+                outputLines.push({ id: `ai-success-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
 
                  // Display the AI answer directly as well
                  outputLines.push({
@@ -156,7 +158,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
                 logType = 'E';
                 logFlag = 0; // Set flag to 0 for error
                 logText = outputText;
-                outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+                outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
                 newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
                 outputLines.push({
                     id: `ai-answer-fail-${timestamp}`,
@@ -173,7 +175,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
              logType = 'W';
              logFlag = 1;
              logText = outputText + ` (User ID: ${userId})`;
-             outputLines.push({ id: `ai-store-perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+             outputLines.push({ id: `ai-store-perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 1 });
              newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
              // Still display the answer
               outputLines.push({
@@ -192,7 +194,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         logType = 'E';
         logFlag = 0; // Set flag to 0 for error
         logText = outputText;
-        outputLines.push({ id: `ai-err-gen-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+        outputLines.push({ id: `ai-err-gen-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
         newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
     }
 

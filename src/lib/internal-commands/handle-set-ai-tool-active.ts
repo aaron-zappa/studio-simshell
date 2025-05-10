@@ -17,6 +17,7 @@ interface HandlerParams {
     args: string[]; // Expected: ['<name>', 'active', <0|1>] - index.ts passes args starting *after* 'set ai_tool'
     timestamp: string;
     currentLogEntries: LogEntry[];
+    overridePermissionChecks?: boolean;
 }
 
 /**
@@ -25,7 +26,7 @@ interface HandlerParams {
  * Requires 'manage_ai_tools' permission.
  */
 export const handleSetAiToolActive = async (params: HandlerParams): Promise<HandlerResult> => {
-    const { args, timestamp, currentLogEntries, userId, userPermissions } = params;
+    const { args, timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks } = params;
     let outputLines: OutputLine[] = [];
     let updatedLogEntries = [...currentLogEntries];
     let logText = '';
@@ -34,7 +35,15 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
     let outputText = '';
     let logFlag: 0 | 1 = 0; // Default flag
 
-    // Permission check moved to central handler
+    // Permission check bypassed if overridePermissionChecks is true
+    // if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) {
+    //     const errorMsg = "Permission denied: Cannot manage AI tools.";
+    //     return {
+    //         outputLines: [{ id: `set-tool-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //     };
+    // }
+
 
     // Validate arguments: <name> active <0|1> (args array starts after 'set ai_tool')
     if (args.length !== 3 || args[1] !== 'active' || (args[2] !== '0' && args[2] !== '1')) {
@@ -44,7 +53,7 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
         logType = 'E';
         logFlag = 0; // Set flag to 0 for error
         logText = outputText + ` (User: ${userId}, Command: set ai_tool ${args.join(' ')})`;
-        outputLines = [{ id: `set-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }];
+        outputLines = [{ id: `set-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 }];
     } else {
         const toolName = args[0]; // Tool name is the first arg after 'set ai_tool'
         const isActiveValue = parseInt(args[2], 10); // 0 or 1 is the third arg
@@ -60,14 +69,15 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
                 outputType = 'info';
                 logText = outputText + ` (User: ${userId})`;
                 logType = 'I';
-                outputLines.push({ id: `set-tool-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+                logFlag = 0;
+                outputLines.push({ id: `set-tool-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
             } else {
                 outputText = `Error: AI tool '${toolName}' not found.`;
                 outputType = 'error'; // Changed to error as it's a failed operation
                 logType = 'W'; // Warning because the command was valid but target not found
                 logFlag = 1; // Set flag for warning (target not found is a recoverable issue)
                 logText = outputText + ` (User: ${userId})`;
-                outputLines.push({ id: `set-tool-notfound-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+                outputLines.push({ id: `set-tool-notfound-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 1 });
             }
         } catch (error) {
             console.error(`Error updating AI tool status for '${toolName}':`, error);
@@ -76,7 +86,7 @@ export const handleSetAiToolActive = async (params: HandlerParams): Promise<Hand
             logText = outputText + ` (User: ${userId})`;
             logType = 'E';
             logFlag = 0; // Set flag to 0 for error
-            outputLines.push({ id: `set-tool-db-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp });
+            outputLines.push({ id: `set-tool-db-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
         }
     }
 

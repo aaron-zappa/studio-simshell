@@ -18,6 +18,7 @@ interface HandlerParams {
     userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[];
+    overridePermissionChecks?: boolean;
 }
 
 /**
@@ -25,8 +26,16 @@ interface HandlerParams {
  * Retrieves and displays all variables stored in the database.
  * Requires 'read_variables' permission.
  */
-export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
-    // Permission check moved to central handler
+export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check bypassed if overridePermissionChecks is true
+    // if (!overridePermissionChecks && !userPermissions.includes('read_variables')) {
+    //     const errorMsg = "Permission denied: Cannot read variables.";
+    //     return {
+    //         outputLines: [{ id: `list-vars-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //     };
+    // }
+
     const sql = 'SELECT name, datatype, value FROM variables ORDER BY name';
     let logText: string;
     let logType: 'I' | 'E' = 'I';
@@ -69,7 +78,8 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
             type: outputType,
             category: 'internal',
             // Add timestamp only for errors or info messages that should look like logs
-            timestamp: (outputType === 'error' || outputType === 'info') ? timestamp : undefined
+            timestamp: (outputType === 'error' || outputType === 'info') ? timestamp : undefined,
+            flag: logFlag // Pass the determined flag
         }],
         newLogEntries
     };

@@ -42,6 +42,7 @@ interface InternalCommandHandlerParams {
     getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Potentially problematic in Server Action
     currentLogEntries: LogEntry[]; // Pass current logs (uses new LogEntry type)
     initialSuggestions: Record<string, string[]>;
+    overridePermissionChecks?: boolean; // Optional flag to bypass checks
 }
 
 // Define the structure for the return value, including potential log updates
@@ -54,15 +55,15 @@ interface HandlerResult {
 /**
  * Central dispatcher for handling internal commands.
  * Now returns a HandlerResult object.
- * Includes permission checks for relevant commands.
+ * Includes permission checks for relevant commands, can be overridden.
  */
 export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<HandlerResult> => {
-    const { commandName, commandLower, args, getCustomCommandAction, userPermissions, timestamp, userId } = params; // Destructure args
+    const { commandName, commandLower, args, getCustomCommandAction, userPermissions, timestamp, userId, overridePermissionChecks } = params; // Destructure args
 
     const permissionDenied = (requiredPermission: string): HandlerResult => {
         const errorMsg = `Permission denied: Requires '${requiredPermission}' permission.`;
         return {
-            outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp }],
+            outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
             // Include flag=0 for permission denied error log
             newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }],
         };
@@ -73,7 +74,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         // TODO: Implement actual script execution logic here (with strict permission checks)
         console.warn("Experimental @bat command received, but execution is not yet implemented.");
         return {
-            outputLines: [{ id: `bat-warn-${params.timestamp}`, text: `Experimental command @bat: not yet implemented.`, type: 'warning', category: 'internal', timestamp: params.timestamp }],
+            outputLines: [{ id: `bat-warn-${params.timestamp}`, text: `Experimental command @bat: not yet implemented.`, type: 'warning', category: 'internal', timestamp: params.timestamp, flag: 1 }],
             newLogEntries: [...params.currentLogEntries, { timestamp: params.timestamp, type: 'W', flag: 1, text: `Experimental @bat command not implemented: ${params.command} (User: ${userId})` }]
         };
     }
@@ -99,19 +100,19 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleRefine(params);
         case 'add_int_cmd': // Changed from 'add'
              if (commandLower.startsWith('add_int_cmd ')) {
-                 if (!userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools'); // Assuming same permission for simplicity
+                 if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools'); // Assuming same permission for simplicity
                  return handleAddCommand(params); // Handles regular internal commands
              }
              break;
         case 'add_ai_tool': // Changed from 'add'
              if (commandLower.startsWith('add_ai_tool ')) {
-                 if (!userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
+                 if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
                  return handleAddAiTool(params); // Handles defining AI tools
              }
              break;
         case 'set': // Check for 'set ai_tool active'
              if (commandLower.startsWith('set ai_tool ')) { // Check if args[1] exists before accessing
-                 if (!userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
+                 if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
                  // Pass args starting *after* 'set ai_tool' to the handler
                  return handleSetAiToolActive({ ...params, args: args.slice(2) });
              }
@@ -121,7 +122,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  // Export log is client-side, server handler is informational (no specific perm needed here)
                 return handleExportLog(params);
              } else if (commandLower === 'export db') {
-                 if (!userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify'); // Exporting DB might be sensitive
+                 if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify'); // Exporting DB might be sensitive
                 // Export db triggers persistence with a default name
                 return handleExportDb(params);
              }
@@ -132,7 +133,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         case 'create': // Check if it's 'create sqlite'
             if (commandLower.startsWith('create sqlite')) {
                  // Creating might be admin-level
-                 if (!userPermissions.includes('manage_users')) return permissionDenied('manage_users'); // Example: Restrict to admin
+                 if (!overridePermissionChecks && !userPermissions.includes('manage_users')) return permissionDenied('manage_users'); // Example: Restrict to admin
                  return handleCreateSqlite(params); // Returns HandlerResult
             }
             break; // Fall through if not 'create sqlite'
@@ -144,35 +145,35 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             break; // Fall through if not 'show requirements'
         case 'persist': // Check if it's 'persist memory db to'
             if (commandLower.startsWith('persist memory db to ')) {
-                 if (!userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify'); // Persisting DB might be sensitive
+                 if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify'); // Persisting DB might be sensitive
                  return handlePersistDb(params); // Call the new handler
             }
             break; // Fall through if not the exact command
         case 'init': // Check if it's 'init' or 'init db'
             if (commandLower === 'init db') {
                  // DB Init is likely an admin task
-                 if (!userPermissions.includes('manage_roles_permissions')) return permissionDenied('manage_roles_permissions');
+                 if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) return permissionDenied('manage_roles_permissions');
                  return handleInitDb(params); // Call the specific handler
             } else if (commandLower === 'init' && args.length === 0) { // Check for 'init' without args
                  // General Init might also be admin
-                 if (!userPermissions.includes('manage_roles_permissions')) return permissionDenied('manage_roles_permissions');
+                 if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) return permissionDenied('manage_roles_permissions');
                  return handleInit(params); // Call the new general init handler
             }
             break; // Fall through if not 'init' or 'init db'
         case 'list': // Check if it's 'list py vars'
             if (commandLower === 'list py vars') {
-                if (!userPermissions.includes('read_variables')) return permissionDenied('read_variables');
+                if (!overridePermissionChecks && !userPermissions.includes('read_variables')) return permissionDenied('read_variables');
                 return handleListPyVars(params); // Call the new list vars handler
             }
             break; // Fall through if not the exact command
         case 'ai': // Add case for the new 'ai' command
-            if (!userPermissions.includes('use_ai_tools')) return permissionDenied('use_ai_tools');
+            if (!overridePermissionChecks && !userPermissions.includes('use_ai_tools')) return permissionDenied('use_ai_tools');
             return handleAiCommand(params); // Call the new AI handler
     }
 
      // Check again for 'export db' specifically in case it wasn't caught by the switch (e.g., due to casing)
      if (commandLower === 'export db') {
-          if (!userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify');
+          if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify');
          return handleExportDb(params);
      }
 
@@ -181,7 +182,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
     const customAction = getCustomCommandAction(params.commandName);
     if (customAction !== undefined) {
         // Basic check - maybe custom commands require a general 'execute_custom' perm?
-        // if (!userPermissions.includes('execute_custom')) return permissionDenied('execute_custom');
+        // if (!overridePermissionChecks && !userPermissions.includes('execute_custom')) return permissionDenied('execute_custom');
         // handleCustomCommand now returns HandlerResult
         return handleCustomCommand(params, customAction);
     }
@@ -190,6 +191,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
     return handleNotFound(params); // This now returns HandlerResult
 };
 
+async function executeScriptFile(): Promise<HandlerResult> {
+    return {
+        outputLines: [], newLogEntries: []
+    };
+}
 /**
  * Returns the name of the current file.
  * This function is not exported to avoid being treated as a Server Action.

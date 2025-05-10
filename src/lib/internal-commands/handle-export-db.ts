@@ -16,6 +16,7 @@ interface HandlerParams {
     userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
+    overridePermissionChecks?: boolean;
 }
 
 // Default filename for export db command
@@ -26,8 +27,16 @@ const DEFAULT_EXPORT_FILENAME = 'simshell_export.db'; // Updated default name
  * Persists the current database state to a default file name ('simshell_export.db') in the 'data' directory.
  * Requires 'execute_sql_modify' permission.
  */
-export const handleExportDb = async ({ timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
-    // Permission check moved to central handler
+export const handleExportDb = async ({ timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check bypassed if overridePermissionChecks is true
+    // if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) {
+    //     const errorMsg = "Permission denied: Cannot export database.";
+    //     return {
+    //         outputLines: [{ id: `export-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //     };
+    // }
+
     let logText: string;
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
@@ -43,6 +52,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
             outputText = `Database successfully exported to: data/${targetFilename}`;
             outputType = 'info';
             logText = outputText + ` (User: ${userId})`;
+            logFlag = 0;
         } else {
              // This case might not be reachable if persistDbToFile throws on failure
             outputText = `Failed to export database to ${targetFilename} for an unknown reason.`;
@@ -64,7 +74,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {
-        outputLines: [{ id: `export-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }],
+        outputLines: [{ id: `export-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag }],
         newLogEntries
     };
 };

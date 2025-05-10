@@ -18,6 +18,7 @@ interface HandlerParams {
     userPermissions: string[]; // Added permissions
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
+    overridePermissionChecks?: boolean;
 }
 
 /**
@@ -26,8 +27,16 @@ interface HandlerParams {
  * DOES NOT handle clipboard, as that requires client-side API access.
  * Requires admin-level permission (e.g., 'manage_roles_permissions').
  */
-export const handleInit = async ({ timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
-    // Permission check moved to central handler
+export const handleInit = async ({ timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check bypassed if overridePermissionChecks is true
+    // if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) {
+    //     const errorMsg = "Permission denied: Cannot initialize system (admin operation).";
+    //     return {
+    //         outputLines: [{ id: `init-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //     };
+    // }
+
     const createTableSql = `
         CREATE TABLE IF NOT EXISTS variables (
             name VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -49,7 +58,7 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
         await runSql(createTableSql);
         const dbInitMsg = "Database initialized successfully. 'variables' table ensured.";
         logEntries.push({ timestamp, type: 'I', flag: 0, text: `${dbInitMsg} (User: ${userId})` });
-        outputLines.push({ id: `init-db-${timestamp}`, text: dbInitMsg, type: 'info', category: 'internal', timestamp });
+        outputLines.push({ id: `init-db-${timestamp}`, text: dbInitMsg, type: 'info', category: 'internal', timestamp, flag: 0 });
 
         // 2. Initialize Default Python Variables (excluding clipboard)
         const defaultVars = [
@@ -81,15 +90,15 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
         const clipboardInitMsg = "Clipboard variable placeholder created. Assign with `clipboard = get()` command (requires clipboard access).";
         logEntries.push({ timestamp, type: 'I', flag: 0, text: `${clipboardInitMsg} (User: ${userId})` });
         // Don't add clipboard specific message to direct output, keep it simple
-        // outputLines.push({ id: `init-clipboard-${timestamp}`, text: clipboardInitMsg, type: 'info', category: 'internal', timestamp });
+        // outputLines.push({ id: `init-clipboard-${timestamp}`, text: clipboardInitMsg, type: 'info', category: 'internal', timestamp, flag: 0 });
 
 
         const varInitMsg = `Initialized ${varsAddedCount} default Python variable(s).`;
         logEntries.push({ timestamp, type: 'I', flag: 0, text: `${varInitMsg} (User: ${userId})` });
-        outputLines.push({ id: `init-vars-${timestamp}`, text: varInitMsg, type: 'info', category: 'internal', timestamp });
+        outputLines.push({ id: `init-vars-${timestamp}`, text: varInitMsg, type: 'info', category: 'internal', timestamp, flag: 0 });
 
         if (varErrors.length > 0) {
-            outputLines.push({ id: `init-vars-err-${timestamp}`, text: `Errors encountered during variable initialization:\n${varErrors.join('\n')}`, type: 'error', category: 'internal', timestamp });
+            outputLines.push({ id: `init-vars-err-${timestamp}`, text: `Errors encountered during variable initialization:\n${varErrors.join('\n')}`, type: 'error', category: 'internal', timestamp, flag: 0 });
         }
 
         // Add the clipboard info message to the final combined message
@@ -104,7 +113,7 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
         console.error("Error during initialization:", error);
         const errorMsg = `Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
         logEntries.push({ timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }); // Set flag to 0 for error
-        outputLines.push({ id: `init-error-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp });
+        outputLines.push({ id: `init-error-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
         overallSuccess = false;
         finalMessage = errorMsg;
         logFlag = 0; // Set flag to 0 for critical init error

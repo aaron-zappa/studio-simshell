@@ -17,10 +17,19 @@ interface HandlerParams {
     args: string[]; // Includes 'memory', 'db', 'to', '<filename.db>'
     timestamp: string;
     currentLogEntries: LogEntry[]; // Pass current logs
+    overridePermissionChecks?: boolean;
 }
 
-export const handlePersistDb = async ({ args, timestamp, currentLogEntries, userId, userPermissions }: HandlerParams): Promise<HandlerResult> => {
-    // Permission check moved to central handler
+export const handlePersistDb = async ({ args, timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
+    // Permission check bypassed if overridePermissionChecks is true
+    // if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) {
+    //     const errorMsg = "Permission denied: Cannot persist database.";
+    //     return {
+    //         outputLines: [{ id: `persist-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //     };
+    // }
+
     let logText: string;
     let logType: 'I' | 'E' = 'I';
     let outputType: OutputLine['type'] = 'info';
@@ -43,6 +52,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
                 outputText = `Successfully persisted in-memory database to file: data/${targetFilename}`;
                 outputType = 'info';
                 logText = outputText + ` (User: ${userId})`;
+                logFlag = 0;
             } else {
                  // This case might not be reachable if persistDbToFile throws on failure
                 outputText = 'Failed to persist database for an unknown reason.';
@@ -65,7 +75,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
     const newLogEntries = [...currentLogEntries, logEntry];
 
     return {
-        outputLines: [{ id: `persist-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp }],
+        outputLines: [{ id: `persist-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag }],
         newLogEntries
     };
 };
