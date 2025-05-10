@@ -8,6 +8,7 @@ const SQL_SCRIPTS_DIR = path.join(process.cwd(), 'src', 'sql-scripts');
 
 /**
  * Server Action to get a list of .sql files from the src/sql-scripts directory.
+ * Filters out files that start with "admin_".
  * @returns A promise that resolves to an array of SQL script filenames.
  * @throws Throws an error if reading the directory fails.
  */
@@ -27,7 +28,8 @@ export async function getSqlScriptFiles(): Promise<string[]> {
     }
 
     const files = await fs.readdir(SQL_SCRIPTS_DIR);
-    const sqlFiles = files.filter(file => file.endsWith('.sql'));
+    const sqlFiles = files
+      .filter(file => file.endsWith('.sql') && !file.startsWith('admin_'));
     return sqlFiles;
   } catch (error) {
     console.error('Error reading SQL script files:', error);

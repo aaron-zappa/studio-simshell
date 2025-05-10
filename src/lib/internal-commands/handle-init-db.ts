@@ -116,6 +116,15 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         `INSERT OR IGNORE INTO user_roles (user_id, role_id) SELECT u.user_id, r.role_id FROM users u JOIN roles r ON r.role_name = 'developer' WHERE u.username = 'dev';`,
         `INSERT OR IGNORE INTO user_roles (user_id, role_id) SELECT u.user_id, r.role_id FROM users u JOIN roles r ON r.role_name = 'basic_user' WHERE u.username = 'user';`,
     ];
+    
+    const createPeterAdminStatement = `
+    INSERT OR IGNORE INTO user_roles (user_id, role_id)
+    SELECT u.user_id, r.role_id
+    FROM users u
+    JOIN roles r ON r.role_name = 'administrator'
+    WHERE u.username = 'peter'
+    `;
+    createStatements.push(createPeterAdminStatement);
 
     let logText: string = 'Initializing database tables and sample data... ';
     let logType: 'I' | 'E' = 'I';
