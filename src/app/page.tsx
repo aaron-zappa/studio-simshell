@@ -19,8 +19,9 @@ import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-comma
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 import { getDbStatusAction } from '@/lib/database';
+import { executeSqlScript } from '@/lib/sql-script-runner'; // Import the SQL script runner
 
-const SIMULATED_USER_ID = 2;
+const SIMULATED_USER_ID = 1; // Assuming admin for now
 
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
@@ -44,7 +45,10 @@ export default function Home() {
             if (status.includes('nok')) {
                 statusType = 'error';
                 logType = 'E';
+            } else {
+                logFlag = 0; // Ensure flag is 0 for success
             }
+
 
             const statusLine: OutputLine = {
                 id: `db-status-${timestamp}`,
@@ -94,79 +98,141 @@ export default function Home() {
     }
   };
 
-  const handleDirectSqlSubmit = async (sqlCommand: string) => {
-    const commandTrimmed = sqlCommand.trim();
+  const handleDirectSqlSubmit = async (sqlInput: string) => {
+    const commandTrimmed = sqlInput.trim();
     if (!commandTrimmed) return;
 
     setIsRunning(true);
     const timestamp = new Date().toISOString();
-    
-    const commandLogOutput: OutputLine = {
-        id: `cmd-sql-${timestamp}`,
-        text: commandTrimmed,
-        type: 'command',
-        category: 'sql',
-        timestamp: timestamp,
-    };
+    const sqlScriptRegex = /^@sql:([a-zA-Z0-9_.-]+\.sql)$/i;
+    const scriptMatch = commandTrimmed.match(sqlScriptRegex);
 
-    setHistory(prev => [...prev, commandLogOutput]);
-    // Log entry for the command itself
-    setLogEntries(prev => [...prev, { timestamp, type: 'I', flag: 0, text: `Direct SQL command executed: ${commandTrimmed}` }]);
-
-
-    try {
-        const executionResult = await executeCommand({
-            userId: SIMULATED_USER_ID,
-            command: commandTrimmed,
-            mode: 'sql', // Directly set mode to SQL
-            addSuggestion,
-            addCustomCommand,
-            getCustomCommandAction,
-            currentLogEntries: logEntries,
-            initialSuggestions,
-        });
-
-        const outputToDisplay = executionResult.outputLines
-            .filter(line => line.id !== commandLogOutput?.id) // Already added command log
-            .map(line => ({
-                ...line,
-                flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? 0 : undefined)
-            }));
-        
-        setHistory((prev) => [...prev, ...outputToDisplay]);
-
-        if (executionResult.newLogEntries) {
-            setLogEntries(executionResult.newLogEntries);
-        }
-        if (executionResult.toastInfo) {
-            toast({
-                title: "AI Notification",
-                description: executionResult.toastInfo.message,
-                variant: executionResult.toastInfo.variant || 'default',
-            });
-        }
-
-    } catch (error) {
-        console.error("Error during direct SQL execution:", error);
-        const errorMsg = `Failed to execute SQL: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        toast({
-           title: "SQL Execution Error",
-           description: errorMsg,
-           variant: "destructive",
-        });
-        const errorOutput: OutputLine = {
-            id: `sql-error-${timestamp}`,
-            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            type: 'error',
+    if (scriptMatch && scriptMatch[1]) {
+        const scriptFilename = scriptMatch[1];
+        const commandLogOutput: OutputLine = {
+            id: `cmd-sql-script-${timestamp}`,
+            text: commandTrimmed, // Log the @sql: command itself
+            type: 'command',
             category: 'sql',
             timestamp: timestamp,
-            flag: 0,
         };
-        setHistory((prev) => [...prev, errorOutput]);
-        setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorMsg }]);
-    } finally {
-        setIsRunning(false);
+        setHistory(prev => [...prev, commandLogOutput]);
+        setLogEntries(prev => [...prev, { timestamp, type: 'I', flag: 0, text: `Executing SQL script file: ${scriptFilename}` }]);
+
+        try {
+            const scriptResult = await executeSqlScript(scriptFilename);
+            
+            if (scriptResult.outputLines) {
+                const outputToDisplay = scriptResult.outputLines.map(line => ({
+                    ...line,
+                    flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
+                }));
+                 setHistory((prev) => [...prev, ...outputToDisplay]);
+            }
+
+            if (scriptResult.newLogEntries) {
+                setLogEntries(prev => [...prev, ...scriptResult.newLogEntries]);
+            }
+             if (scriptResult.error) {
+                 toast({
+                    title: "SQL Script Error",
+                    description: scriptResult.error,
+                    variant: "destructive",
+                 });
+             } else {
+                  toast({
+                    title: "SQL Script",
+                    description: `Script '${scriptFilename}' execution finished.`,
+                    variant: "default",
+                 });
+             }
+
+        } catch (error) {
+            console.error("Error during SQL script execution:", error);
+            const errorMsg = `Failed to execute SQL script '${scriptFilename}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+            toast({
+               title: "SQL Script Execution Error",
+               description: errorMsg,
+               variant: "destructive",
+            });
+            const errorOutput: OutputLine = {
+                id: `sql-script-error-${timestamp}`,
+                text: errorMsg,
+                type: 'error',
+                category: 'sql',
+                timestamp: timestamp,
+                flag: 0,
+            };
+            setHistory((prev) => [...prev, errorOutput]);
+            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorMsg }]);
+        }
+    } else {
+        // Regular SQL command execution
+        const commandLogOutput: OutputLine = {
+            id: `cmd-sql-${timestamp}`,
+            text: commandTrimmed,
+            type: 'command',
+            category: 'sql',
+            timestamp: timestamp,
+        };
+
+        setHistory(prev => [...prev, commandLogOutput]);
+        setLogEntries(prev => [...prev, { timestamp, type: 'I', flag: 0, text: `Direct SQL command executed: ${commandTrimmed}` }]);
+
+        try {
+            const executionResult = await executeCommand({
+                userId: SIMULATED_USER_ID,
+                command: commandTrimmed,
+                mode: 'sql',
+                addSuggestion,
+                addCustomCommand,
+                getCustomCommandAction,
+                currentLogEntries: logEntries,
+                initialSuggestions,
+                overridePermissionChecks: true, // Assuming override for direct SQL panel for now
+            });
+
+            const outputToDisplay = executionResult.outputLines
+                .filter(line => line.id !== commandLogOutput?.id)
+                .map(line => ({
+                    ...line,
+                    flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
+                }));
+            
+            setHistory((prev) => [...prev, ...outputToDisplay]);
+
+            if (executionResult.newLogEntries) {
+                setLogEntries(prev => [...prev, ...executionResult.newLogEntries.filter(log => !logEntries.some(existing => existing.timestamp === log.timestamp && existing.text === log.text))]);
+            }
+            if (executionResult.toastInfo) {
+                toast({
+                    title: "AI Notification",
+                    description: executionResult.toastInfo.message,
+                    variant: executionResult.toastInfo.variant || 'default',
+                });
+            }
+
+        } catch (error) {
+            console.error("Error during direct SQL execution:", error);
+            const errorMsg = `Failed to execute SQL: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            toast({
+               title: "SQL Execution Error",
+               description: errorMsg,
+               variant: "destructive",
+            });
+            const errorOutput: OutputLine = {
+                id: `sql-error-${timestamp}`,
+                text: errorMsg,
+                type: 'error',
+                category: 'sql',
+                timestamp: timestamp,
+                flag: 0,
+            };
+            setHistory((prev) => [...prev, errorOutput]);
+            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorMsg }]);
+        }
     }
+    setIsRunning(false);
   };
 
 
@@ -174,28 +240,27 @@ export default function Home() {
     const commandTrimmed = originalCommand.trim();
     const timestamp = new Date().toISOString();
     let commandLogOutput: OutputLine | null = null;
+    let finalCommandLower = ''; // Initialize here
     setIsRunning(true);
 
     let finalCommand = commandTrimmed;
-    let finalCommandLower: string = '';
     let clipboardReadError: string | null = null;
 
     const clipboardGetRegex = /^\s*clipboard\s*=\s*get\(\)\s*$/i;
     if (clipboardGetRegex.test(commandTrimmed)) {
        try {
          const clipboardContent = await readClipboard();
-         const escapedContent = clipboardContent.replace(/"/g, '\\"');
+         const escapedContent = clipboardContent.replace(/"/g, '\\"'); // Basic escaping for quotes
          finalCommand = `clipboard = "${escapedContent}"`;
-         finalCommandLower = finalCommand.toLowerCase();
        } catch (error) {
          console.error("Clipboard read error:", error);
          clipboardReadError = error instanceof Error ? error.message : 'Unknown clipboard error';
-         finalCommand = '';
-         finalCommandLower = '';
+         finalCommand = ''; // Prevent execution if clipboard fails
        }
-    } else {
-        finalCommandLower = finalCommand.toLowerCase();
     }
+    
+    finalCommandLower = finalCommand.toLowerCase(); // Set finalCommandLower after potential modification
+
 
     let classificationResult: { category: CommandCategory; reasoning?: string | undefined } | null = null;
     let executionResult: {
@@ -209,20 +274,38 @@ export default function Home() {
       if (clipboardReadError) {
         throw new Error(clipboardReadError);
       }
-      if (!finalCommand) {
+      if (!finalCommand && clipboardGetRegex.test(commandTrimmed)) { // Only throw if it was a clipboard command that failed
          commandLogOutput = {
              id: `cmd-clipboard-skip-${timestamp}`,
-             text: originalCommand,
+             text: originalCommand, // Log the original command
              type: 'command',
-             category: 'python',
+             category: 'python', // Assume python for clipboard = get()
              timestamp: timestamp
          };
          setHistory((prev) => [...prev, commandLogOutput]);
-         throw new Error("Command execution skipped due to clipboard read failure.");
+         throw new Error("Command execution skipped: Clipboard operation failed.");
       }
+       if (!finalCommand && !clipboardGetRegex.test(commandTrimmed) && commandTrimmed.length > 0) {
+          // This case should ideally not be reached if finalCommand is only empty due to clipboard error
+          // but as a fallback for any other way finalCommand might be empty with an original command.
+           commandLogOutput = {
+             id: `cmd-empty-final-${timestamp}`,
+             text: originalCommand,
+             type: 'command',
+             category: 'internal', // Default to internal if category unknown
+             timestamp: timestamp
+           };
+           setHistory((prev) => [...prev, commandLogOutput]);
+           throw new Error("Command execution skipped: Processed command is empty.");
+       }
+       if (!finalCommand && commandTrimmed.length === 0) { // No command was entered
+            setIsRunning(false);
+            return;
+       }
+
 
       classificationResult = await classifyCommand({
-          command: finalCommand,
+          command: finalCommand, // Use the potentially modified command for classification
           activeCategories: selectedCategories
       });
       const category: CommandCategory = classificationResult.category;
@@ -230,7 +313,7 @@ export default function Home() {
 
       commandLogOutput = {
          id: `cmd-${timestamp}`,
-         text: originalCommand,
+         text: originalCommand, // Log the original command here
          type: 'command',
          category: (category === 'ambiguous' || category === 'unknown') ? 'internal' : category,
          timestamp: timestamp
@@ -250,9 +333,9 @@ export default function Home() {
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         const classificationLog: LogEntry = {
             timestamp,
-            type: 'W',
-            flag: 0,
-            text: ambiguousOutput.text
+            type: 'W', // Warning for ambiguous/unknown
+            flag: 1,   // Flag 1 for this type of warning
+            text: `Command classification: ${category}. Reasoning: ${classificationReasoning || 'N/A'}. Original: '${originalCommand}', Processed: '${finalCommand}', Active: ${selectedCategories.join(', ')}`
         };
         setLogEntries(prev => [...prev, classificationLog]);
         setIsRunning(false);
@@ -268,61 +351,66 @@ export default function Home() {
           clientHandled = true;
          }
          else if (finalCommandLower === 'export log') {
-          const exportResultLine = exportLogFile(logEntries);
-          const logText = exportResultLine ? exportResultLine.text : "Attempted log export.";
-          const logType = exportResultLine?.type === 'error' ? 'E' : 'I';
-          const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 0 : 0;
-          const exportLog: LogEntry = { timestamp, type: logType, flag: logFlagVal, text: logText };
-          setLogEntries(prev => [...prev, exportLog]);
+          const exportResultLine = exportLogFile(logEntries); // exportLogFile now returns OutputLine or null
+           const logText = exportResultLine ? exportResultLine.text : "Log export action attempted.";
+           const logType: LogEntry['type'] = exportResultLine?.type === 'error' ? 'E' : 'I';
+           const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 0 : 0; // Error flag 0
+           const exportLog: LogEntry = { timestamp, type: logType, flag: logFlagVal, text: logText };
+           setLogEntries(prev => [...prev, exportLog]);
+
           if(commandLogOutput && exportResultLine){
-             if(exportResultLine.type === 'error' || exportResultLine.type === 'info'){
-                 exportResultLine.timestamp = timestamp;
-                 exportResultLine.flag = logFlagVal;
-             }
+             // Ensure timestamp and flag are set for the output line
+             exportResultLine.timestamp = timestamp; // Use current execution timestamp
+             exportResultLine.flag = logFlagVal;    // Use determined flag
              setHistory((prev) => [...prev, commandLogOutput, exportResultLine]);
+          } else if (commandLogOutput) {
+             // If exportResultLine is null (e.g., no logs), just show command
+             setHistory((prev) => [...prev, commandLogOutput]);
           }
           clientHandled = true;
          }
          else if (finalCommandLower === 'pause') {
            const pauseOutput: OutputLine = {
              id: `pause-${timestamp}`,
-             text: 'task stopped',
+             text: 'task stopped', // Changed from "Task paused."
              type: 'info',
              category: 'internal',
-             timestamp: timestamp,
-             flag: 0,
+             timestamp: timestamp, // Set timestamp
+             flag: 0, // Set flag
            };
             if(commandLogOutput){
                setHistory((prev) => [...prev, commandLogOutput, pauseOutput]);
             }
-            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." };
+            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." }; // Log still says "Task paused."
             setLogEntries(prev => [...prev, pauseLog]);
-           setIsRunning(false);
-           clientHandled = true;
+           // setIsRunning(false); // This will be handled in finally
+           clientHandled = true; // Mark as client handled
          }
       }
 
       if (clientHandled) {
-         if (finalCommandLower !== 'pause') setIsRunning(false);
+         if (finalCommandLower !== 'pause') setIsRunning(false); // Reset if not pause
          return;
       }
 
       executionResult = await executeCommand({
         userId: SIMULATED_USER_ID,
-        command: finalCommand,
+        command: finalCommand, // Use the processed command
         mode: category as CommandMode,
-        addSuggestion,
-        addCustomCommand,
-        getCustomCommandAction,
-        currentLogEntries: logEntries,
-        initialSuggestions
+        addSuggestion, // Problematic in server actions
+        addCustomCommand, // Problematic in server actions
+        getCustomCommandAction, // Problematic in server actions
+        currentLogEntries: logEntries, // Pass current log entries
+        initialSuggestions,
+        overridePermissionChecks: true, // Pass the override flag
       });
 
       const outputToDisplay = executionResult.outputLines
-          .filter(line => line.id !== commandLogOutput?.id)
+          .filter(line => line.id !== commandLogOutput?.id) // Avoid duplicating command log
           .map(line => ({
              ...line,
-             flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? 0 : undefined)
+             // Ensure flag is explicitly set for log-style lines
+             flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
            }));
 
        if(commandLogOutput){
@@ -330,9 +418,12 @@ export default function Home() {
        }
 
        if (executionResult.newLogEntries) {
-          setLogEntries(executionResult.newLogEntries);
+          // Filter out duplicate log entries before adding
+          const uniqueNewLogs = executionResult.newLogEntries.filter(
+              newLog => !logEntries.some(existing => existing.timestamp === newLog.timestamp && existing.text === newLog.text)
+          );
+          setLogEntries(prev => [...prev, ...uniqueNewLogs]);
        }
-
        if (executionResult.toastInfo) {
             toast({
                 title: "AI Notification",
@@ -341,8 +432,9 @@ export default function Home() {
             });
        }
 
+
     } catch (error) {
-        errorOccurred = true;
+        errorOccurred = true; // Set error occurred flag
         console.error("Error during command handling:", error);
         const errorMsg = `Failed to process command: ${error instanceof Error ? error.message : 'Unknown error'}`;
         toast({
@@ -355,21 +447,26 @@ export default function Home() {
             text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
             type: 'error',
             category: 'internal',
-            timestamp: timestamp,
-            flag: 0,
+            timestamp: timestamp, // Set timestamp for error
+            flag: 0, // Set flag for error
         };
-         const errorLog: LogEntry = { timestamp, type: 'E', flag: 0, text: errorMsg };
-         if (executionResult?.newLogEntries) {
+         const errorLog: LogEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; // Set flag for error log
+         // Ensure logs are updated even if executionResult is null
+         if (executionResult && executionResult.newLogEntries) {
              setLogEntries([...executionResult.newLogEntries, errorLog]);
          } else {
              setLogEntries(prev => [...prev, errorLog]);
          }
+         // Ensure commandLogOutput is created if it wasn't (e.g. error before classification)
          const cmdLog = commandLogOutput || { id: `cmd-err-${timestamp}`, text: originalCommand, type: 'command', category: 'internal', timestamp: timestamp };
          setHistory((prev) => [...prev, cmdLog, errorOutput]);
 
     } finally {
-      if (finalCommandLower !== 'pause') {
-          setIsRunning(false);
+      // Use finalCommandLower for pause check
+      if (finalCommandLower === 'pause' && !errorOccurred) {
+          // isRunning is intentionally kept true for 'pause'
+      } else {
+          setIsRunning(false); // Set to false for all other cases (non-pause, or if an error occurred)
       }
     }
   };
@@ -420,7 +517,7 @@ export default function Home() {
         </AccordionItem>
       </Accordion>
 
-       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2">
+       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2"> {/* Adjusted flex-grow */}
         <OutputDisplay history={history} className="h-full" />
       </main>
 
@@ -443,3 +540,4 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
+
