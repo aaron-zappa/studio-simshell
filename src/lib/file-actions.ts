@@ -1,4 +1,5 @@
 // src/lib/file-actions.ts
+// src/lib/file-actions.ts
 'use server';
 
 import * as fs from 'fs/promises';
@@ -29,7 +30,7 @@ export async function getSqlScriptFiles(): Promise<string[]> {
 
     const files = await fs.readdir(SQL_SCRIPTS_DIR);
     const sqlFiles = files
-      .filter(file => file.endsWith('.sql') && !file.startsWith('admin_'));
+      .filter(file => file.endsWith('.sql') && !file.toLowerCase().startsWith('admin_')); // Ensure case-insensitive check for "admin_"
     return sqlFiles;
   } catch (error) {
     console.error('Error reading SQL script files:', error);
@@ -50,3 +51,4 @@ export async function getSqlScriptFiles(): Promise<string[]> {
 function getFilename(): string {
     return 'file-actions.ts';
 }
+
