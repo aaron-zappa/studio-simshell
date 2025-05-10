@@ -2,7 +2,7 @@
 // src/hooks/use-suggestions.ts
 'use client';
 
-import * as React from 'react';
+import * as React from 'react'; // Added missing React import
 import type { CommandMode } from '@/types/command-types';
 import type { CustomCommands } from './use-custom-commands';
 
@@ -18,6 +18,7 @@ const initialSuggestionsData: Record<CommandMode, string[]> = {
       'add int_cmd <short> <name> "<description>" <whatToDo>', // Updated old command suggestion
       'add ai_tool <toolname> "<args_description>" "<description>"', // Corrected AI tool suggestion order
       'set ai_tool <name> active <0|1>', // Added new set command suggestion
+      'set sim_mode <0|1>', // Added new set sim_mode command suggestion
       'export log',
       'export db', // Added export db suggestion
       'pause',
@@ -66,6 +67,10 @@ export const useSuggestions = () => {
              // Format for set ai_tool active
              if (mode === 'internal' && lowerCommand.startsWith('set ai_tool ')) {
                 suggestionToAdd = 'set ai_tool <name> active <0|1>';
+             }
+             // Format for set sim_mode
+             if (mode === 'internal' && lowerCommand.startsWith('set sim_mode ')) {
+                suggestionToAdd = 'set sim_mode <0|1>';
              }
             // Add format for persist memory db to
             if (mode === 'internal' && lowerCommand.startsWith('persist memory db to')) {

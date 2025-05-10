@@ -26,6 +26,7 @@ import { handleInit } from './handle-init'; // Import the new init handler
 import { handleListPyVars } from './handle-list-py-vars'; // Import the new list vars handler
 import { handleAiCommand } from './handle-ai-command'; // Import the new AI command handler
 import { handleSetAiToolActive } from './handle-set-ai-tool-active'; // Import the new set tool active handler
+import { handleSetSimMode } from './handle-set-sim-mode'; // Import new handler for sim_mode
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -98,26 +99,30 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         case 'refine':
              // Placeholder - Add permission check if implemented
             return handleRefine(params);
-        case 'add_int_cmd': // Changed from 'add'
+        case 'add_int_cmd':
              if (commandLower.startsWith('add_int_cmd ')) {
                  if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools'); // Assuming same permission for simplicity
                  return handleAddCommand(params); // Handles regular internal commands
              }
              break;
-        case 'add_ai_tool': // Changed from 'add'
+        case 'add_ai_tool':
              if (commandLower.startsWith('add_ai_tool ')) {
                  if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
                  return handleAddAiTool(params); // Handles defining AI tools
              }
              break;
-        case 'set': // Check for 'set ai_tool active'
-             if (commandLower.startsWith('set ai_tool ')) { // Check if args[1] exists before accessing
+        case 'set':
+             if (commandLower.startsWith('set ai_tool ')) {
                  if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) return permissionDenied('manage_ai_tools');
                  // Pass args starting *after* 'set ai_tool' to the handler
                  return handleSetAiToolActive({ ...params, args: args.slice(2) });
+             } else if (commandLower.startsWith('set sim_mode ')) {
+                // Assuming 'manage_variables' permission is appropriate, or create a new one
+                 if (!overridePermissionChecks && !userPermissions.includes('manage_variables')) return permissionDenied('manage_variables');
+                 return handleSetSimMode({ ...params, args: args.slice(2) }); // Pass args after 'set sim_mode'
              }
-             break; // Fall through if not the specific 'set' command
-        case 'export': // Check if it's 'export log' or 'export db'
+             break; // Fall through if not a recognized 'set' command
+        case 'export':
              if (commandLower === 'export log') {
                  // Export log is client-side, server handler is informational (no specific perm needed here)
                 return handleExportLog(params);
@@ -130,26 +135,26 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         case 'pause':
             // Pause is mostly client-side, server handler is informational
             return handlePause(params);
-        case 'create': // Check if it's 'create sqlite'
+        case 'create':
             if (commandLower.startsWith('create sqlite')) {
                  // Creating might be admin-level
                  if (!overridePermissionChecks && !userPermissions.includes('manage_users')) return permissionDenied('manage_users'); // Example: Restrict to admin
                  return handleCreateSqlite(params); // Returns HandlerResult
             }
             break; // Fall through if not 'create sqlite'
-        case 'show': // Check if it's 'show requirements'
+        case 'show':
             if (commandLower.startsWith('show requirements')) {
                 // Generally safe, no specific perm needed
                  return handleShowRequirements(params); // This now returns HandlerResult
             }
             break; // Fall through if not 'show requirements'
-        case 'persist': // Check if it's 'persist memory db to'
+        case 'persist':
             if (commandLower.startsWith('persist memory db to ')) {
                  if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) return permissionDenied('execute_sql_modify'); // Persisting DB might be sensitive
                  return handlePersistDb(params); // Call the new handler
             }
             break; // Fall through if not the exact command
-        case 'init': // Check if it's 'init' or 'init db'
+        case 'init':
             if (commandLower === 'init db') {
                  // DB Init is likely an admin task
                  if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) return permissionDenied('manage_roles_permissions');
@@ -160,13 +165,13 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  return handleInit(params); // Call the new general init handler
             }
             break; // Fall through if not 'init' or 'init db'
-        case 'list': // Check if it's 'list py vars'
+        case 'list':
             if (commandLower === 'list py vars') {
                 if (!overridePermissionChecks && !userPermissions.includes('read_variables')) return permissionDenied('read_variables');
                 return handleListPyVars(params); // Call the new list vars handler
             }
             break; // Fall through if not the exact command
-        case 'ai': // Add case for the new 'ai' command
+        case 'ai':
             if (!overridePermissionChecks && !userPermissions.includes('use_ai_tools')) return permissionDenied('use_ai_tools');
             return handleAiCommand(params); // Call the new AI handler
     }

@@ -14,97 +14,72 @@ interface HandlerResult {
 
 
 interface HandlerParams {
-    userId: number; // Added userId
-    userPermissions: string[]; // Added permissions (though fetched again here for conditional display)
+    userId: number;
+    userPermissions: string[]; // These are the permissions passed from command-executor
     timestamp: string;
     initialSuggestions: Record<string, string[]>;
-    currentLogEntries: LogEntry[]; // Pass current logs
+    currentLogEntries: LogEntry[];
 }
 
 // Map permissions to the commands they enable (adjust as needed)
+// This map is used to filter which commands are shown in help based on user's permissions.
 const commandPermissions: Record<string, string> = {
-    'add_int_cmd': 'manage_ai_tools', // Assuming same permission
+    'add_int_cmd': 'manage_ai_tools',
     'add_ai_tool': 'manage_ai_tools',
     'set_ai_tool': 'manage_ai_tools',
+    'set_sim_mode': 'manage_variables', // Example permission
     'export_db': 'execute_sql_modify',
-    'create_sqlite': 'manage_users', // Example: Admin only
+    'create_sqlite': 'manage_users',
     'persist_memory_db_to': 'execute_sql_modify',
     'init_db': 'manage_roles_permissions',
     'init': 'manage_roles_permissions',
     'list_py_vars': 'read_variables',
     'ai': 'use_ai_tools',
-    // Commands without specific permissions: help, clear, mode, history, define, refine, export log, pause, show requirements
+    // Commands without specific permissions here will always be shown if 'internal'
 };
 
 /**
  * Handles the 'help' command.
- * Displays available categories, internal commands (based on user permissions),
+ * Displays available categories, internal commands (based on user permissions from params),
  * and usage notes, grouped by category.
  */
-export const handleHelp = async ({ userId, timestamp, initialSuggestions, currentLogEntries }: HandlerParams): Promise<HandlerResult> => {
+export const handleHelp = async ({ userId, timestamp, initialSuggestions, currentLogEntries, userPermissions: passedUserPermissions }: HandlerParams): Promise<HandlerResult> => {
     let helpText = '';
     let outputLines: OutputLine[] = [];
     let logText = '';
     let logType: 'I' | 'E' = 'I';
     let logFlag: 0 | 1 = 0;
 
-    // Attempt to fetch permissions to filter the help output
-    const permResult = await getUserPermissions(userId);
-    let userPermissions: string[] = [];
+    // Use the permissions passed from command-executor.
+    // If permissions couldn't be fetched there (e.g., DB_NOT_INITIALIZED was already handled by command-executor),
+    // passedUserPermissions might be an empty array or a specific error indicator if command-executor passed one.
+    // For simplicity, this help handler now trusts the passedUserPermissions.
 
-    if (Array.isArray(permResult)) {
-        userPermissions = permResult;
-    } else if (permResult.code === 'DB_NOT_INITIALIZED') {
-         // If DB not initialized, show a minimal help message
-         helpText = `Database not initialized. Please run 'init db' to set up tables and permissions.
-Available categories: ${ALL_COMMAND_MODES.join(', ')}.
-Use checkboxes to select active categories. Type 'help' for more info after DB initialization.`;
-         outputLines.push({ id: `help-init-prompt-${timestamp}`, text: helpText, type: 'info', category: 'internal', timestamp, flag: 0 });
-         logText = `Displayed minimal help (DB not initialized). (User: ${userId})`;
-         logType = 'I';
-         logFlag = 0;
-         const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
-         return { outputLines, newLogEntries: [...currentLogEntries, logEntry] };
-    } else {
-         // Handle other permission fetching errors
-         helpText = `Error fetching user permissions: ${permResult.error}. Cannot display full help.
-Available categories: ${ALL_COMMAND_MODES.join(', ')}.
-Use checkboxes to select active categories. Type 'help' for more info.`;
-         outputLines.push({ id: `help-perm-error-${timestamp}`, text: helpText, type: 'error', category: 'internal', timestamp, flag: 0 });
-         logText = `Error displaying help due to permission fetch error: ${permResult.error}. (User: ${userId})`;
-         logType = 'E';
-         logFlag = 0;
-         const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
-         return { outputLines, newLogEntries: [...currentLogEntries, logEntry] };
-    }
-
+    // If DB wasn't initialized, command-executor might have already added an error to output.
+    // This help function will proceed to build help text based on available info.
+    // It's up to command-executor to decide if it should even call handleHelp if essential parts (like permissions) are missing.
 
     helpText = `Command category is automatically detected.
 @bat:<filename><.bat/.sh/.sim>(experimental).
 
 Available categories: ${ALL_COMMAND_MODES.join(', ')}.
+Use checkboxes to select active categories.
 
 --- Command Suggestions by Category ---`;
 
-    // Iterate through categories and their suggestions
-    // Ensure consistent order of categories in help
     for (const category of ALL_COMMAND_MODES) {
         const suggestions = initialSuggestions[category];
         if (suggestions && suggestions.length > 0) {
-            // Add bold category heading
             helpText += `\n\n**${category.charAt(0).toUpperCase() + category.slice(1)}**`;
-            // List suggestions under the category, checking permissions for internal commands
             suggestions.forEach(suggestion => {
                 let showSuggestion = true;
                 if (category === 'internal') {
-                    // Extract the base command name (first word)
                     const baseCommand = suggestion.split(' ')[0].toLowerCase();
                     const requiredPermission = commandPermissions[baseCommand];
-                    if (requiredPermission && !userPermissions.includes(requiredPermission) && !userPermissions.includes('override_all_permissions')) {
+                    if (requiredPermission && !passedUserPermissions.includes(requiredPermission) && !passedUserPermissions.includes('override_all_permissions')) {
                         showSuggestion = false;
                     }
                 }
-
                 if (showSuggestion) {
                     helpText += `\n- ${suggestion}`;
                 }
@@ -117,16 +92,14 @@ Assign variables using \`var_name = value\`.
 Note: 'mode' command is informational only.`;
 
 
-    outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp: undefined, flag: 0 }]; // Add flag
+    outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp: undefined, flag: 0 }];
 
-    // Create log entry with flag=0
     logText = `Displayed help. (User: ${userId})`;
     logType = 'I';
     logFlag = 0;
     const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
     const newLogEntries = [...currentLogEntries, logEntry];
 
-    // Return the result object
     return { outputLines: outputLines, newLogEntries };
 };
 
