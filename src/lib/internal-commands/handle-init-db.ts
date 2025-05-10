@@ -79,6 +79,16 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
             FOREIGN KEY (role_id) REFERENCES roles (role_id) ON DELETE CASCADE,
             FOREIGN KEY (permission_id) REFERENCES permissions (permission_id) ON DELETE CASCADE
         );`,
+        // New table for command definitions
+        `CREATE TABLE IF NOT EXISTS commands (
+            command_name TEXT NOT NULL,
+            command_description TEXT,
+            argument_name TEXT NOT NULL,
+            argument_type TEXT NOT NULL,
+            argument_purpose TEXT,
+            argument_default_value TEXT,
+            PRIMARY KEY (command_name, argument_name)
+        );`,
         // Optionally enable foreign key support if needed (can impact performance slightly)
         // `PRAGMA foreign_keys = ON;`
 
@@ -110,6 +120,8 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('admin', 'dummy_hash');`, // Replace with real hashing
         `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('dev', 'dummy_hash');`,
         `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('user', 'dummy_hash');`,
+        `INSERT OR IGNORE INTO users (username, password_hash) VALUES ('peter', 'dummy_hash');`,
+
 
         // User-Role Assignments
         `INSERT OR IGNORE INTO user_roles (user_id, role_id) SELECT u.user_id, r.role_id FROM users u JOIN roles r ON r.role_name = 'administrator' WHERE u.username = 'admin';`,
