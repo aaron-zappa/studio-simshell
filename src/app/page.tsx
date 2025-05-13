@@ -24,6 +24,7 @@ import { getDbStatusAction } from '@/lib/database';
 import { executeSqlScript } from '@/lib/sql-script-runner';
 import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow';
 import { getSqlScriptFiles } from '@/lib/file-actions'; // Import new server action
+import { Cpu } from 'lucide-react'; // Import Cpu icon
 
 const SIMULATED_USER_ID = 1; // Example user ID
 
@@ -211,6 +212,7 @@ export default function Home() {
                 mode: 'sql', // Direct SQL mode
                 currentLogEntries: logEntries,
                 initialSuggestions,
+                getCustomCommandAction,
                 overridePermissionChecks: true, 
             });
 
@@ -464,6 +466,7 @@ export default function Home() {
         mode: category as CommandMode,
         currentLogEntries: logEntries, 
         initialSuggestions,
+        getCustomCommandAction,
         overridePermissionChecks: true, 
       });
       
@@ -573,7 +576,10 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
        <header className="flex items-center justify-between mb-2 flex-wrap gap-4">
-        <h1 className="text-lg font-semibold">SimShell</h1>
+        <div className="flex items-center gap-2">
+          <Cpu className="h-7 w-7 text-primary" data-ai-hint="chip circuit" />
+          <h1 className="text-lg font-semibold">SimShell</h1>
+        </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className="text-sm font-medium mr-2">Active Categories:</span>
               {ALL_COMMAND_MODES.map(category => (
@@ -659,4 +665,5 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
+
 
