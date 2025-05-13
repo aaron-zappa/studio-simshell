@@ -2,34 +2,31 @@
 // src/lib/internal-commands/handle-not-found.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
-
-// Define the structure for the return value, including potential log updates
-interface HandlerResult {
-    outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Uses new LogEntry type
-}
+import type { LogEntry } from '@/types/log-types';
+import type { HandlerResult } from './index'; // Import HandlerResult from parent index
 
 interface HandlerParams {
-    userId: number; // Added userId
-    userPermissions: string[]; // Added permissions
+    userId: number;
+    userPermissions: string[];
     commandName: string;
     timestamp: string;
-    currentLogEntries: LogEntry[]; // Pass current logs
+    currentLogEntries: LogEntry[];
 }
 
-// Update function signature to return HandlerResult and make it async
 export const handleNotFound = async ({ commandName, timestamp, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
-    // No permission check needed for error message
     const outputText = `Internal command not found: ${commandName}`;
-    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'error', category: 'internal', timestamp }];
+    const outputLines: OutputLine[] = [{ id: `out-${timestamp}`, text: outputText, type: 'error', category: 'internal', timestamp, flag: 0 }];
 
-    // Create log entry with flag=1 for warning (or 0 if error)
-    const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `Attempted unknown internal command: ${commandName} (User: ${userId})` }; // Keep flag 1 for Warning
+    const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `Attempted unknown internal command: ${commandName} (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];
 
-    // Return the result object
-    return { outputLines: outputLines, newLogEntries };
+    return {
+        outputLines: outputLines,
+        newLogEntries: newLogEntries,
+        newSuggestions: undefined,
+        newCustomCommands: undefined,
+        toastInfo: undefined
+    };
 };
 
 /**

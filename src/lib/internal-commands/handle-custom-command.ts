@@ -3,42 +3,40 @@
 'use server';
 import type { OutputLine } from '@/components/output-display';
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
-import type { LogEntry } from '@/types/log-types'; // Import new LogEntry
-
-// Define the structure for the return value, including potential log updates
-interface HandlerResult {
-    outputLines: OutputLine[];
-    newLogEntries?: LogEntry[]; // Uses new LogEntry type
-}
+import type { LogEntry } from '@/types/log-types';
+import type { HandlerResult } from './index'; // Import HandlerResult from parent index
 
 interface HandlerParams {
-    userId: number; // Added userId
-    userPermissions: string[]; // Added permissions
+    userId: number;
+    userPermissions: string[];
     timestamp: string;
-    commandName: string; // Needed for logging
-    currentLogEntries: LogEntry[]; // Pass current logs
+    commandName: string;
+    currentLogEntries: LogEntry[];
 }
 
-// Update function signature to return HandlerResult
 export const handleCustomCommand = async (params: HandlerParams, action: CustomCommandAction): Promise<HandlerResult> => {
     const { timestamp, commandName, currentLogEntries, userId, userPermissions } = params;
-    // Permission check moved to central handler
 
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    const outputText = action; // Action is the output for now
-    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
+    const outputText = action;
+    const outputLines: OutputLine[] = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp, flag: 0 }]; // Added flag
 
-    // Create log entry with flag=0
     const logEntry: LogEntry = {
         timestamp,
         type: 'I',
-        flag: 0, // Default flag
+        flag: 0,
         text: `Executed custom command '${commandName}'. Output: ${outputText} (User: ${userId})`
     };
     const newLogEntries = [...currentLogEntries, logEntry];
 
-    return { outputLines: outputLines, newLogEntries: newLogEntries };
+    return {
+        outputLines: outputLines,
+        newLogEntries: newLogEntries,
+        newSuggestions: undefined,
+        newCustomCommands: undefined,
+        toastInfo: undefined
+    };
 };
 
 /**

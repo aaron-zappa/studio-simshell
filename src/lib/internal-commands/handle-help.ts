@@ -2,34 +2,25 @@
 // src/lib/internal-commands/handle-help.ts
 'use server';
 import type { OutputLine } from '@/components/output-display';
-import { type CommandMode, ALL_COMMAND_MODES } from '@/types/command-types';
+import { ALL_COMMAND_MODES, type CommandMode } from '@/types/command-types';
 import type { LogEntry } from '@/types/log-types';
-import { internalCommandDefinitions, type CommandDefinition } from '@/lib/internal-commands-definitions'; // Import new definitions
-import { isDatabaseInitialized } from '@/lib/database'; // Assuming this function exists
-
-interface HandlerResult {
-    outputLines: OutputLine[];
-    newLogEntries?: LogEntry[];
-}
+import { internalCommandDefinitions, type CommandDefinition } from '@/lib/internal-commands-definitions';
+import { isDatabaseInitialized } from '@/lib/database';
+import type { HandlerResult } from './index';
 
 interface HandlerParams {
     userId: number;
     userPermissions: string[];
     timestamp: string;
-    initialSuggestions: Record<string, string[]>; // For non-internal categories
+    initialSuggestions: Record<string, string[]>;
     currentLogEntries: LogEntry[];
-    overridePermissionChecks?: boolean; // To show all commands if true
+    overridePermissionChecks?: boolean;
 }
 
-/**
- * Handles the 'help' command.
- * Displays available categories, internal commands (based on user permissions from params),
- * and usage notes, grouped by category.
- */
 export const handleHelp = async ({ userId, timestamp, initialSuggestions, currentLogEntries, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
     let helpText = `Command category is automatically detected.\n@bat:<filename><.bat/.sh/.sim>(experimental).\n\n--- Command Suggestions by Category ---`;
     let outputLines: OutputLine[] = [];
-    let logText = 'Displayed help. ';
+    let logTextEntry = 'Displayed help. ';
     let logType: 'I' | 'E' = 'I';
     let logFlag: 0 | 1 = 0;
 
@@ -37,13 +28,14 @@ export const handleHelp = async ({ userId, timestamp, initialSuggestions, curren
 
     let commandsToShow: CommandDefinition[] = internalCommandDefinitions;
 
-    if (!dbInitialized) {
-        commandsToShow = internalCommandDefinitions.filter(cmdDef => cmdDef.name === 'ai');
-        logText += '(Database not initialized - showing limited help)';
+    if (!dbInitialized && !overridePermissionChecks) { // Only filter if not overriding and DB not init
+        commandsToShow = internalCommandDefinitions.filter(cmdDef => cmdDef.name === 'ai' || cmdDef.name === 'init db' || cmdDef.name === 'help');
+        logTextEntry += '(Database not initialized - showing limited help)';
+        helpText += "\n\n**Note:** Database not fully initialized. Some commands may be unavailable. Run 'init db'.";
     }
 
-    // Internal Commands
- helpText += `\\n\\n**Internal**`;
+
+    helpText += `\n\n**Internal**`;
     commandsToShow.forEach(cmdDef => {
         if (overridePermissionChecks || !cmdDef.requiredPermission || userPermissions.includes(cmdDef.requiredPermission) || userPermissions.includes('override_all_permissions')) {
             helpText += `\n- **${cmdDef.name}**`;
@@ -63,25 +55,24 @@ export const handleHelp = async ({ userId, timestamp, initialSuggestions, curren
         }
     });
 
-    // Other Categories (Python, SQL, etc.)
     for (const category of ALL_COMMAND_MODES) {
-        if (category === 'internal') continue; // Already handled
+        if (category === 'internal') continue;
 
         const suggestions = initialSuggestions[category];
         if (suggestions && suggestions.length > 0) {
             helpText += `\n\n**${category.charAt(0).toUpperCase() + category.slice(1)}**`;
             suggestions.forEach(suggestion => {
-                // For non-internal commands, we don't have detailed definitions in internalCommandDefinitions yet.
-                // We can add a generic permission check if needed, e.g., execute_python, execute_sql.
-                // For now, showing all suggestions for other active categories.
                 let showSuggestion = true;
-                if (category === 'sql' && !(overridePermissionChecks || userPermissions.includes('execute_sql_select') || userPermissions.includes('execute_sql_modify') || userPermissions.includes('override_all_permissions'))) {
-                    showSuggestion = false;
+                if (!overridePermissionChecks && !userPermissions.includes('override_all_permissions')) {
+                    if (category === 'sql' && !(userPermissions.includes('execute_sql_select') || userPermissions.includes('execute_sql_modify'))) {
+                        showSuggestion = false;
+                    }
+                    if (category === 'python' && !userPermissions.includes('execute_python_code')) {
+                        showSuggestion = false;
+                    }
+                    // Add similar checks for other categories if specific permissions apply
                 }
-                 if (category === 'python' && !(overridePermissionChecks || userPermissions.includes('execute_python_code') || userPermissions.includes('override_all_permissions'))) { // Assuming a generic python perm
-                    showSuggestion = false;
-                 }
-                // Add similar checks for other categories if specific permissions apply
+
 
                 if (showSuggestion) {
                     helpText += `\n- ${suggestion}`;
@@ -94,13 +85,17 @@ export const handleHelp = async ({ userId, timestamp, initialSuggestions, curren
 
     outputLines = [{ id: `out-${timestamp}`, text: helpText, type: 'output', category: 'internal', timestamp: undefined, flag: 0 }];
 
-    logText = `Displayed help. (User: ${userId})`;
-    logType = 'I';
-    logFlag = 0;
-    const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
+    logTextEntry += `(User: ${userId})`;
+    const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logTextEntry };
     const newLogEntries = [...currentLogEntries, logEntry];
 
-    return { outputLines: outputLines, newLogEntries };
+    return {
+        outputLines: outputLines,
+        newLogEntries: newLogEntries,
+        newSuggestions: undefined,
+        newCustomCommands: undefined,
+        toastInfo: undefined
+    };
 };
 
 /**

@@ -6,7 +6,7 @@ import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
 import type { LogEntry } from '@/types/log-types';
 import type { CommandMode } from '@/types/command-types';
-import { internalCommandDefinitions } from '@/lib/internal-commands-definitions'; // Can be used for permission checks
+import { internalCommandDefinitions } from '@/lib/internal-commands-definitions';
 
 // Import individual command handlers
 import { handleHelp } from './handle-help';
@@ -39,17 +39,20 @@ interface InternalCommandHandlerParams {
     commandName: string;
     args: string[];
     timestamp: string;
-    addSuggestion: (mode: CommandMode, command: string) => void;
-    addCustomCommand: (name: string, action: CustomCommandAction) => void;
+    addSuggestion: (mode: CommandMode, command: string) => void; // This is problematic for server actions
+    addCustomCommand: (name: string, action: CustomCommandAction) => void; // This is problematic for server actions
     getCustomCommandAction: (name: string) => CustomCommandAction | undefined;
     currentLogEntries: LogEntry[];
     initialSuggestions: Record<string, string[]>;
     overridePermissionChecks?: boolean;
 }
 
-interface HandlerResult {
+// Updated HandlerResult to include newSuggestions and newCustomCommands
+export interface HandlerResult {
     outputLines: OutputLine[];
     newLogEntries?: LogEntry[];
+    newSuggestions?: { mode: CommandMode; command: string }[];
+    newCustomCommands?: { name: string; action: CustomCommandAction }[];
     toastInfo?: { message: string; variant?: 'default' | 'destructive' };
 }
 
@@ -62,7 +65,6 @@ interface HandlerResult {
 export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<HandlerResult> => {
     const { commandName, commandLower, args, getCustomCommandAction, userPermissions, timestamp, userId, overridePermissionChecks } = params;
 
-    // Find command definition for permission check
     const commandDef = internalCommandDefinitions.find(def => def.name === commandName);
 
     const permissionDenied = (requiredPermission: string): HandlerResult => {
@@ -70,46 +72,44 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         return {
             outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
             newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }],
+            // Ensure all fields of HandlerResult are present, even if undefined
+            newSuggestions: undefined,
+            newCustomCommands: undefined,
             toastInfo: undefined
         };
     };
 
-    // Centralized permission check using commandDef (except for help which is always allowed)
     if (commandName !== 'help' && commandDef && commandDef.requiredPermission && !overridePermissionChecks && !userPermissions.includes(commandDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
         return permissionDenied(commandDef.requiredPermission);
     }
     
-    // Experimental @bat command handling
     if (commandName.startsWith('@bat:')) {
-        // TODO: Implement actual script execution logic here (with strict permission checks)
         console.warn("Experimental @bat command received, but execution is not yet implemented.");
         return {
             outputLines: [{ id: `bat-warn-${params.timestamp}`, text: `Experimental command @bat: not yet implemented.`, type: 'warning', category: 'internal', timestamp: params.timestamp, flag: 1 }],
             newLogEntries: [...params.currentLogEntries, { timestamp: params.timestamp, type: 'W', flag: 1, text: `Experimental @bat command not implemented: ${params.command} (User: ${userId})` }],
+            newSuggestions: undefined,
+            newCustomCommands: undefined,
             toastInfo: undefined
         };
     }
 
-
-    // Dispatch to specific handlers
     switch (commandName) {
         case 'help':
-            return handleHelp(params); // Help has its own internal permission filtering for display
+            return handleHelp(params);
         case 'clear':
-            return { outputLines: [], toastInfo: undefined };
+            return { outputLines: [], newSuggestions: undefined, newCustomCommands: undefined, toastInfo: undefined };
         case 'mode':
             return handleMode(params);
         case 'history':
-            // `commandDef` check above handles permission for 'history' if defined
             return handleHistory(params);
         case 'define':
             return handleDefine(params);
         case 'refine':
             return handleRefine(params);
         case 'add_int_cmd':
-             if (commandLower.startsWith('add_int_cmd ')) { // Ensure it's the full command
-                 // Permission already checked if commandDef for 'add_int_cmd' has requiredPermission
-                 return handleAddCommand(params);
+             if (commandLower.startsWith('add_int_cmd ')) {
+                 return handleAddCommand(params); // handleAddCommand needs to return full HandlerResult
              }
              break;
         case 'add_ai_tool':
@@ -119,7 +119,6 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
              break;
         case 'set':
              if (commandLower.startsWith('set ai_tool ')) {
-                 // Find 'set_ai_tool' in definitions for permission or define it as a sub-command
                  const setAiToolDef = internalCommandDefinitions.find(d => d.name === 'set_ai_tool');
                  if (setAiToolDef?.requiredPermission && !overridePermissionChecks && !userPermissions.includes(setAiToolDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
                      return permissionDenied(setAiToolDef.requiredPermission);
@@ -146,15 +145,13 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
              break;
         case 'pause':
             return handlePause(params);
-        case 'create_sqlite': // Changed from 'create'
-            // Permission handled by commandDef check at the start if 'create_sqlite' is defined
+        case 'create_sqlite':
             return handleCreateSqlite(params);
-        case 'show_requirements': // Changed from 'show'
+        case 'show_requirements':
             return handleShowRequirements(params);
-        case 'persist_memory_db_to': // Changed from 'persist'
+        case 'persist_memory_db_to':
             return handlePersistDb(params);
         case 'init':
-            // Special handling for 'init' vs 'init db'
             if (commandLower === 'init db') {
                  const initDbDef = internalCommandDefinitions.find(d => d.name === 'init_db');
                  if (initDbDef?.requiredPermission && !overridePermissionChecks && !userPermissions.includes(initDbDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
@@ -169,7 +166,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
                  return handleInit(params);
             }
             break;
-        case 'list_py_vars': // Changed from 'list'
+        case 'list_py_vars':
             return handleListPyVars(params);
         case 'ai':
             return handleAiCommand(params);
@@ -177,20 +174,12 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
 
     const customAction = getCustomCommandAction(params.commandName);
     if (customAction !== undefined) {
-        // For custom commands, we might need a generic 'execute_custom_command' permission
-        // Or, their definition (if stored) could include specific permissions.
-        // For now, assuming custom commands bypass the commandDef check above or are caught by it if named like a base command.
         return handleCustomCommand(params, customAction);
     }
 
     return handleNotFound(params);
 };
 
-async function executeScriptFile(): Promise<HandlerResult> {
-    return {
-        outputLines: [], newLogEntries: [], toastInfo: undefined
-    };
-}
 /**
  * Returns the name of the current file.
  * This function is not exported to avoid being treated as a Server Action.
