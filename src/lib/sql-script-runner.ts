@@ -30,9 +30,9 @@ export async function executeSqlScript(filename: string): Promise<ExecuteSqlScri
   // --- Security Check: Validate filename and construct path ---
   if (!filename.match(/^[a-zA-Z0-9_.-]+\.sql$/) || filename.includes('..') || filename.includes('/')) {
     const errorMsg = `Error: Invalid SQL script filename '${filename}'.`;
-    logEntries.push({ timestamp, type: 'E', flag: 0, text: errorMsg });
+    logEntries.push({ timestamp, type: 'E', flag: 1, text: errorMsg }); // Error flag
     return {
-      outputLines: [{ id: `sql-script-invalid-name-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 0 }],
+      outputLines: [{ id: `sql-script-invalid-name-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 1 }], // Error flag
       newLogEntries: logEntries,
       error: errorMsg,
     };
@@ -43,9 +43,9 @@ export async function executeSqlScript(filename: string): Promise<ExecuteSqlScri
   // Ensure the resolved path is actually within the allowed directory
   if (!_path.resolve(filePath).startsWith(_path.resolve(SQL_SCRIPTS_DIR))) {
     const errorMsg = `Error: Access denied for SQL script path '${filename}'.`;
-     logEntries.push({ timestamp, type: 'E', flag: 0, text: errorMsg });
+     logEntries.push({ timestamp, type: 'E', flag: 1, text: errorMsg }); // Error flag
     return {
-      outputLines: [{ id: `sql-script-access-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 0 }],
+      outputLines: [{ id: `sql-script-access-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 1 }], // Error flag
       newLogEntries: logEntries,
       error: errorMsg,
     };
@@ -111,8 +111,8 @@ export async function executeSqlScript(filename: string): Promise<ExecuteSqlScri
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
         const detailedError = `Error in SQL script '${filename}', command ${i + 1} ('${commandText.substring(0,50)}...'): ${errorMsg}`;
-        outputLines.push({ id: `sql-script-err-${i}-${cmdTimestamp}`, text: detailedError, type: 'error', category: 'sql', timestamp: cmdTimestamp, flag: 0 });
-        logEntries.push({ timestamp: cmdTimestamp, type: 'E', flag: 0, text: detailedError });
+        outputLines.push({ id: `sql-script-err-${i}-${cmdTimestamp}`, text: detailedError, type: 'error', category: 'sql', timestamp: cmdTimestamp, flag: 1 }); // Error flag
+        logEntries.push({ timestamp: cmdTimestamp, type: 'E', flag: 1, text: detailedError }); // Error flag
         // Optionally, decide if script execution should stop on error
         // For now, it continues to the next command.
       }
@@ -121,8 +121,8 @@ export async function executeSqlScript(filename: string): Promise<ExecuteSqlScri
 
   } catch (error) {
     const errorMsg = `Error processing SQL script '${filename}': ${error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'File not found.' : (error instanceof Error ? error.message : 'Unknown error')}`;
-    outputLines.push({ id: `sql-script-proc-err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 0 });
-    logEntries.push({ timestamp, type: 'E', flag: 0, text: errorMsg });
+    outputLines.push({ id: `sql-script-proc-err-${timestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp, flag: 1 }); // Error flag
+    logEntries.push({ timestamp, type: 'E', flag: 1, text: errorMsg }); // Error flag
     return { outputLines, newLogEntries: logEntries, error: errorMsg };
   }
 
@@ -137,3 +137,4 @@ export async function executeSqlScript(filename: string): Promise<ExecuteSqlScri
 function getFilename(): string {
     return 'sql-script-runner.ts';
 }
+

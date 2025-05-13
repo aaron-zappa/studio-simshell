@@ -25,8 +25,8 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
     // if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) {
     //     const errorMsg = "Permission denied: Cannot persist database.";
     //     return {
-    //         outputLines: [{ id: `persist-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //         outputLines: [{ id: `persist-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }] // Error flag
     //     };
     // }
 
@@ -42,7 +42,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
         outputText = 'Error: Invalid syntax. Use: persist memory db to <filename.db>';
         outputType = 'error';
         logType = 'E';
-        logFlag = 0; // Set flag to 0 for error
+        logFlag = 1; // Set flag to 1 for error
         logText = outputText + ` (User: ${userId}, Command: persist ${args.join(' ')})`;
     } else {
         const targetFilename = args[3];
@@ -58,7 +58,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
                 outputText = 'Failed to persist database for an unknown reason.';
                 outputType = 'error';
                 logType = 'E';
-                logFlag = 0; // Set flag to 0 for error
+                logFlag = 1; // Set flag to 1 for error
                 logText = outputText + ` (User: ${userId})`;
             }
         } catch (error) {
@@ -66,7 +66,7 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
             outputText = `Error persisting database: ${error instanceof Error ? error.message : 'Unknown error'}`;
             outputType = 'error';
             logType = 'E';
-            logFlag = 0; // Set flag to 0 for error
+            logFlag = 1; // Set flag to 1 for error
             logText = outputText + ` (User: ${userId})`;
         }
     }
@@ -88,3 +88,4 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
 function getFilename(): string {
     return 'handle-persist-db.ts';
 }
+

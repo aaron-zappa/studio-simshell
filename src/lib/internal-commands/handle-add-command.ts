@@ -50,7 +50,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
             outputText = `Error: Cannot redefine built-in command "${newCommandName}".`;
             outputType = 'error';
             logType = 'E';
-            logFlag = 0;
+            logFlag = 1; // Error flag
             logText = `${outputText} (User: ${userId})`;
             outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag }];
         } else {
@@ -69,7 +69,7 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
         outputText = `Error: Invalid syntax. Use: add_int_cmd <short> <name> "<description>" <whatToDo>`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 0;
+        logFlag = 1; // Error flag
         logText = `${outputText} (User: ${userId}, Command: ${command})`;
         outputLines = [{ id: `out-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag }];
     }
@@ -93,3 +93,4 @@ export const handleAddCommand = async (params: HandlerParams): Promise<HandlerRe
 function getFilename(): string {
     return 'handle-add-command.ts';
 }
+

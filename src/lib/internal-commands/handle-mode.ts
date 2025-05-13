@@ -36,19 +36,21 @@ export const handleMode = async ({ args, timestamp, initialSuggestions, currentL
     if (args.length === 0) {
        logText = `Command category is automatically detected. Available categories: ${Object.keys(initialSuggestions).join(', ')}. Use 'help' for more info.`;
        outputType = 'info';
-       outputLines = [{ id: `mode-info-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
+       logFlag = 0;
+       outputLines = [{ id: `mode-info-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp, flag: logFlag }];
     }
     // Check if the requested mode is valid just for info purposes
     else if (Object.keys(initialSuggestions).includes(requestedMode)) {
         logText = `Info: You requested mode '${requestedMode}'. Command category is automatically detected.`;
         outputType = 'info';
-        outputLines = [{ id: `mode-info-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
+        logFlag = 0;
+        outputLines = [{ id: `mode-info-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp, flag: logFlag }];
     } else {
         logText = `Info: '${requestedMode}' is not a recognized category. Categories are automatically detected. Valid categories: ${Object.keys(initialSuggestions).join(', ')}`;
         logType = 'W'; // Warning for invalid request
         logFlag = 1; // Set flag for warning
         outputType = 'error'; // Keep output as error for user feedback
-        outputLines = [{ id: `mode-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp }];
+        outputLines = [{ id: `mode-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp, flag: logFlag }];
     }
 
     // Create log entry

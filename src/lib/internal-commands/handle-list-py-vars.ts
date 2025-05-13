@@ -31,8 +31,8 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
     // if (!overridePermissionChecks && !userPermissions.includes('read_variables')) {
     //     const errorMsg = "Permission denied: Cannot read variables.";
     //     return {
-    //         outputLines: [{ id: `list-vars-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //         outputLines: [{ id: `list-vars-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }] // Error flag
     //     };
     // }
 
@@ -52,6 +52,7 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
              const formattedTable = await formatResultsAsTable(results);
              outputText = formattedTable || "No variables found."; // formatResultsAsTable returns null on empty input, but we check length > 0
              logText = `Listed ${results.length} variable(s) from database. (User: ${userId})`;
+             logFlag = 0;
         } else {
              outputText = "No variables found in the database.";
              logText = `No variables found when listing. (User: ${userId})`;
@@ -65,7 +66,7 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
         outputType = 'error';
         logText = outputText + ` (User: ${userId})`;
         logType = 'E';
-        logFlag = 0; // Set flag to 0 for error
+        logFlag = 1; // Set flag to 1 for error
     }
 
     const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText };
@@ -93,3 +94,4 @@ export const handleListPyVars = async ({ timestamp, currentLogEntries, userId, u
 function getFilename(): string {
     return 'handle-list-py-vars.ts';
 }
+

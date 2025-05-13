@@ -57,11 +57,11 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
              return { id: `log-export-success-${timestamp}`, text: 'Log file exported successfully as logfile.csv.', type: 'info', category: 'internal', flag: 0 }; // Added flag
         } else {
              console.error('Browser does not support automatic downloading.');
-             return { id: `log-export-fail-${timestamp}`, text: 'Error: Browser does not support automatic download.', type: 'error', category: 'internal', flag: 0 }; // Added flag, set to 0 for error
+             return { id: `log-export-fail-${timestamp}`, text: 'Error: Browser does not support automatic download.', type: 'error', category: 'internal', flag: 1 }; // Error flag
         }
     } catch (error) {
         console.error('Error exporting log file:', error);
-        return { id: `log-export-error-${timestamp}`, text: `Error exporting log file: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error', category: 'internal', flag: 0 }; // Added flag, set to 0 for error
+        return { id: `log-export-error-${timestamp}`, text: `Error exporting log file: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error', category: 'internal', flag: 1 }; // Error flag
     }
 };
 
@@ -79,3 +79,4 @@ function getFilename(): string {
 // The 'show requirements' command logic is now in its own handler file.
 // Logging should now happen within command handlers by creating LogEntry objects
 // and returning them in the HandlerResult.
+

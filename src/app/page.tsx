@@ -53,8 +53,7 @@ export default function Home() {
             if (status.includes('nok')) {
                 statusType = 'error';
                 logType = 'E';
-            } else {
-                logFlag = 0;
+                logFlag = 1; // Set flag to 1 for Error
             }
 
 
@@ -77,10 +76,10 @@ export default function Home() {
                 type: 'error',
                 category: 'internal',
                 timestamp: timestamp,
-                flag: 0,
+                flag: 1, // Set flag to 1 for Error
              };
              setHistory(prev => [...prev, errorLine]);
-             setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorLine.text }]);
+             setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorLine.text }]); // Set flag to 1 for Error
         }
     };
     fetchDbStatus();
@@ -151,7 +150,7 @@ export default function Home() {
             if (scriptResult.outputLines) {
                 const outputToDisplay = scriptResult.outputLines.map(line => ({
                     ...line,
-                    flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
+                    flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : undefined)
                 }));
                  setHistory((prev) => [...prev, ...outputToDisplay]);
             }
@@ -187,10 +186,10 @@ export default function Home() {
                 type: 'error',
                 category: 'sql',
                 timestamp: timestamp,
-                flag: 0,
+                flag: 1, // Error flag
             };
             setHistory((prev) => [...prev, errorOutput]);
-            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorMsg }]);
+            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
         }
     } else {
         // Regular SQL command execution
@@ -221,7 +220,7 @@ export default function Home() {
                     .filter(line => line.id !== commandLogOutput?.id)
                     .map(line => ({
                         ...line,
-                        flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
+                        flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : undefined)
                     }));
                 
                 setHistory((prev) => [...prev, ...outputToDisplay]);
@@ -240,9 +239,9 @@ export default function Home() {
                 console.error("Direct SQL execution did not return expected result object or outputLines:", executionResult);
                 const errorMsg = "SQL execution failed to produce a valid result.";
                 const errTimestamp = new Date().toISOString();
-                const errorOutputLine: OutputLine = { id: `sql-exec-err-${errTimestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp: errTimestamp, flag: 0 };
+                const errorOutputLine: OutputLine = { id: `sql-exec-err-${errTimestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp: errTimestamp, flag: 1 }; // Error flag
                 setHistory((prev) => [...prev, errorOutputLine]);
-                setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 0, text: errorMsg }]);
+                setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
                 toast({ title: "SQL Execution Error", description: errorMsg, variant: "destructive" });
             }
 
@@ -260,10 +259,10 @@ export default function Home() {
                 type: 'error',
                 category: 'sql',
                 timestamp: timestamp,
-                flag: 0,
+                flag: 1, // Error flag
             };
             setHistory((prev) => [...prev, errorOutput]);
-            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorMsg }]);
+            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
         }
     }
     setIsRunning(false);
@@ -288,10 +287,10 @@ export default function Home() {
             type: 'error',
             category: 'internal', 
             timestamp: timestamp,
-            flag: 0,
+            flag: 1, // Error flag
         };
         setHistory((prev) => [...prev, errorOutput]);
-        setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 0, text: errorMsg }]);
+        setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
     }
   };
 
@@ -355,6 +354,7 @@ export default function Home() {
              timestamp: timestamp
          };
          setHistory((prev) => [...prev, commandLogOutput]);
+         setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: "Command execution skipped: Clipboard operation failed." }]); // Error flag
          throw new Error("Command execution skipped: Clipboard operation failed.");
       }
        if (!finalCommand && !clipboardGetRegex.test(commandTrimmed) && commandTrimmed.length > 0) {
@@ -366,6 +366,7 @@ export default function Home() {
              timestamp: timestamp
            };
            setHistory((prev) => [...prev, commandLogOutput]);
+           setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: "Command execution skipped: Processed command is empty." }]); // Error flag
            throw new Error("Command execution skipped: Processed command is empty.");
        }
        if (!finalCommand && commandTrimmed.length === 0) { 
@@ -398,7 +399,7 @@ export default function Home() {
           type: 'error',
           category: 'internal',
           timestamp: timestamp,
-          flag: 0,
+          flag: 1, // Error flag
         };
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         const classificationLog: LogEntry = {
@@ -424,7 +425,7 @@ export default function Home() {
           const exportResultLine = exportLogFile(logEntries); 
            const logText = exportResultLine ? exportResultLine.text : "Log export action attempted.";
            const logType: LogEntry['type'] = exportResultLine?.type === 'error' ? 'E' : 'I';
-           const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 0 : 0; 
+           const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 1 : 0; 
            const exportLog: LogEntry = { timestamp, type: logType, flag: logFlagVal, text: logText };
            setLogEntries(prev => [...prev, exportLog]);
 
@@ -475,7 +476,7 @@ export default function Home() {
               .filter(line => line.id !== commandLogOutput?.id) 
               .map(line => ({
                  ...line,
-                 flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
+                 flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : undefined)
                }));
 
            if(commandLogOutput){
@@ -509,7 +510,7 @@ export default function Home() {
               type: 'error',
               category: 'internal',
               timestamp: errTimestamp,
-              flag: 0,
+              flag: 1, // Error flag
           };
           if (commandLogOutput) {
             setHistory((prev) => [...prev, commandLogOutput, errorOutputLine]);
@@ -518,7 +519,7 @@ export default function Home() {
              const cmdFallbackLog: OutputLine = { id: `cmd-fallback-${errTimestamp}`, text: originalCommand || "[unknown command]", type: 'command', category: 'internal', timestamp: errTimestamp };
              setHistory((prev) => [...prev, cmdFallbackLog, errorOutputLine]);
           }
-          setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 0, text: errorMsg }]);
+          setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
           toast({ title: "Execution Error", description: errorMsg, variant: "destructive" });
       }
 
@@ -538,9 +539,9 @@ export default function Home() {
             type: 'error',
             category: 'internal',
             timestamp: timestamp, 
-            flag: 0, 
+            flag: 1,  // Error flag
         };
-         const errorLog: LogEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; 
+         const errorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: errorMsg }; // Error flag
          if (executionResult && executionResult.newLogEntries) { // Check if executionResult is not null
              setLogEntries([...executionResult.newLogEntries, errorLog]);
          } else {
@@ -665,5 +666,6 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
+
 
 

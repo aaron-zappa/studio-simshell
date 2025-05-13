@@ -70,8 +70,8 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
     const permissionDenied = (requiredPermission: string): HandlerResult => {
         const errorMsg = `Permission denied: Requires '${requiredPermission}' permission.`;
         return {
-            outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-            newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }],
+            outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
+            newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }], // Error flag
             // Ensure all fields of HandlerResult are present, even if undefined
             newSuggestions: undefined,
             newCustomCommands: undefined,
@@ -145,11 +145,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
              break;
         case 'pause':
             return handlePause(params);
-        case 'create_sqlite':
+        case 'create_sqlite': // Corrected command name based on definitions
             return handleCreateSqlite(params);
         case 'show_requirements':
             return handleShowRequirements(params);
-        case 'persist_memory_db_to':
+        case 'persist_memory_db_to': // Corrected command name based on definitions
             return handlePersistDb(params);
         case 'init':
             if (commandLower === 'init db') {
@@ -188,3 +188,4 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
 function getFilename(): string {
     return 'index.ts';
 }
+

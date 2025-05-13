@@ -25,8 +25,8 @@ export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, u
     // if (!overridePermissionChecks && !userPermissions.includes('manage_users')) {
     //     const errorMsg = "Permission denied: Cannot create SQLite database (admin operation).";
     //     return {
-    //         outputLines: [{ id: `create-sqlite-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //         outputLines: [{ id: `create-sqlite-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }] // Error flag
     //     };
     // }
 
@@ -40,13 +40,14 @@ export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, u
         outputText = `Error: Invalid syntax. Use: create sqlite <filename.db> (filename is ignored, uses in-memory DB)`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 0; // Set flag to 0 for error
+        logFlag = 1; // Set flag to 1 for error
         logText = outputText + ` (User: ${userId}, Command: create ${args.join(' ')})`;
     } else {
          // Simulate a brief action, actual DB init is deferred to first use or 'init db'.
          await new Promise(resolve => setTimeout(resolve, 100));
          outputText = `Internal SQLite in-memory database is ready. Use SQL commands directly. (Filename argument is ignored).`;
          logType = 'I';
+         logFlag = 0;
          logText = outputText + ` (User: ${userId})`;
     }
 
@@ -67,3 +68,4 @@ export const handleCreateSqlite = async ({ args, timestamp, currentLogEntries, u
 function getFilename(): string {
     return 'handle-create-sqlite.ts';
 }
+

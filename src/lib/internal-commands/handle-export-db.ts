@@ -32,8 +32,8 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
     // if (!overridePermissionChecks && !userPermissions.includes('execute_sql_modify')) {
     //     const errorMsg = "Permission denied: Cannot export database.";
     //     return {
-    //         outputLines: [{ id: `export-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //         outputLines: [{ id: `export-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }] // Error flag
     //     };
     // }
 
@@ -58,7 +58,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
             outputText = `Failed to export database to ${targetFilename} for an unknown reason.`;
             outputType = 'error';
             logType = 'E';
-            logFlag = 0; // Set flag to 0 for error
+            logFlag = 1; // Set flag to 1 for error
             logText = outputText + ` (User: ${userId})`;
         }
     } catch (error) {
@@ -66,7 +66,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
         outputText = `Error exporting database to ${targetFilename}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 0; // Set flag to 0 for error
+        logFlag = 1; // Set flag to 1 for error
         logText = outputText + ` (User: ${userId})`;
     }
 
@@ -87,3 +87,4 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
 function getFilename(): string {
     return 'handle-export-db.ts';
 }
+

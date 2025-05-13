@@ -41,7 +41,7 @@ export const handleSetSimMode = async (params: HandlerParams): Promise<HandlerRe
         outputText = `Error: Invalid syntax. Use: set sim_mode <0|1>`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 0;
+        logFlag = 1; // Error flag
         logText = outputText + ` (User: ${userId}, Command: set sim_mode ${args.join(' ')})`;
         outputLines.push({ id: `set-sim-mode-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
     } else {
@@ -61,7 +61,7 @@ export const handleSetSimMode = async (params: HandlerParams): Promise<HandlerRe
             outputType = 'error';
             logText = outputText + ` (User: ${userId})`;
             logType = 'E';
-            logFlag = 0;
+            logFlag = 1; // Error flag
             outputLines.push({ id: `set-sim-mode-db-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
         }
     }
@@ -82,3 +82,4 @@ export const handleSetSimMode = async (params: HandlerParams): Promise<HandlerRe
 function getFilename(): string {
     return 'handle-set-sim-mode.ts';
 }
+

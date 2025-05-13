@@ -31,8 +31,8 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
     // if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) {
     //     const errorMsg = "Permission denied: Cannot initialize database (admin operation).";
     //     return {
-    //         outputLines: [{ id: `init-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //         outputLines: [{ id: `init-db-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }] // Error flag
     //     };
     // }
 
@@ -185,14 +185,14 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
                 errors.push(errorMsg);
                 logType = 'E';
                 outputType = 'error';
-                logFlag = 0;
-                outputLines.push({ id: `init-err-${statementType}-${errors.length}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
+                logFlag = 1; // Error flag
+                outputLines.push({ id: `init-err-${statementType}-${errors.length}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Error flag
             }
         }
 
         const initialSummaryText = `DB Initialization (Tables & RBAC): ${successfulStatements} statements executed successfully. ${errors.length} errors encountered.`;
         logText += initialSummaryText;
-        outputLines.push({ id: `init-summary-rbac-${timestamp}`, text: initialSummaryText, type: errors.length > 0 ? 'error' : 'info', category: 'internal', timestamp, flag: errors.length > 0 ? 0 : 0 });
+        outputLines.push({ id: `init-summary-rbac-${timestamp}`, text: initialSummaryText, type: errors.length > 0 ? 'error' : 'info', category: 'internal', timestamp, flag: errors.length > 0 ? 1 : 0 }); // Error flag if errors
 
         // --- Populate command_metadata and command_input_arguments ---
         outputLines.push({ id: `init-cmd-meta-start-${timestamp}`, text: "Populating command metadata...", type: 'info', category: 'internal', timestamp, flag: 0 });
@@ -239,14 +239,14 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
                 errors.push(errorMsg); // Add to overall errors
                 cmdMetaErrorCount++;
                 logType = 'E'; // Ensure overall log type reflects error
-                logFlag = 0;   // Ensure overall flag reflects error
-                outputLines.push({ id: `init-cmd-meta-err-${cmdDef.name}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
+                logFlag = 1;   // Ensure overall flag reflects error
+                outputLines.push({ id: `init-cmd-meta-err-${cmdDef.name}-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Error flag
             }
         }
         
         const cmdMetaSummaryText = `Command Metadata Population: ${cmdMetaSuccessCount} commands processed. ${cmdMetaErrorCount} errors.`;
         logText += ` | ${cmdMetaSummaryText}`;
-        outputLines.push({ id: `init-cmd-meta-summary-${timestamp}`, text: cmdMetaSummaryText, type: cmdMetaErrorCount > 0 ? 'error' : 'info', category: 'internal', timestamp, flag: cmdMetaErrorCount > 0 ? 0 : 0 });
+        outputLines.push({ id: `init-cmd-meta-summary-${timestamp}`, text: cmdMetaSummaryText, type: cmdMetaErrorCount > 0 ? 'error' : 'info', category: 'internal', timestamp, flag: cmdMetaErrorCount > 0 ? 1 : 0 }); // Error flag if errors
         
         // Determine final overall output type based on any errors encountered
         outputType = errors.length > 0 ? 'error' : 'info';
@@ -258,8 +258,8 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
         logText = `Critical Error during DB initialization: ${error instanceof Error ? error.message : 'Unknown error'}`;
         logType = 'E';
         outputType = 'error';
-        logFlag = 0;
-        outputLines = [{ id: `init-db-crit-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp, flag: 0 }];
+        logFlag = 1; // Error flag
+        outputLines = [{ id: `init-db-crit-error-${timestamp}`, text: logText, type: outputType, category: 'internal', timestamp, flag: 1 }]; // Error flag
     }
 
     const logEntry: LogEntry = { timestamp, type: logType, flag: logFlag, text: logText + ` (User: ${userId})` };
@@ -279,3 +279,4 @@ export const handleInitDb = async ({ timestamp, currentLogEntries, userId, userP
 function getFilename(): string {
     return 'handle-init-db.ts';
 }
+

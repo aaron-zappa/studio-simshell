@@ -10,6 +10,7 @@ import { handleInternalCommand, type HandlerResult as InternalHandlerResult } fr
 import { storeVariableInDb } from '@/lib/variables';
 import { getUserPermissions } from '@/lib/permissions';
 import type { LogEntry } from '@/types/log-types';
+import { runSql } from '@/lib/database';
 
 interface ExecuteCommandParams {
   userId: number;
@@ -94,8 +95,8 @@ export async function executeCommand ({
                const errorMsg = permResult.code === 'DB_NOT_INITIALIZED'
                     ? "Permission check skipped: Database RBAC tables not initialized. Please run 'init db'."
                     : `Error fetching user permissions: ${permResult.error}`;
-               outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
-               const permErrorLog: LogEntry = { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User ID: ${userId})` };
+               outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Error flag
+               const permErrorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User ID: ${userId})` }; // Error flag
                return {
                    outputLines: [commandOutput, ...outputLines],
                    newLogEntries: potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, permErrorLog] : [...currentLogEntries, permErrorLog],
@@ -163,8 +164,8 @@ export async function executeCommand ({
             const matchPrint = commandTrimmed.match(/print\((['"]?)(.*?)\1\)/);
             const printOutput = matchPrint ? matchPrint[2] : 'Syntax Error in print';
             const type: OutputLine['type'] = matchPrint ? 'output' : 'error';
-            outputLines.push({ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: 0 });
-            logEntryToAdd = { timestamp, type: matchPrint ? 'I' : 'E', flag: 0, text: `Python print: ${printOutput} (User: ${userId})` };
+            outputLines.push({ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: type === 'error' ? 1 : 0 }); // Error flag
+            logEntryToAdd = { timestamp, type: matchPrint ? 'I' : 'E', flag: matchPrint ? 0 : 1, text: `Python print: ${printOutput} (User: ${userId})` }; // Error flag
          } else {
             await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100));
             const simOutput = `Simulating Python: ${commandTrimmed} (output placeholder)`;
@@ -209,8 +210,8 @@ export async function executeCommand ({
          } catch (error) {
            const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
            const displayError = errorMsg.includes('no such table') ? `${errorMsg}. Consider running 'init db'.` : errorMsg;
-           outputLines.push({ id: `err-${timestamp}`, text: displayError, type: 'error', category: 'sql', timestamp, flag: 0 });
-           logEntryToAdd = { timestamp, type: 'E', flag: 0, text: `SQL Error: ${displayError} (User: ${userId})` };
+           outputLines.push({ id: `err-${timestamp}`, text: displayError, type: 'error', category: 'sql', timestamp, flag: 1 }); // Error flag
+           logEntryToAdd = { timestamp, type: 'E', flag: 1, text: `SQL Error: ${displayError} (User: ${userId})` }; // Error flag
          }
       }
       else if (mode === 'excel') {
@@ -223,8 +224,8 @@ export async function executeCommand ({
                  try {
                      const numbers = numbersMatch[1].split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
                      excelOutput = `${numbers.reduce((acc, val) => acc + val, 0)}`;
-                 } catch (e) { excelOutput = '#VALUE!'; excelLogType = 'E'; outputTypeExcel = 'error'; logFlagExcel = 0; }
-             } else { excelOutput = '#NAME?'; excelLogType = 'E'; outputTypeExcel = 'error'; logFlagExcel = 0; }
+                 } catch (e) { excelOutput = '#VALUE!'; excelLogType = 'E'; outputTypeExcel = 'error'; logFlagExcel = 1; } // Error flag
+             } else { excelOutput = '#NAME?'; excelLogType = 'E'; outputTypeExcel = 'error'; logFlagExcel = 1; } // Error flag
          }
          outputLines.push({ id: `out-${timestamp}`, text: excelOutput, type: outputTypeExcel, category: 'excel', timestamp: outputTypeExcel === 'error' ? timestamp : undefined, flag: logFlagExcel });
          logEntryToAdd = { timestamp, type: excelLogType, flag: logFlagExcel, text: `Excel simulation: ${excelOutput} (User: ${userId})` };
@@ -236,7 +237,7 @@ export async function executeCommand ({
         if (commandLower.startsWith('console.log(')) {
             const matchConsoleLog = commandTrimmed.match(/console\.log\((['"]?)(.*?)\1\)/);
             simOutput = matchConsoleLog ? `Output: ${matchConsoleLog[2]}` : 'Syntax Error in console.log';
-            tsOutputType = matchConsoleLog ? 'output' : 'error'; if (!matchConsoleLog) { tsLogType = 'E'; tsLogFlag = 0; }
+            tsOutputType = matchConsoleLog ? 'output' : 'error'; if (!matchConsoleLog) { tsLogType = 'E'; tsLogFlag = 1; } // Error flag
         } else if (commandLower.includes('=')) simOutput = `Simulating TypeScript: ${commandTrimmed} (Variable notionally assigned)`;
         else if (commandLower.startsWith('type ') || commandLower.startsWith('interface ')) simOutput = `Simulating TypeScript: ${commandTrimmed} (Type/Interface notionally defined)`;
         outputLines.push({ id: `out-${timestamp}`, text: simOutput, type: tsOutputType, category: 'typescript', timestamp: tsOutputType === 'error' ? timestamp : undefined, flag: tsLogFlag });
@@ -248,8 +249,8 @@ export async function executeCommand ({
   } catch (error) {
       console.error("Unhandled error during command execution:", error);
       const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      outputLines.push({ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
-      logEntryToAdd = { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` };
+      outputLines.push({ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Error flag
+      logEntryToAdd = { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }; // Error flag
   }
 
 
@@ -276,3 +277,4 @@ export async function executeCommand ({
 function getFilename(): string {
     return 'command-executor.ts';
 }
+

@@ -41,8 +41,8 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
     // if (!overridePermissionChecks && !userPermissions.includes('manage_ai_tools')) {
     //     const errorMsg = "Permission denied: Cannot manage AI tools.";
     //     return {
-    //         outputLines: [{ id: `add-tool-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //         outputLines: [{ id: `add-tool-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }] // Error flag
     //     };
     // }
 
@@ -75,15 +75,16 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
             outputType = 'info';
             logText = outputText + ` (User: ${userId})`;
             logType = 'I';
-            outputLines.push({ id: `add-tool-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
+            logFlag = 0;
+            outputLines.push({ id: `add-tool-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
         } catch (error) {
             console.error(`Error storing AI tool metadata for '${toolName}':`, error);
             outputText = `Error storing AI tool metadata: ${error instanceof Error ? error.message : 'Unknown DB error'}`;
             outputType = 'error';
             logText = outputText + ` (User: ${userId})`;
             logType = 'E';
-            logFlag = 0; // Set flag to 0 for error
-            outputLines.push({ id: `add-tool-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
+            logFlag = 1; // Set flag to 1 for error
+            outputLines.push({ id: `add-tool-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
         }
     } else {
         // Update syntax error message
@@ -91,8 +92,8 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
         outputType = 'error';
         logText = outputText + ` (User: ${userId}, Command: ${command})`;
         logType = 'E';
-        logFlag = 0; // Set flag to 0 for error
-        outputLines = [{ id: `add-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 }];
+        logFlag = 1; // Set flag to 1 for error
+        outputLines = [{ id: `add-tool-syntax-err-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag }];
     }
 
     // Add log entry regardless of success/failure
@@ -112,3 +113,4 @@ export const handleAddAiTool = async (params: HandlerParams): Promise<HandlerRes
 function getFilename(): string {
     return 'handle-add-ai-tool.ts';
 }
+

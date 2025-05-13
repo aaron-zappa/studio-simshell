@@ -63,6 +63,7 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
 
         outputText = header + '\n' + rows + `\n(${requirements.length} requirement${requirements.length === 1 ? '' : 's'} found)`;
         logText = `Displayed log requirements. Found ${requirements.length}. (User: ${userId})`;
+        logFlag = 0;
 
     } catch (error) {
         console.error("Error generating requirements CSV:", error);
@@ -70,7 +71,7 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
         outputType = 'error';
         logText = outputText + ` (User: ${userId})`;
         logType = 'E';
-        logFlag = 0; // Set flag to 0 for error
+        logFlag = 1; // Set flag to 1 for error
     }
 
     // TODO: Handle arguments if needed
@@ -84,7 +85,8 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
         text: outputText,
         type: outputType,
         category: 'internal',
-        timestamp: outputType === 'error' || outputType === 'info' ? timestamp : undefined // Add timestamp for errors/info
+        timestamp: outputType === 'error' || outputType === 'info' ? timestamp : undefined, // Add timestamp for errors/info
+        flag: logFlag
     }];
 
     // Create log entry
@@ -103,3 +105,4 @@ export const handleShowRequirements = async ({ timestamp, args, currentLogEntrie
 function getFilename(): string {
     return 'handle-show-requirements.ts';
 }
+

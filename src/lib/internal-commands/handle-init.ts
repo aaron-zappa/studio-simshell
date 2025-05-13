@@ -32,8 +32,8 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
     // if (!overridePermissionChecks && !userPermissions.includes('manage_roles_permissions')) {
     //     const errorMsg = "Permission denied: Cannot initialize system (admin operation).";
     //     return {
-    //         outputLines: [{ id: `init-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }],
-    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }]
+    //         outputLines: [{ id: `init-perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
+    //         newLogEntries: [...currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }] // Error flag
     //     };
     // }
 
@@ -79,10 +79,10 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
             } catch (error) {
                 const errorMsg = `Error storing default variable '${variable.name}': ${error instanceof Error ? error.message : 'Unknown error'}`;
                 console.error(errorMsg);
-                logEntries.push({ timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }); // Set flag to 0 for error
+                logEntries.push({ timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }); // Error flag
                 varErrors.push(errorMsg);
                 overallSuccess = false;
-                // logFlag = 0; // Overall flag is set later based on overallSuccess
+                // logFlag = 1; // Overall flag is set later based on overallSuccess
             }
         }
 
@@ -98,25 +98,25 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
         outputLines.push({ id: `init-vars-${timestamp}`, text: varInitMsg, type: 'info', category: 'internal', timestamp, flag: 0 });
 
         if (varErrors.length > 0) {
-            outputLines.push({ id: `init-vars-err-${timestamp}`, text: `Errors encountered during variable initialization:\n${varErrors.join('\n')}`, type: 'error', category: 'internal', timestamp, flag: 0 });
+            outputLines.push({ id: `init-vars-err-${timestamp}`, text: `Errors encountered during variable initialization:\n${varErrors.join('\n')}`, type: 'error', category: 'internal', timestamp, flag: 1 }); // Error flag
         }
 
         // Add the clipboard info message to the final combined message
         finalMessage = `Initialization complete. ${dbInitMsg} ${varInitMsg} ${clipboardInitMsg}`;
          if (!overallSuccess) {
              finalMessage += " Some errors occurred during variable initialization.";
-             logFlag = 0; // Set overall flag to 0 if any error occurred
+             logFlag = 1; // Set overall flag to 1 if any error occurred
          }
 
 
     } catch (error) {
         console.error("Error during initialization:", error);
         const errorMsg = `Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        logEntries.push({ timestamp, type: 'E', flag: 0, text: `${errorMsg} (User: ${userId})` }); // Set flag to 0 for error
-        outputLines.push({ id: `init-error-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 });
+        logEntries.push({ timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }); // Error flag
+        outputLines.push({ id: `init-error-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Error flag
         overallSuccess = false;
         finalMessage = errorMsg;
-        logFlag = 0; // Set flag to 0 for critical init error
+        logFlag = 1; // Set flag to 1 for critical init error
     }
 
     const combinedLogEntries = [...currentLogEntries, ...logEntries];
@@ -144,3 +144,4 @@ export const handleInit = async ({ timestamp, currentLogEntries, userId, userPer
 function getFilename(): string {
     return 'handle-init.ts';
 }
+
