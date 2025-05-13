@@ -5,6 +5,7 @@ import type { OutputLine } from '@/components/output-display';
 import { type CommandMode, ALL_COMMAND_MODES } from '@/types/command-types';
 import type { LogEntry } from '@/types/log-types';
 import { internalCommandDefinitions, type CommandDefinition } from '@/lib/internal-commands-definitions'; // Import new definitions
+import { isDatabaseInitialized } from '@/lib/database'; // Assuming this function exists
 
 interface HandlerResult {
     outputLines: OutputLine[];
@@ -28,13 +29,22 @@ interface HandlerParams {
 export const handleHelp = async ({ userId, timestamp, initialSuggestions, currentLogEntries, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
     let helpText = `Command category is automatically detected.\n@bat:<filename><.bat/.sh/.sim>(experimental).\n\n--- Command Suggestions by Category ---`;
     let outputLines: OutputLine[] = [];
-    let logText = '';
+    let logText = 'Displayed help. ';
     let logType: 'I' | 'E' = 'I';
     let logFlag: 0 | 1 = 0;
 
+    const dbInitialized = await isDatabaseInitialized();
+
+    let commandsToShow: CommandDefinition[] = internalCommandDefinitions;
+
+    if (!dbInitialized) {
+        commandsToShow = internalCommandDefinitions.filter(cmdDef => cmdDef.name === 'ai');
+        logText += '(Database not initialized - showing limited help)';
+    }
+
     // Internal Commands
-    helpText += `\n\n**Internal**`;
-    internalCommandDefinitions.forEach(cmdDef => {
+ helpText += `\\n\\n**Internal**`;
+    commandsToShow.forEach(cmdDef => {
         if (overridePermissionChecks || !cmdDef.requiredPermission || userPermissions.includes(cmdDef.requiredPermission) || userPermissions.includes('override_all_permissions')) {
             helpText += `\n- **${cmdDef.name}**`;
             if (cmdDef.argsFormat) {

@@ -4,9 +4,7 @@
 
 import type { CustomCommandAction } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
-import { type LogEntry } from '@/types/log-types'; // Import the new LogEntry type
 import type { CommandMode } from '@/types/command-types';
-import { runSql } from '@/lib/database';
 import { formatResultsAsTable } from '@/lib/formatting';
 import { handleInternalCommand } from '@/lib/internal-commands'; // Import the central internal command handler
 import { storeVariableInDb } from '@/lib/variables'; // Import variable storing function
@@ -16,9 +14,6 @@ interface ExecuteCommandParams {
   userId: number; // Add user ID
   command: string;
   mode: CommandMode; // This is now the *classified category* passed from the client
-  addSuggestion: (mode: CommandMode, command: string) => void; // Potentially problematic in Server Action
-  addCustomCommand: (name: string, action: CustomCommandAction) => void; // Potentially problematic in Server Action
-  getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Potentially problematic in Server Action
   currentLogEntries: LogEntry[]; // Pass current log entries (uses new LogEntry type)
   initialSuggestions: Record<string, string[]>;
 }
@@ -26,6 +21,8 @@ interface ExecuteCommandParams {
 // Define the return type to include potentially updated log entries and toast info
 interface ExecuteCommandResult {
   outputLines: OutputLine[];
+  newSuggestions?: { mode: CommandMode; command: string }[]; // Data for adding new suggestions
+  newCustomCommands?: { name: string; action: CustomCommandAction }[]; // Data for adding new custom commands
   newLogEntries?: LogEntry[]; // Include new log entries if they were modified (uses new LogEntry type)
   toastInfo?: { message: string; variant?: 'default' | 'destructive' }; // Added for toast notifications
 }
@@ -41,12 +38,11 @@ export async function executeCommand ({
     userId, // Receive user ID
     command,
     mode, // mode is the classified category
-    addSuggestion,
-    addCustomCommand,
-    getCustomCommandAction,
     currentLogEntries, // Receive current logs
     initialSuggestions
 }: ExecuteCommandParams): Promise<ExecuteCommandResult> { // Return the result object
+  console.log(`[executeCommand] Received command: "${command}", Mode: "${mode}", User ID: ${userId}`);
+
   const timestamp = new Date().toISOString();
   const commandTrimmed = command.trim();
   const commandLower = commandTrimmed.toLowerCase();
@@ -61,12 +57,21 @@ export async function executeCommand ({
     timestamp: timestamp,
     // flag: 0 // Typically commands themselves don't have a flag unless logged specially
   };
+  // --- Early Check for Help/Test ---
+  if (commandLower === 'help' || commandLower === '?') {
+    return {
+      outputLines: [], // Return empty outputLines
+      newLogEntries: [...currentLogEntries, { timestamp: timestamp, type: 'I', flag: 0, text: 'Database not initialized. Only AI command(s) are available.' }],
+    };
 
   let outputLines: OutputLine[] = [];
   let potentiallyUpdatedLogs: LogEntry[] | undefined = undefined; // Track log changes
   let logEntry: LogEntry | null = null; // Variable to hold a potential new log entry
-  let toastInfoFromResult: ExecuteCommandResult['toastInfo'] = undefined;
+  let newSuggestions: ExecuteCommandResult['newSuggestions']; // Initialize newSuggestions
+  let newCustomCommands: ExecuteCommandResult['newCustomCommands']; // Initialize newCustomCommands
+  let toastInfoFromResult: ExecuteCommandResult['toastInfo']; // Initialize toastInfoFromResult
 
+  // --- Rest of the Command Processing Logic ---
 
   // --- Fetch User Permissions ---
   let userPermissions: string[] = [];
@@ -160,7 +165,7 @@ export async function executeCommand ({
             await storeVariableInDb(variableName, String(actualValue), dataType);
             outputLines = []; // Simulate no direct output for assignment
             logEntry = { timestamp, type: 'I', flag: 0, text: `Stored/Updated internal variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
-         } catch (error) {
+         } catch (error: any) {
             console.error("Error storing variable:", error);
             const errorMsg = `Error storing internal variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
             outputLines = [{ id: `assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
@@ -178,17 +183,16 @@ export async function executeCommand ({
             commandLower,
             commandName,
             args: commandTrimmed.split(' ').slice(1),
-            timestamp,
-            addSuggestion: addSuggestion,
-            addCustomCommand: addCustomCommand,
-            getCustomCommandAction: getCustomCommandAction,
+            timestamp, // Pass timestamp
             currentLogEntries: potentiallyUpdatedLogs || currentLogEntries, // Pass logs that might include the override warning
             initialSuggestions: initialSuggestions,
             overridePermissionChecks: OVERRIDE_PERMISSION_CHECKS // Pass the override flag
         });
-         outputLines = internalResult.outputLines;
-         potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
+ outputLines = internalResult.outputLines; // Use outputLines from internalResult
+ potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
          toastInfoFromResult = internalResult.toastInfo; // Capture toast info
+ newSuggestions = internalResult.newSuggestions; // Assign newSuggestions from internalResult
+ newCustomCommands = internalResult.newCustomCommands; // Assign newCustomCommands from internalResult
       }
       // --- Other Category Handlers ---
       else if (mode === 'python') {
@@ -234,7 +238,7 @@ export async function executeCommand ({
                   await storeVariableInDb(variableName, String(actualValue), dataType);
                   outputLines = []; // No direct output for assignment
                   logEntry = { timestamp, type: 'I', flag: 0, text: `Stored/Updated Python variable '${variableName}' with type '${dataType}' and value: ${String(actualValue)}` };
-              } catch (error) {
+              } catch (error: any) {
                   console.error("Error storing Python variable:", error);
                   const errorMsg = `Error storing Python variable '${variableName}': ${error instanceof Error ? error.message : 'Unknown error'}`;
                   outputLines = [{ id: `py-assign-err-${timestamp}`, text: errorMsg, type: 'error', category: 'python', timestamp, flag: 0 }]; // Set flag to 0 for error
@@ -320,7 +324,7 @@ export async function executeCommand ({
               logEntry = { timestamp, type: 'I', flag: 0, text: successMsg };
            }
          } catch (error) {
-           console.error("SQL execution error:", error);
+           console.error(`[executeCommand] SQL execution error for command "${commandTrimmed}":`, error);
            const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
             // Check if the error indicates missing tables (potentially from init db not being run)
             if (error instanceof Error && error.message.includes('no such table')) {
@@ -393,7 +397,7 @@ export async function executeCommand ({
        }
 
   } catch (error) // Catch errors from handlers themselves or permission denials
-  {
+  { // Added parameter 'error' with type 'any' for better error handling
       console.error("Unhandled error during command execution:", error);
       const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
       outputLines = [{ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 0 }]; // Set flag to 0 for error
@@ -434,6 +438,8 @@ export async function executeCommand ({
   return {
     outputLines: [commandOutput, ...outputLines],
     newLogEntries: finalLogEntries, // Return updated logs if they changed
+    newSuggestions: internalResult.newSuggestions, // Return new suggestions data
+    newCustomCommands: internalResult.newCustomCommands, // Return new custom commands data
     toastInfo: toastInfoFromResult, // Propagate toast info
   };
 }

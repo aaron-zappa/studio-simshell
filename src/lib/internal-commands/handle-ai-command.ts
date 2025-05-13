@@ -132,57 +132,95 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         // Check permission before storing
         if (overridePermissionChecks || userPermissions.includes('manage_variables')) {
             try {
+                // Attempt to store in the primary variables table
                 await storeVariableInDb('ai_answer', aiAnswer, 'string');
-                outputText = `AI response stored successfully in variable 'ai_answer'.`;
+                const successMessage = `AI response from ${aiResult.partner} stored successfully in variable 'ai_answer'.`;
                 outputType = 'info';
                 logType = 'I';
                 const finalLogText = `AI command executed successfully for user ${userId}. Response stored in 'ai_answer'. Processed input: "${processedInputText}"`;
                 newLogEntries.push({ timestamp, type: logType, flag: 0, text: finalLogText });
-                outputLines.push({ id: `ai-success-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
+                outputLines.push({ id: `ai-success-${timestamp}`, text: successMessage, type: outputType, category: 'internal', timestamp, flag: 0 });
 
                  // Display the AI answer directly as well
-                 outputLines.push({
-                    id: `ai-answer-${timestamp}`,
-                    text: `AI Answer: ${aiAnswer}`, // Prefix to clarify it's the answer
-                    type: 'output', // Display as regular output
-                    category: 'internal', // Keep category as internal since it's the result of an internal command
-                    timestamp: undefined // Don't format as a log line
-                 });
+                outputLines.push({
+                   id: `ai-answer-${timestamp}`,
+                   text: `AI Answer: ${aiAnswer}`, // Prefix to clarify it's the answer
+                   type: 'output',
+                   category: 'internal',
+                   timestamp: undefined // Don't format as a log line
+                });
 
+                // Check if the error is due to the variables table missing
             } catch (dbError) {
                 console.error("Error storing AI answer in DB:", dbError);
-                outputText = `AI generated a response, but failed to store it in variable 'ai_answer': ${dbError instanceof Error ? dbError.message : 'Unknown DB error'}`;
-                outputType = 'error';
-                logType = 'E';
-                logFlag = 0; // Set flag to 0 for error
-                logText = outputText;
-                outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
-                newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
-                outputLines.push({
-                    id: `ai-answer-fail-${timestamp}`,
-                    text: `AI Answer (generated but not stored): ${aiAnswer}`,
-                    type: 'output',
-                    category: 'internal',
-                    timestamp: undefined
-                 });
+                const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown DB error';
+
+                if (errorMessage.includes("SQL Error: no such table: variables")) {
+                    try {
+                        // Attempt to store in the fallback variables2 table
+                        // Assuming storeVariableInDb supports table name as an optional parameter
+                        await storeVariableInDb('ai_answer', aiAnswer, 'string', 'variables2');
+                        outputText = `AI response from ${aiResult.partner} stored successfully in fallback variable table 'variables2' due to missing 'variables' table.`;
+                        outputType = 'warning'; // Indicate it's a fallback
+                        logType = 'W';
+                        logFlag = 1; // Use a flag for warnings
+                        logText = outputText + ` (User: ${userId})`;
+                        outputLines.push({ id: `ai-success-fallback-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
+                        newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
+
+                    } catch (fallbackDbError) {
+                        // If fallback also fails
+                        outputText = `AI generated a response, but failed to store it in variable 'ai_answer' or fallback 'variables2': ${fallbackDbError instanceof Error ? fallbackDbError.message : 'Unknown DB error'}`;
+                        outputType = 'error';
+                        logType = 'E';
+                        logFlag = 0;
+                        logText = outputText;
+                        outputLines.push({ id: `ai-err-db-fallback-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
+                        newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
+                        outputLines.push({
+                            id: `ai-answer-fail-${timestamp}`,
+                            text: `AI Answer (generated but not stored): ${aiAnswer}`,
+                            type: 'output',
+                            category: 'internal',
+                            timestamp: undefined
+                        });
+                    }
+                } else {
+                    // Handle other database errors for the primary table
+                    outputText = `AI generated a response, but failed to store it in variable 'ai_answer': ${errorMessage}`;
+                    outputType = 'error';
+                    logType = 'E';
+                    logFlag = 0;
+                    logText = outputText;
+                    outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
+                    newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
+                    outputLines.push({
+                        id: `ai-answer-fail-${timestamp}`,
+                        text: `AI Answer (generated but not stored): ${aiAnswer}`,
+                        type: 'output',
+                        category: 'internal',
+                        timestamp: undefined
+                     });
+                }
+
             }
         } else {
             // User lacks permission to store the variable
              outputText = `AI generated a response, but permission denied to store it in variable 'ai_answer'.`;
-             outputType = 'warning'; // Use warning as AI did respond
-             logType = 'W';
-             logFlag = 1;
-             logText = outputText + ` (User ID: ${userId})`;
-             outputLines.push({ id: `ai-store-perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 1 });
-             newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
-             // Still display the answer
-              outputLines.push({
+            outputType = 'warning'; // Use warning as AI did respond
+            logType = 'W';
+            logFlag = 1;
+            logText = outputText + ` (User ID: ${userId})`;
+            outputLines.push({ id: `ai-store-perm-denied-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
+            newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
+            // Still display the answer
+            outputLines.push({
                 id: `ai-answer-nostore-${timestamp}`,
                 text: `AI Answer (not stored): ${aiAnswer}`,
                 type: 'output',
                 category: 'internal',
                 timestamp: undefined
-             });
+            });
         }
 
     } catch (aiError) {
@@ -190,9 +228,9 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         outputText = `Error processing AI command: ${aiError instanceof Error ? aiError.message : 'Unknown AI error'}`;
         outputType = 'error';
         logType = 'E';
-        logFlag = 0; // Set flag to 0 for error
+        logFlag = 0;
         logText = outputText;
-        outputLines.push({ id: `ai-err-gen-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: 0 });
+        outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
         newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
     }
 

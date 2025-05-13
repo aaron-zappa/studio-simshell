@@ -176,6 +176,28 @@ export async function persistDbToFile(targetFilename: string): Promise<boolean> 
     }
 }
 
+/**
+ * Checks if the database is initialized by attempting a simple query on a core table.
+ * This function is NOT exported as a Server Action itself but can be called by one.
+ * @returns True if the database seems initialized, false otherwise.
+ */
+export async function isDatabaseInitialized(): Promise<boolean> {
+    try {
+        const db = getDb(); // Attempt to get DB instance (may throw if initialization fails)
+        // Attempt a simple query on a core table expected to exist after initialization (e.g., 'users')
+ if (db) { // Check if db instance was successfully obtained
+            db.prepare('SELECT 1 FROM users LIMIT 1').get(); // This will throw 'no such table' if the table doesn't exist
+ return true; // Query succeeded, table exists
+ }
+ return false; // If getDb didn't throw but returned null (shouldn't happen with current getDb logic, but for safety)
+    } catch (error) {
+        if (error instanceof Error && error.message.includes('no such table')) {
+            return false; // Database tables not initialized
+        }
+ throw error; // Re-throw other errors
+    }
+}
+
 // --- Server Action to get DB status ---
 /**
  * Server Action to get the status of the loaded database.
