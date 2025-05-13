@@ -76,13 +76,13 @@ export async function executeSqlScript(filename: string): Promise<ExecuteSqlScri
       const commandText = commands[i];
       const cmdTimestamp = new Date().toISOString();
       
-      // Add the command itself to outputLines
+      // Add the command itself to outputLines, as type 'output' to avoid '$' prefix
       outputLines.push({
         id: `sql-script-cmd-${i}-${cmdTimestamp}`,
         text: commandText,
-        type: 'command',
+        type: 'output', // Changed from 'command'
         category: 'sql',
-        timestamp: cmdTimestamp,
+        timestamp: cmdTimestamp, // Keep timestamp for context if needed
       });
 
       try {

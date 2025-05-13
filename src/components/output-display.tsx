@@ -104,3 +104,4 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
 function getFilename(): string {
     return 'output-display.tsx';
 }
+
