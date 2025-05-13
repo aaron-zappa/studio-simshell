@@ -63,7 +63,6 @@ export async function executeCommand ({
       outputLines: [], // Return empty outputLines
       newLogEntries: [...currentLogEntries, { timestamp: timestamp, type: 'I', flag: 0, text: 'Database not initialized. Only AI command(s) are available.' }],
     };
-
   let outputLines: OutputLine[] = [];
   let potentiallyUpdatedLogs: LogEntry[] | undefined = undefined; // Track log changes
   let logEntry: LogEntry | null = null; // Variable to hold a potential new log entry
@@ -188,7 +187,12 @@ export async function executeCommand ({
             initialSuggestions: initialSuggestions,
             overridePermissionChecks: OVERRIDE_PERMISSION_CHECKS // Pass the override flag
         });
- outputLines = internalResult.outputLines; // Use outputLines from internalResult
+        outputLines = internalResult.outputLines; // Use outputLines from internalResult
+        // Combine the logEntry created before internal command handling (if any)
+        // with the logs returned by the internal handler.
+        potentiallyUpdatedLogs = logEntry
+            ? [...(internalResult.newLogEntries || []), logEntry]
+            : internalResult.newLogEntries;
  potentiallyUpdatedLogs = internalResult.newLogEntries; // Capture potential log changes
          toastInfoFromResult = internalResult.toastInfo; // Capture toast info
  newSuggestions = internalResult.newSuggestions; // Assign newSuggestions from internalResult
@@ -407,31 +411,10 @@ export async function executeCommand ({
 
   // Combine logs if a new entry was created outside internal handlers
   let finalLogEntries = potentiallyUpdatedLogs;
-  if (!finalLogEntries && logEntry) {
-      finalLogEntries = [...currentLogEntries, logEntry];
-  } else if (finalLogEntries && logEntry) {
-       // If internal handler already updated logs, we might need to decide whether to add the generic log too.
-        if (logEntry.text.includes('variable') || logEntry.text.startsWith('SQL') || logEntry.text.startsWith('Excel') || logEntry.text.startsWith('Simulating') || logEntry.text.startsWith('Python print') || logEntry.text.startsWith('TypeScript simulation')) {
-           // If it's a relevant log, add it even if internal handler modified logs.
-           // Avoid duplicates if the internal handler already logged this exact message.
-            if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
-                 finalLogEntries = [...finalLogEntries, logEntry];
-            }
-        } else if (logEntry.type === 'E') { // Always add error logs
-             if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
-                 finalLogEntries = [...finalLogEntries, logEntry];
-            }
-        } else if (logEntry.type === 'W' && logEntry.text.includes('WARNING: All permission checks are currently bypassed')) {
-            // Ensure the bypass warning is logged
-             if (!finalLogEntries.some(existing => existing.timestamp === logEntry.timestamp && existing.text === logEntry.text)) {
-                 finalLogEntries = [...finalLogEntries, logEntry];
-            }
-        }
-        else {
-            // console.warn("Log entry generated but internal handler also modified logs. Generic log ignored: ", logEntry.text);
-        }
+  // If potentiallyUpdatedLogs is undefined, it means no new logs were created by internal handlers or explicitly set.
+  if (!finalLogEntries) {
+      finalLogEntries = logEntry ? [...currentLogEntries, logEntry] : currentLogEntries;
   }
-
 
   // Return the result object
   // Always include the command itself in the output
