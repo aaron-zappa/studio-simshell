@@ -34,7 +34,7 @@ export default function Home() {
   const [isRunning, setIsRunning] = React.useState<boolean>(false);
   const { toast } = useToast();
 
-  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal', 'python']);
+  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal']);
   const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
   const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
 
@@ -666,6 +666,7 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
+
 
 
 
