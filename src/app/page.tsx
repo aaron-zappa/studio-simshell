@@ -25,7 +25,7 @@ import { executeSqlScript } from '@/lib/sql-script-runner';
 import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow';
 import { getSqlScriptFiles } from '@/lib/file-actions'; // Import new server action
 
-const SIMULATED_USER_ID = 1;
+const SIMULATED_USER_ID = 1; // Example user ID
 
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
@@ -208,33 +208,40 @@ export default function Home() {
             const executionResult = await executeCommand({
                 userId: SIMULATED_USER_ID,
                 command: commandTrimmed,
-                mode: 'sql',
-                addSuggestion,
-                addCustomCommand,
-                getCustomCommandAction,
+                mode: 'sql', // Direct SQL mode
                 currentLogEntries: logEntries,
                 initialSuggestions,
                 overridePermissionChecks: true, 
             });
 
-            const outputToDisplay = executionResult.outputLines
-                .filter(line => line.id !== commandLogOutput?.id)
-                .map(line => ({
-                    ...line,
-                    flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
-                }));
-            
-            setHistory((prev) => [...prev, ...outputToDisplay]);
+            if (executionResult && executionResult.outputLines) {
+                const outputToDisplay = executionResult.outputLines
+                    .filter(line => line.id !== commandLogOutput?.id)
+                    .map(line => ({
+                        ...line,
+                        flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
+                    }));
+                
+                setHistory((prev) => [...prev, ...outputToDisplay]);
 
-            if (executionResult.newLogEntries) {
-                setLogEntries(prev => [...prev, ...executionResult.newLogEntries.filter(log => !logEntries.some(existing => existing.timestamp === log.timestamp && existing.text === log.text))]);
-            }
-            if (executionResult.toastInfo) {
-                toast({
-                    title: "AI Notification",
-                    description: executionResult.toastInfo.message,
-                    variant: executionResult.toastInfo.variant || 'default',
-                });
+                if (executionResult.newLogEntries) {
+                    setLogEntries(prev => [...prev, ...executionResult.newLogEntries.filter(log => !logEntries.some(existing => existing.timestamp === log.timestamp && existing.text === log.text))]);
+                }
+                if (executionResult.toastInfo) {
+                    toast({
+                        title: "AI Notification",
+                        description: executionResult.toastInfo.message,
+                        variant: executionResult.toastInfo.variant || 'default',
+                    });
+                }
+            } else {
+                console.error("Direct SQL execution did not return expected result object or outputLines:", executionResult);
+                const errorMsg = "SQL execution failed to produce a valid result.";
+                const errTimestamp = new Date().toISOString();
+                const errorOutputLine: OutputLine = { id: `sql-exec-err-${errTimestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp: errTimestamp, flag: 0 };
+                setHistory((prev) => [...prev, errorOutputLine]);
+                setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 0, text: errorMsg }]);
+                toast({ title: "SQL Execution Error", description: errorMsg, variant: "destructive" });
             }
 
         } catch (error) {
@@ -455,38 +462,62 @@ export default function Home() {
         userId: SIMULATED_USER_ID,
         command: finalCommand, 
         mode: category as CommandMode,
-        addSuggestion, 
-        addCustomCommand, 
-        getCustomCommandAction, 
         currentLogEntries: logEntries, 
         initialSuggestions,
         overridePermissionChecks: true, 
       });
+      
+      if (executionResult && executionResult.outputLines) {
+          const outputToDisplay = executionResult.outputLines
+              .filter(line => line.id !== commandLogOutput?.id) 
+              .map(line => ({
+                 ...line,
+                 flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
+               }));
 
-      const outputToDisplay = executionResult.outputLines
-          .filter(line => line.id !== commandLogOutput?.id) 
-          .map(line => ({
-             ...line,
-             flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 0 : 0) : undefined)
-           }));
+           if(commandLogOutput){
+             setHistory((prev) => [...prev, commandLogOutput, ...outputToDisplay]);
+           } else {
+             setHistory((prev) => [...prev, ...outputToDisplay]);
+           }
 
-       if(commandLogOutput){
-         setHistory((prev) => [...prev, commandLogOutput, ...outputToDisplay]);
-       }
-
-       if (executionResult.newLogEntries) {
-          const uniqueNewLogs = executionResult.newLogEntries.filter(
-              newLog => !logEntries.some(existing => existing.timestamp === newLog.timestamp && existing.text === newLog.text)
-          );
-          setLogEntries(prev => [...prev, ...uniqueNewLogs]);
-       }
-       if (executionResult.toastInfo) {
-            toast({
-                title: "AI Notification",
-                description: executionResult.toastInfo.message,
-                variant: executionResult.toastInfo.variant || 'default',
-            });
-       }
+           if (executionResult.newLogEntries) {
+              const uniqueNewLogs = executionResult.newLogEntries.filter(
+                  newLog => !logEntries.some(existing => existing.timestamp === newLog.timestamp && existing.text === newLog.text)
+              );
+              setLogEntries(prev => [...prev, ...uniqueNewLogs]);
+           }
+           if (executionResult.toastInfo) {
+                toast({
+                    title: "AI Notification",
+                    description: executionResult.toastInfo.message,
+                    variant: executionResult.toastInfo.variant || 'default',
+                });
+           }
+      } else {
+          // Handle the case where executionResult or executionResult.outputLines is not as expected
+          errorOccurred = true;
+          console.error("executeCommand did not return the expected result object or outputLines:", executionResult);
+          const errorMsg = "Command execution failed to produce a valid result.";
+          const errTimestamp = new Date().toISOString(); // Use a new timestamp for this specific error
+          const errorOutputLine: OutputLine = {
+              id: `exec-result-err-${errTimestamp}`,
+              text: errorMsg,
+              type: 'error',
+              category: 'internal',
+              timestamp: errTimestamp,
+              flag: 0,
+          };
+          if (commandLogOutput) {
+            setHistory((prev) => [...prev, commandLogOutput, errorOutputLine]);
+          } else {
+             // If commandLogOutput itself is null (should be rare unless originalCommand was empty and not caught)
+             const cmdFallbackLog: OutputLine = { id: `cmd-fallback-${errTimestamp}`, text: originalCommand || "[unknown command]", type: 'command', category: 'internal', timestamp: errTimestamp };
+             setHistory((prev) => [...prev, cmdFallbackLog, errorOutputLine]);
+          }
+          setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 0, text: errorMsg }]);
+          toast({ title: "Execution Error", description: errorMsg, variant: "destructive" });
+      }
 
 
     } catch (error) {
@@ -507,7 +538,7 @@ export default function Home() {
             flag: 0, 
         };
          const errorLog: LogEntry = { timestamp, type: 'E', flag: 0, text: errorMsg }; 
-         if (executionResult && executionResult.newLogEntries) {
+         if (executionResult && executionResult.newLogEntries) { // Check if executionResult is not null
              setLogEntries([...executionResult.newLogEntries, errorLog]);
          } else {
              setLogEntries(prev => [...prev, errorLog]);
@@ -517,6 +548,7 @@ export default function Home() {
 
     } finally {
       if (finalCommandLower === 'pause' && !errorOccurred) {
+        // Do nothing special, setIsRunning(false) is handled by the client-side nature of 'pause' effectively
       } else {
           setIsRunning(false); 
       }
@@ -627,3 +659,4 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
+
