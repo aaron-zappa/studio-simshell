@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions';
 import { executeCommand } from '@/lib/command-executor';
@@ -23,10 +23,11 @@ import { cn } from '@/lib/utils';
 import { getDbStatusAction } from '@/lib/database';
 import { executeSqlScript } from '@/lib/sql-script-runner';
 import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow';
-import { getSqlScriptFiles } from '@/lib/file-actions'; // Import new server action
-import { Cpu } from 'lucide-react'; // Import Cpu icon
+import { getSqlScriptFiles } from '@/lib/file-actions';
+import { Cpu } from 'lucide-react';
+import { getUserDetailsById } from '@/lib/users'; // Import user details fetching
 
-const SIMULATED_USER_ID = 1; // Example user ID
+const SIMULATED_USER_ID = 1;
 
 export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
@@ -41,55 +42,49 @@ export default function Home() {
   const [sqlScriptFiles, setSqlScriptFiles] = React.useState<string[]>([]);
   const [selectedSqlScript, setSelectedSqlScript] = React.useState<string>("");
 
+  const [currentUser, setCurrentUser] = React.useState<{ username: string; role: string } | null>(null);
+
   React.useEffect(() => {
-    const fetchDbStatus = async () => {
-        try {
-            const status = await getDbStatusAction();
-            const timestamp = new Date().toISOString();
-            let statusType: OutputLine['type'] = 'info';
-            let logType: LogEntry['type'] = 'I';
-            let logFlag: 0 | 1 = 0;
+    const fetchInitialData = async () => {
+      // Fetch DB Status
+      try {
+        const status = await getDbStatusAction();
+        const timestamp = new Date().toISOString();
+        let statusType: OutputLine['type'] = 'info';
+        let logType: LogEntry['type'] = 'I';
+        let logFlag: 0 | 1 = status.includes('nok') ? 1 : 0;
 
-            if (status.includes('nok')) {
-                statusType = 'error';
-                logType = 'E';
-                logFlag = 1; // Set flag to 1 for Error
-            }
+        const statusLine: OutputLine = {
+          id: `db-status-${timestamp}`,
+          text: status,
+          type: statusType,
+          category: 'internal',
+          timestamp: timestamp,
+          flag: logFlag,
+        };
+        setHistory(prev => [...prev, statusLine]);
+        setLogEntries(prev => [...prev, { timestamp, type: logType, flag: logFlag, text: status }]);
+      } catch (error) {
+        console.error("Failed to fetch DB status:", error);
+        const timestamp = new Date().toISOString();
+        const errorLine: OutputLine = {
+          id: `db-status-err-${timestamp}`,
+          text: `Error fetching DB status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          type: 'error',
+          category: 'internal',
+          timestamp: timestamp,
+          flag: 1,
+        };
+        setHistory(prev => [...prev, errorLine]);
+        setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorLine.text }]);
+      }
 
-
-            const statusLine: OutputLine = {
-                id: `db-status-${timestamp}`,
-                text: status,
-                type: statusType,
-                category: 'internal',
-                timestamp: timestamp,
-                flag: logFlag,
-            };
-            setHistory(prev => [...prev, statusLine]);
-            setLogEntries(prev => [...prev, { timestamp, type: logType, flag: logFlag, text: status }]);
-        } catch (error) {
-            console.error("Failed to fetch DB status:", error);
-            const timestamp = new Date().toISOString();
-             const errorLine: OutputLine = {
-                id: `db-status-err-${timestamp}`,
-                text: `Error fetching DB status: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                type: 'error',
-                category: 'internal',
-                timestamp: timestamp,
-                flag: 1, // Set flag to 1 for Error
-             };
-             setHistory(prev => [...prev, errorLine]);
-             setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorLine.text }]); // Set flag to 1 for Error
-        }
-    };
-    fetchDbStatus();
-
-    const fetchSqlFiles = async () => {
+      // Fetch SQL Files
       try {
         const files = await getSqlScriptFiles();
         setSqlScriptFiles(files);
         if (files.length > 0) {
-          setSelectedSqlScript(files[0]); // Select the first file by default
+          setSelectedSqlScript(files[0]);
         }
       } catch (error) {
         console.error("Failed to fetch SQL script files:", error);
@@ -99,8 +94,24 @@ export default function Home() {
           variant: "destructive",
         });
       }
+
+      // Fetch Current User Details
+      try {
+        const userDetails = await getUserDetailsById(SIMULATED_USER_ID);
+        if (userDetails) {
+          setCurrentUser(userDetails);
+        } else {
+          console.warn(`Could not fetch details for user ID: ${SIMULATED_USER_ID}. Display prefix might be affected.`);
+          // Optionally set a default/fallback user display if needed
+          setCurrentUser({ username: `User${SIMULATED_USER_ID}`, role: 'Unknown' });
+        }
+      } catch (error) {
+        console.error("Failed to fetch user details:", error);
+        setCurrentUser({ username: `User${SIMULATED_USER_ID}`, role: 'Error' });
+      }
     };
-    fetchSqlFiles();
+
+    fetchInitialData();
   }, [toast]);
 
   const handleCategoryChange = (category: CommandMode, checked: boolean | 'indeterminate') => {
@@ -140,6 +151,7 @@ export default function Home() {
             type: 'command',
             category: 'sql',
             timestamp: timestamp,
+            issuer: currentUser // Add issuer
         };
         setHistory(prev => [...prev, commandLogOutput]);
         setLogEntries(prev => [...prev, { timestamp, type: 'I', flag: 0, text: `Executing SQL script file: ${scriptFilename}` }]);
@@ -186,19 +198,19 @@ export default function Home() {
                 type: 'error',
                 category: 'sql',
                 timestamp: timestamp,
-                flag: 1, // Error flag
+                flag: 1,
             };
             setHistory((prev) => [...prev, errorOutput]);
-            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
+            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]);
         }
     } else {
-        // Regular SQL command execution
         const commandLogOutput: OutputLine = {
             id: `cmd-sql-${timestamp}`,
             text: commandTrimmed,
             type: 'command',
             category: 'sql',
             timestamp: timestamp,
+            issuer: currentUser // Add issuer
         };
 
         setHistory(prev => [...prev, commandLogOutput]);
@@ -208,7 +220,7 @@ export default function Home() {
             const executionResult = await executeCommand({
                 userId: SIMULATED_USER_ID,
                 command: commandTrimmed,
-                mode: 'sql', // Direct SQL mode
+                mode: 'sql',
                 currentLogEntries: logEntries,
                 initialSuggestions,
                 getCustomCommandAction,
@@ -239,9 +251,9 @@ export default function Home() {
                 console.error("Direct SQL execution did not return expected result object or outputLines:", executionResult);
                 const errorMsg = "SQL execution failed to produce a valid result.";
                 const errTimestamp = new Date().toISOString();
-                const errorOutputLine: OutputLine = { id: `sql-exec-err-${errTimestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp: errTimestamp, flag: 1 }; // Error flag
+                const errorOutputLine: OutputLine = { id: `sql-exec-err-${errTimestamp}`, text: errorMsg, type: 'error', category: 'sql', timestamp: errTimestamp, flag: 1 };
                 setHistory((prev) => [...prev, errorOutputLine]);
-                setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
+                setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 1, text: errorMsg }]);
                 toast({ title: "SQL Execution Error", description: errorMsg, variant: "destructive" });
             }
 
@@ -259,10 +271,10 @@ export default function Home() {
                 type: 'error',
                 category: 'sql',
                 timestamp: timestamp,
-                flag: 1, // Error flag
+                flag: 1,
             };
             setHistory((prev) => [...prev, errorOutput]);
-            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
+            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]);
         }
     }
     setIsRunning(false);
@@ -287,10 +299,10 @@ export default function Home() {
             type: 'error',
             category: 'internal', 
             timestamp: timestamp,
-            flag: 1, // Error flag
+            flag: 1,
         };
         setHistory((prev) => [...prev, errorOutput]);
-        setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
+        setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorMsg }]);
     }
   };
 
@@ -334,11 +346,7 @@ export default function Home() {
 
 
     let classificationResult: { category: CommandCategory; reasoning?: string | undefined } | null = null;
-    let executionResult: {
-        outputLines: OutputLine[];
-        newLogEntries?: LogEntry[] | undefined;
-        toastInfo?: { message: string; variant?: 'default' | 'destructive' } | undefined;
-    } | null = null;
+    let executionResult: ExecuteCommandResult | null = null;
     let errorOccurred = false;
 
     try {
@@ -351,10 +359,11 @@ export default function Home() {
              text: originalCommand, 
              type: 'command',
              category: 'python', 
-             timestamp: timestamp
+             timestamp: timestamp,
+             issuer: currentUser // Add issuer
          };
          setHistory((prev) => [...prev, commandLogOutput]);
-         setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: "Command execution skipped: Clipboard operation failed." }]); // Error flag
+         setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: "Command execution skipped: Clipboard operation failed." }]);
          throw new Error("Command execution skipped: Clipboard operation failed.");
       }
        if (!finalCommand && !clipboardGetRegex.test(commandTrimmed) && commandTrimmed.length > 0) {
@@ -363,10 +372,11 @@ export default function Home() {
              text: originalCommand,
              type: 'command',
              category: 'internal', 
-             timestamp: timestamp
+             timestamp: timestamp,
+             issuer: currentUser // Add issuer
            };
            setHistory((prev) => [...prev, commandLogOutput]);
-           setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: "Command execution skipped: Processed command is empty." }]); // Error flag
+           setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: "Command execution skipped: Processed command is empty." }]);
            throw new Error("Command execution skipped: Processed command is empty.");
        }
        if (!finalCommand && commandTrimmed.length === 0) { 
@@ -384,10 +394,11 @@ export default function Home() {
 
       commandLogOutput = {
          id: `cmd-${timestamp}`,
-         text: originalCommand, 
+         text: finalCommand, // Use finalCommand as text for the command log output
          type: 'command',
          category: (category === 'ambiguous' || category === 'unknown') ? 'internal' : category,
-         timestamp: timestamp
+         timestamp: timestamp,
+         issuer: currentUser // Add issuer
       };
 
       if (category === 'ambiguous' || category === 'unknown') {
@@ -399,7 +410,7 @@ export default function Home() {
           type: 'error',
           category: 'internal',
           timestamp: timestamp,
-          flag: 1, // Error flag
+          flag: 1,
         };
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         const classificationLog: LogEntry = {
@@ -499,27 +510,25 @@ export default function Home() {
                 });
            }
       } else {
-          // Handle the case where executionResult or executionResult.outputLines is not as expected
           errorOccurred = true;
           console.error("executeCommand did not return the expected result object or outputLines:", executionResult);
           const errorMsg = "Command execution failed to produce a valid result.";
-          const errTimestamp = new Date().toISOString(); // Use a new timestamp for this specific error
+          const errTimestamp = new Date().toISOString();
           const errorOutputLine: OutputLine = {
               id: `exec-result-err-${errTimestamp}`,
               text: errorMsg,
               type: 'error',
               category: 'internal',
               timestamp: errTimestamp,
-              flag: 1, // Error flag
+              flag: 1,
           };
           if (commandLogOutput) {
             setHistory((prev) => [...prev, commandLogOutput, errorOutputLine]);
           } else {
-             // If commandLogOutput itself is null (should be rare unless originalCommand was empty and not caught)
-             const cmdFallbackLog: OutputLine = { id: `cmd-fallback-${errTimestamp}`, text: originalCommand || "[unknown command]", type: 'command', category: 'internal', timestamp: errTimestamp };
+             const cmdFallbackLog: OutputLine = { id: `cmd-fallback-${errTimestamp}`, text: originalCommand || "[unknown command]", type: 'command', category: 'internal', timestamp: errTimestamp, issuer: currentUser };
              setHistory((prev) => [...prev, cmdFallbackLog, errorOutputLine]);
           }
-          setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 1, text: errorMsg }]); // Error flag
+          setLogEntries(prev => [...prev, { timestamp: errTimestamp, type: 'E', flag: 1, text: errorMsg }]);
           toast({ title: "Execution Error", description: errorMsg, variant: "destructive" });
       }
 
@@ -539,15 +548,15 @@ export default function Home() {
             type: 'error',
             category: 'internal',
             timestamp: timestamp, 
-            flag: 1,  // Error flag
+            flag: 1,
         };
-         const errorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: errorMsg }; // Error flag
-         if (executionResult && executionResult.newLogEntries) { // Check if executionResult is not null
+         const errorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+         if (executionResult && executionResult.newLogEntries) {
              setLogEntries([...executionResult.newLogEntries, errorLog]);
          } else {
              setLogEntries(prev => [...prev, errorLog]);
          }
-         const cmdLog = commandLogOutput || { id: `cmd-err-${timestamp}`, text: originalCommand, type: 'command', category: 'internal', timestamp: timestamp };
+         const cmdLog = commandLogOutput || { id: `cmd-err-${timestamp}`, text: originalCommand, type: 'command', category: 'internal', timestamp: timestamp, issuer: currentUser };
          setHistory((prev) => [...prev, cmdLog, errorOutput]);
 
     } finally {
@@ -666,7 +675,3 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
-
-
-
-

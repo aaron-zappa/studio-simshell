@@ -12,10 +12,14 @@ import type { LogEntry } from '@/types/log-types'; // Import LogEntry type
 export type OutputLine = {
   id: string; // For React key prop
   text: string;
-  type?: 'command' | 'output' | 'error' | 'info' | 'warning'; // Added 'warning' type potentially
-  category?: CommandMode | 'internal'; // Use imported CommandMode
-  timestamp?: string; // Added optional timestamp for log-like formatting
-  flag?: 0 | 1; // Added optional flag for log-like formatting
+  type?: 'command' | 'output' | 'error' | 'info' | 'warning';
+  category?: CommandMode | 'internal';
+  timestamp?: string;
+  flag?: 0 | 1;
+  issuer?: { // New field for command issuer details
+    name: string;
+    role: string;
+  };
 };
 
 interface OutputDisplayProps {
@@ -26,12 +30,12 @@ interface OutputDisplayProps {
 // Helper to determine category styling
 const getCategoryStyle = (category?: OutputLine['category']): string => {
   switch (category) {
-    case 'python': return 'text-accent-green'; // Example: Green for Python
-    case 'unix': return 'text-accent-yellow'; // Example: Yellow for Unix
-    case 'windows': return 'text-blue-500'; // Example: Blue for Windows (using Tailwind directly for simplicity)
-    case 'sql': return 'text-purple-500'; // Example: Purple for SQL
-    case 'excel': return 'text-green-700 dark:text-green-400'; // Example: Dark Green for Excel
-    case 'typescript': return 'text-sky-500'; // Example: Sky Blue for TypeScript
+    case 'python': return 'text-accent-green';
+    case 'unix': return 'text-accent-yellow';
+    case 'windows': return 'text-blue-500';
+    case 'sql': return 'text-purple-500';
+    case 'excel': return 'text-green-700 dark:text-green-400';
+    case 'typescript': return 'text-sky-500';
     default: return '';
   }
 };
@@ -49,7 +53,6 @@ const getTypeIndicator = (type?: OutputLine['type']): string | null => {
 export function OutputDisplay({ history, className }: OutputDisplayProps) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom when history updates
   React.useEffect(() => {
     if (scrollAreaRef.current) {
       const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -67,8 +70,16 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
           <div className="space-y-2 font-mono text-sm">
             {history.map((line) => {
                 const typeIndicator = getTypeIndicator(line.type);
-                // Check if it should be shown in log format: requires type (I,W,E), timestamp, and flag is defined
                 const showLogFormat = (line.type === 'info' || line.type === 'error' || line.type === 'warning') && line.timestamp && typeIndicator && line.flag !== undefined;
+
+                let commandDisplayPrefix = "";
+                if (line.type === 'command' && !showLogFormat) { // Only apply custom prefix if not in log format
+                    if (line.issuer && line.issuer.name && line.issuer.role) {
+                        commandDisplayPrefix = `partner in role ${line.issuer.role}: ${line.issuer.name}$ `;
+                    } else {
+                        commandDisplayPrefix = "$ "; // Fallback prefix for commands
+                    }
+                }
 
                 return (
                   <div key={line.id} className="flex items-start space-x-2">
@@ -76,14 +87,13 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
                        "whitespace-pre-wrap break-words",
                        line.type === 'command' && 'text-foreground font-semibold',
                        line.type === 'error' && 'text-destructive',
-                       (line.type === 'info' || line.type === 'warning') && 'text-muted-foreground italic',
-                       // Apply category style even for log-formatted lines if category exists
+                       (line.type === 'info' || line.type === 'warning') && !showLogFormat && 'text-muted-foreground italic', // Avoid italic if it's a log-formatted line
+                       (line.type === 'info' || line.type === 'warning') && showLogFormat && 'text-muted-foreground', // For log-formatted, don't italicize
                        getCategoryStyle(line.category)
                      )}>
-                        {line.type === 'command' && '$ '}
                         {showLogFormat
-                           ? `${line.timestamp},${typeIndicator},${line.flag},${line.text}` // Added flag here
-                           : line.text
+                           ? `${line.timestamp},${typeIndicator},${line.flag},${line.text}`
+                           : `${commandDisplayPrefix}${line.text}`
                         }
                       </span>
                   </div>
@@ -104,4 +114,3 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
 function getFilename(): string {
     return 'output-display.tsx';
 }
-
