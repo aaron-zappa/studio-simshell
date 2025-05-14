@@ -20,11 +20,11 @@ interface HandlerParams {
 }
 
 // Default filename for export db command
-const DEFAULT_EXPORT_FILENAME = 'simshell_export.db'; // Updated default name
+const DEFAULT_EXPORT_FILENAME = 'simushell_export.db'; // Updated default name
 
 /**
  * Handles the 'export db' internal command.
- * Persists the current database state to a default file name ('simshell_export.db') in the 'data' directory.
+ * Persists the current database state to a default file name ('simushell_export.db') in the 'data' directory.
  * Requires 'execute_sql_modify' permission.
  */
 export const handleExportDb = async ({ timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
@@ -55,7 +55,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
             logFlag = 0;
         } else {
              // This case might not be reachable if persistDbToFile throws on failure
-            outputText = `Failed to export database to ${targetFilename} for an unknown reason.`;
+            outputText = `Failed to export database to data/${targetFilename} for an unknown reason.`;
             outputType = 'error';
             logType = 'E';
             logFlag = 1; // Set flag to 1 for error
@@ -63,7 +63,7 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
         }
     } catch (error) {
         console.error("Error during database export:", error);
-        outputText = `Error exporting database to ${targetFilename}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        outputText = `Error exporting database to data/${targetFilename}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         outputType = 'error';
         logType = 'E';
         logFlag = 1; // Set flag to 1 for error
