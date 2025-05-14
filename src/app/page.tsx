@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions';
-import { executeCommand } from '@/lib/command-executor';
+import { executeCommand, type ExecuteCommandResult } from '@/lib/command-executor';
 import { CommandMode, ALL_COMMAND_MODES } from '@/types/command-types';
 import { exportLogFile } from '@/lib/logging';
 import { type LogEntry } from '@/types/log-types';
@@ -42,7 +42,8 @@ export default function Home() {
   const [sqlScriptFiles, setSqlScriptFiles] = React.useState<string[]>([]);
   const [selectedSqlScript, setSelectedSqlScript] = React.useState<string>("");
 
-  const [currentUser, setCurrentUser] = React.useState<{ username: string; role: string } | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<{ username: string; role: string }>({ username: 'Loading...', role: 'Loading...' });
+
 
   React.useEffect(() => {
     const fetchInitialData = async () => {
@@ -107,7 +108,7 @@ export default function Home() {
         }
       } catch (error) {
         console.error("Failed to fetch user details:", error);
-        setCurrentUser({ username: `User${SIMULATED_USER_ID}`, role: 'Error' });
+        setCurrentUser({ username: `User${SIMULATED_USER_ID}`, role: 'Error Fetching Role' });
       }
     };
 
