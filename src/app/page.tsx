@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCustomCommands } from '@/hooks/use-custom-commands';
+import { useCustomCommands, type CustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions';
 import { executeCommand, type ExecuteCommandResult } from '@/lib/command-executor';
 import { CommandMode, ALL_COMMAND_MODES } from '@/types/command-types';
@@ -25,7 +25,7 @@ import { getDbStatusAction } from '@/lib/database';
 import { executeSqlScript } from '@/lib/sql-script-runner';
 import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow';
 import { getSqlScriptFiles } from '@/lib/file-actions';
-import { Cpu, FlaskConical } from 'lucide-react'; // Added FlaskConical
+import { Cpu, FlaskConical } from 'lucide-react';
 import { getUserDetailsById } from '@/lib/users';
 
 const SIMULATED_USER_ID = 1;
@@ -34,7 +34,7 @@ export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
   const [logEntries, setLogEntries] = React.useState<LogEntry[]>([]);
   const [isRunning, setIsRunning] = React.useState<boolean>(false);
-  const [isTesting, setIsTesting] = React.useState<boolean>(false); // New state for test button
+  const [isTesting, setIsTesting] = React.useState<boolean>(false);
   const { toast } = useToast();
 
   const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal']);
@@ -57,7 +57,7 @@ export default function Home() {
         let logFlag: 0 | 1 = status.includes('nok') ? 1 : 0;
 
         if (status.includes("Database loaded with status ok (file: data/sim_shell.db, tables NOT ok (run 'init db'))")) {
-          logFlag = 1; // Treat "tables NOT ok" as a warning condition for the flag
+          logFlag = 1;
           statusType = 'warning';
           logType = 'W';
         } else if (status.includes('nok')) {
@@ -220,7 +220,7 @@ export default function Home() {
                 mode: 'sql',
                 currentLogEntries: logEntries,
                 initialSuggestions,
-                getCustomCommandAction,
+                customCommands, // Pass the customCommands object
                 overridePermissionChecks: true,
             });
 
@@ -319,7 +319,7 @@ export default function Home() {
     const commandTrimmed = originalCommand.trim();
     const timestamp = new Date().toISOString();
     let commandLogOutput: OutputLine | null = null;
-    let finalCommandLower = '';
+    let finalCommandLower = ''; // Initialize here for wider scope
     setIsRunning(true);
 
     let finalCommand = commandTrimmed;
@@ -338,7 +338,7 @@ export default function Home() {
        }
     }
     
-    finalCommandLower = finalCommand.toLowerCase();
+    finalCommandLower = finalCommand.toLowerCase(); // Assign here after potential modification
 
 
     let classificationResult: { category: CommandCategory; reasoning?: string | undefined } | null = null;
@@ -474,7 +474,7 @@ export default function Home() {
         mode: category as CommandMode,
         currentLogEntries: logEntries,
         initialSuggestions,
-        getCustomCommandAction,
+        customCommands, // Pass the customCommands object
         overridePermissionChecks: true,
       });
       
@@ -583,7 +583,7 @@ export default function Home() {
     if (isRunning || isTesting) return;
 
     setIsTesting(true);
-    setIsRunning(true); // Use general isRunning to disable other inputs
+    setIsRunning(true);
 
     const testQueue: { command: string, category: CommandMode | 'sql' }[] = [];
 
@@ -638,14 +638,14 @@ export default function Home() {
         flag: 0
       };
       setHistory(prev => [...prev, testCommandOutput]);
-      await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for UX
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       if (testItem.category === 'sql') {
         await handleDirectSqlSubmit(testItem.command);
       } else {
         await handleCommandSubmit(testItem.command);
       }
-      await new Promise(resolve => setTimeout(resolve, 300)); // Wait for command to likely finish
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
     
     const testOutputEnd: OutputLine = {

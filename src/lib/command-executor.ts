@@ -2,11 +2,11 @@
 // src/lib/command-executor.ts
 'use server';
 
-import type { CustomCommandAction } from '@/hooks/use-custom-commands';
+import type { CustomCommandAction, CustomCommands } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
 import type { CommandMode } from '@/types/command-types';
 import { formatResultsAsTable } from '@/lib/formatting';
-import { handleInternalCommand, type HandlerResult as InternalHandlerResult } from '@/lib/internal-commands'; // Import the central internal command handler
+import { handleInternalCommand, type HandlerResult as InternalHandlerResult } from '@/lib/internal-commands';
 import { storeVariableInDb } from '@/lib/variables';
 import { getUserPermissions } from '@/lib/permissions';
 import type { LogEntry } from '@/types/log-types';
@@ -18,14 +18,10 @@ interface ExecuteCommandParams {
   mode: CommandMode;
   currentLogEntries: LogEntry[];
   initialSuggestions: Record<string, string[]>;
-  // Removed client-side setters from params as they don't work in Server Actions
-  // addSuggestion: (mode: CommandMode, command: string) => void;
-  // addCustomCommand: (name: string, action: CustomCommandAction) => void;
-  getCustomCommandAction: (name: string) => CustomCommandAction | undefined; // Keep if needed for custom command logic
-  overridePermissionChecks?: boolean; // Added for permission override
+  customCommands: CustomCommands; // Pass the customCommands object
+  overridePermissionChecks?: boolean;
 }
 
-// Define the return type to include potentially updated log entries and toast info
 export interface ExecuteCommandResult {
   outputLines: OutputLine[];
   newSuggestions?: { mode: CommandMode; command: string }[];
@@ -34,21 +30,14 @@ export interface ExecuteCommandResult {
   toastInfo?: { message: string; variant?: 'default' | 'destructive' };
 }
 
-/**
- * Executes a command based on the *classified mode/category* and returns output lines.
- * Fetches user permissions and potentially modifies AI behavior based on them.
- * Delegates internal command handling to a separate module.
- * Handles variable assignments if classified as 'internal'.
- * This is intended to be used as a Server Action.
- */
 export async function executeCommand ({
     userId,
     command,
     mode,
     currentLogEntries,
     initialSuggestions,
-    getCustomCommandAction, // Keep if custom commands are handled here or passed down
-    overridePermissionChecks = false // Default to false
+    customCommands, // Receive customCommands object
+    overridePermissionChecks = false
 }: ExecuteCommandParams): Promise<ExecuteCommandResult> {
   console.log(`[executeCommand] Received command: "${command}", Mode: "${mode}", User ID: ${userId}`);
 
@@ -68,7 +57,6 @@ export async function executeCommand ({
   let potentiallyUpdatedLogs: LogEntry[] | undefined = undefined;
   let logEntryToAdd: LogEntry | null = null;
 
-  // Initialize return fields
   let newSuggestionsResult: ExecuteCommandResult['newSuggestions'];
   let newCustomCommandsResult: ExecuteCommandResult['newCustomCommands'];
   let toastInfoResult: ExecuteCommandResult['toastInfo'];
@@ -82,12 +70,9 @@ export async function executeCommand ({
   }
 
 
-  // --- Fetch User Permissions ---
-  // This part might be redundant if overridePermissionChecks is true and handled above,
-  // but keeping it for structure. The actual check logic inside handlers will use overridePermissionChecks.
   let userPermissions: string[] = [];
   if (!overridePermissionChecks) {
-      if (commandLower !== 'help' && commandLower !== 'init db') { // Allow help/init db before full permission setup
+      if (commandLower !== 'help' && commandLower !== 'init db') {
           const permResult = await getUserPermissions(userId);
           if (Array.isArray(permResult)) {
               userPermissions = permResult;
@@ -95,8 +80,8 @@ export async function executeCommand ({
                const errorMsg = permResult.code === 'DB_NOT_INITIALIZED'
                     ? "Permission check skipped: Database RBAC tables not initialized. Please run 'init db'."
                     : `Error fetching user permissions: ${permResult.error}`;
-               outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Error flag
-               const permErrorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User ID: ${userId})` }; // Error flag
+               outputLines.push({ id: `perm-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 });
+               const permErrorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User ID: ${userId})` };
                return {
                    outputLines: [commandOutput, ...outputLines],
                    newLogEntries: potentiallyUpdatedLogs ? [...potentiallyUpdatedLogs, permErrorLog] : [...currentLogEntries, permErrorLog],
@@ -107,7 +92,7 @@ export async function executeCommand ({
           }
       }
   } else {
-      userPermissions = ['override_all_permissions']; // Dummy permission for override
+      userPermissions = ['override_all_permissions'];
   }
 
 
@@ -124,9 +109,9 @@ export async function executeCommand ({
             commandName: commandLower.split(' ')[0],
             args: commandTrimmed.split(' ').slice(1),
             timestamp,
-            addSuggestion: () => {}, // Placeholder, server actions cannot call client hooks directly
-            addCustomCommand: () => {}, // Placeholder
-            getCustomCommandAction,
+            addSuggestion: () => {},
+            addCustomCommand: () => {},
+            customCommands, // Pass customCommands object
             currentLogEntries: potentiallyUpdatedLogs || currentLogEntries,
             initialSuggestions,
             overridePermissionChecks
@@ -138,7 +123,6 @@ export async function executeCommand ({
         newCustomCommandsResult = internalResult.newCustomCommands;
       }
       else if (assignmentMatch && (mode === 'internal' || mode === 'python')) {
-          // Variable assignment logic for internal or python (if not handled by internal command)
           if (!overridePermissionChecks && !userPermissions.includes('manage_variables')) {
               const errorMsg = "Permission denied: Cannot manage variables.";
               throw new Error(errorMsg);
@@ -157,15 +141,14 @@ export async function executeCommand ({
 
           await storeVariableInDb(variableName, String(actualValue), dataType);
           logEntryToAdd = { timestamp, type: 'I', flag: 0, text: `Stored/Updated ${mode} variable '${variableName}' type '${dataType}' value: ${String(actualValue)} (User: ${userId})` };
-          // No direct output for assignment typically
       }
       else if (mode === 'python') {
          if (commandLower.startsWith('print(')) {
             const matchPrint = commandTrimmed.match(/print\((['"]?)(.*?)\1\)/);
             const printOutput = matchPrint ? matchPrint[2] : 'Syntax Error in print';
             const type: OutputLine['type'] = matchPrint ? 'output' : 'error';
-            outputLines.push({ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: type === 'error' ? 1 : 0 }); // Error flag
-            logEntryToAdd = { timestamp, type: matchPrint ? 'I' : 'E', flag: matchPrint ? 0 : 1, text: `Python print: ${printOutput} (User: ${userId})` }; // Error flag
+            outputLines.push({ id: `out-${timestamp}`, text: printOutput, type: type, category: 'python', timestamp: type === 'error' ? timestamp : undefined, flag: type === 'error' ? 1 : 0 });
+            logEntryToAdd = { timestamp, type: matchPrint ? 'I' : 'E', flag: matchPrint ? 0 : 1, text: `Python print: ${printOutput} (User: ${userId})` };
          } else {
             await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100));
             const simOutput = `Simulating Python: ${commandTrimmed} (output placeholder)`;
@@ -210,8 +193,8 @@ export async function executeCommand ({
          } catch (error) {
            const errorMsg = error instanceof Error ? error.message : 'Unknown SQL execution error';
            const displayError = errorMsg.includes('no such table') ? `${errorMsg}. Consider running 'init db'.` : errorMsg;
-           outputLines.push({ id: `err-${timestamp}`, text: displayError, type: 'error', category: 'sql', timestamp, flag: 1 }); // Error flag
-           logEntryToAdd = { timestamp, type: 'E', flag: 1, text: `SQL Error: ${displayError} (User: ${userId})` }; // Error flag
+           outputLines.push({ id: `err-${timestamp}`, text: displayError, type: 'error', category: 'sql', timestamp, flag: 1 });
+           logEntryToAdd = { timestamp, type: 'E', flag: 1, text: `SQL Error: ${displayError} (User: ${userId})` };
          }
       }
       else if (mode === 'excel') {
@@ -224,8 +207,8 @@ export async function executeCommand ({
                  try {
                      const numbers = numbersMatch[1].split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
                      excelOutput = `${numbers.reduce((acc, val) => acc + val, 0)}`;
-                 } catch (e) { excelOutput = '#VALUE!'; excelLogType = 'E'; outputTypeExcel = 'error'; logFlagExcel = 1; } // Error flag
-             } else { excelOutput = '#NAME?'; excelLogType = 'E'; outputTypeExcel = 'error'; logFlagExcel = 1; } // Error flag
+                 } catch (e) { excelOutput = '#VALUE!'; excelLogType = 'E'; outputTypeExcel = 'error'; logFlagExcel = 1; }
+             } else { excelOutput = '#NAME?'; excelLogType = 'E'; outputTypeExcel = 'error'; logFlagExcel = 1; }
          }
          outputLines.push({ id: `out-${timestamp}`, text: excelOutput, type: outputTypeExcel, category: 'excel', timestamp: outputTypeExcel === 'error' ? timestamp : undefined, flag: logFlagExcel });
          logEntryToAdd = { timestamp, type: excelLogType, flag: logFlagExcel, text: `Excel simulation: ${excelOutput} (User: ${userId})` };
@@ -237,20 +220,18 @@ export async function executeCommand ({
         if (commandLower.startsWith('console.log(')) {
             const matchConsoleLog = commandTrimmed.match(/console\.log\((['"]?)(.*?)\1\)/);
             simOutput = matchConsoleLog ? `Output: ${matchConsoleLog[2]}` : 'Syntax Error in console.log';
-            tsOutputType = matchConsoleLog ? 'output' : 'error'; if (!matchConsoleLog) { tsLogType = 'E'; tsLogFlag = 1; } // Error flag
+            tsOutputType = matchConsoleLog ? 'output' : 'error'; if (!matchConsoleLog) { tsLogType = 'E'; tsLogFlag = 1; }
         } else if (commandLower.includes('=')) simOutput = `Simulating TypeScript: ${commandTrimmed} (Variable notionally assigned)`;
         else if (commandLower.startsWith('type ') || commandLower.startsWith('interface ')) simOutput = `Simulating TypeScript: ${commandTrimmed} (Type/Interface notionally defined)`;
         outputLines.push({ id: `out-${timestamp}`, text: simOutput, type: tsOutputType, category: 'typescript', timestamp: tsOutputType === 'error' ? timestamp : undefined, flag: tsLogFlag });
         logEntryToAdd = { timestamp, type: tsLogType, flag: tsLogFlag, text: `TypeScript simulation: ${simOutput} (User: ${userId})` };
       }
-      // Removed the 'else' that caused "Command not recognized" for unhandled modes, as classification should handle this.
-      // If classification fails or a mode isn't handled above, outputLines will remain empty from this block.
 
   } catch (error) {
       console.error("Unhandled error during command execution:", error);
       const errorMsg = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      outputLines.push({ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }); // Error flag
-      logEntryToAdd = { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }; // Error flag
+      outputLines.push({ id: `fatal-err-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 });
+      logEntryToAdd = { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` };
   }
 
 

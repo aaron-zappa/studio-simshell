@@ -2,7 +2,7 @@
 // src/lib/internal-commands/index.ts
 'use server';
 
-import type { CustomCommandAction } from '@/hooks/use-custom-commands';
+import type { CustomCommandAction, CustomCommands } from '@/hooks/use-custom-commands';
 import type { OutputLine } from '@/components/output-display';
 import type { LogEntry } from '@/types/log-types';
 import type { CommandMode } from '@/types/command-types';
@@ -39,15 +39,14 @@ interface InternalCommandHandlerParams {
     commandName: string;
     args: string[];
     timestamp: string;
-    addSuggestion: (mode: CommandMode, command: string) => void; // This is problematic for server actions
-    addCustomCommand: (name: string, action: CustomCommandAction) => void; // This is problematic for server actions
-    getCustomCommandAction: (name: string) => CustomCommandAction | undefined;
+    addSuggestion: (mode: CommandMode, command: string) => void;
+    addCustomCommand: (name: string, action: CustomCommandAction) => void;
+    customCommands: CustomCommands; // Expect customCommands object
     currentLogEntries: LogEntry[];
     initialSuggestions: Record<string, string[]>;
     overridePermissionChecks?: boolean;
 }
 
-// Updated HandlerResult to include newSuggestions and newCustomCommands
 export interface HandlerResult {
     outputLines: OutputLine[];
     newLogEntries?: LogEntry[];
@@ -57,22 +56,16 @@ export interface HandlerResult {
 }
 
 
-/**
- * Central dispatcher for handling internal commands.
- * Now returns a HandlerResult object.
- * Includes permission checks for relevant commands, can be overridden.
- */
 export const handleInternalCommand = async (params: InternalCommandHandlerParams): Promise<HandlerResult> => {
-    const { commandName, commandLower, args, getCustomCommandAction, userPermissions, timestamp, userId, overridePermissionChecks } = params;
+    const { commandName, commandLower, args, customCommands, userPermissions, timestamp, userId, overridePermissionChecks } = params;
 
     const commandDef = internalCommandDefinitions.find(def => def.name === commandName);
 
     const permissionDenied = (requiredPermission: string): HandlerResult => {
         const errorMsg = `Permission denied: Requires '${requiredPermission}' permission.`;
         return {
-            outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }], // Error flag
-            newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }], // Error flag
-            // Ensure all fields of HandlerResult are present, even if undefined
+            outputLines: [{ id: `perm-denied-${timestamp}`, text: errorMsg, type: 'error', category: 'internal', timestamp, flag: 1 }],
+            newLogEntries: [...params.currentLogEntries, { timestamp, type: 'E', flag: 1, text: `${errorMsg} (User: ${userId})` }],
             newSuggestions: undefined,
             newCustomCommands: undefined,
             toastInfo: undefined
@@ -109,7 +102,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleRefine(params);
         case 'add_int_cmd':
              if (commandLower.startsWith('add_int_cmd ')) {
-                 return handleAddCommand(params); // handleAddCommand needs to return full HandlerResult
+                 return handleAddCommand(params);
              }
              break;
         case 'add_ai_tool':
@@ -145,11 +138,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
              break;
         case 'pause':
             return handlePause(params);
-        case 'create_sqlite': // Corrected command name based on definitions
+        case 'create_sqlite':
             return handleCreateSqlite(params);
         case 'show_requirements':
             return handleShowRequirements(params);
-        case 'persist_memory_db_to': // Corrected command name based on definitions
+        case 'persist_memory_db_to':
             return handlePersistDb(params);
         case 'init':
             if (commandLower === 'init db') {
@@ -172,7 +165,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleAiCommand(params);
     }
 
-    const customAction = getCustomCommandAction(params.commandName);
+    const customAction = customCommands[params.commandName.toLowerCase()]; // Use customCommands object
     if (customAction !== undefined) {
         return handleCustomCommand(params, customAction);
     }
