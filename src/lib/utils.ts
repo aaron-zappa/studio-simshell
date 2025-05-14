@@ -8,6 +8,23 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Reads text from the user's clipboard.
+ * @returns A promise that resolves with the clipboard text.
+ * @throws An error if the clipboard API is not available or permission is denied.
+ */
+export async function readClipboard(): Promise<string> {
+  if (!navigator.clipboard || !navigator.clipboard.readText) {
+    throw new Error("Clipboard API not available or permission denied.");
+  }
+  try {
+    return await navigator.clipboard.readText();
+  } catch (err) {
+    console.error("Failed to read clipboard contents: ", err);
+    throw new Error("Failed to read clipboard. Check browser permissions.");
+  }
+};
+
+/**
  * Returns the name of the current file.
  * This function is not exported to avoid being treated as a Server Action.
  * @returns The filename.

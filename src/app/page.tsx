@@ -19,7 +19,7 @@ import { exportLogFile } from '@/lib/logging';
 import { type LogEntry } from '@/types/log-types';
 import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-command-flow';
 import { useToast } from "@/hooks/use-toast";
-import { cn } from '@/lib/utils';
+import { cn, readClipboard } from '@/lib/utils'; // Import readClipboard from utils
 import { getDbStatusAction } from '@/lib/database';
 import { executeSqlScript } from '@/lib/sql-script-runner';
 import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow';
@@ -121,18 +121,6 @@ export default function Home() {
         ? [...prev, category]
         : prev.filter(c => c !== category)
     );
-  };
-
-  const readClipboard = async (): Promise<string> => {
-    if (!navigator.clipboard || !navigator.clipboard.readText) {
-      throw new Error("Clipboard API not available or permission denied.");
-    }
-    try {
-      return await navigator.clipboard.readText();
-    } catch (err) {
-      console.error("Failed to read clipboard contents: ", err);
-      throw new Error("Failed to read clipboard. Check browser permissions.");
-    }
   };
 
   const handleDirectSqlSubmit = async (sqlInput: string) => {
