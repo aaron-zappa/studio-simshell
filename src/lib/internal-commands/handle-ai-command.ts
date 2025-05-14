@@ -133,7 +133,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         if (overridePermissionChecks || userPermissions.includes('manage_variables')) {
             try {
                 // Attempt to store in the primary variables table
-                await storeVariableInDb('ai_answer', aiAnswer, 'string');
+                await storeVariableInDb('ai_answer', aiAnswer, 'string', 'variables'); // Explicitly 'variables'
                 const successMessage = `AI response stored successfully in variable 'ai_answer'.`;
                 outputType = 'info';
                 logType = 'I';
@@ -150,27 +150,33 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
                    timestamp: undefined // Don't format as a log line
                 });
 
-                // Check if the error is due to the variables table missing
             } catch (dbError) {
                 console.error("Error storing AI answer in DB:", dbError);
                 const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown DB error';
 
-                if (errorMessage.includes("SQL Error: no such table: variables")) {
+                if (errorMessage.includes("no such table: variables")) {
                     try {
                         // Attempt to store in the fallback variables2 table
-                        // Assuming storeVariableInDb supports table name as an optional parameter
-                        await storeVariableInDb('ai_answer', aiAnswer, 'string', 'variables2');
-                        outputText = `AI response stored successfully in fallback variable table 'variables2' due to missing 'variables' table.`;
+                        await storeVariableInDb('ai_answer', aiAnswer, 'string', 'variables2'); // Use 'variables2' here
+                        outputText = `AI response stored successfully in fallback variable table 'variables2' (primary 'variables' table not found).`;
                         outputType = 'warning'; // Indicate it's a fallback
                         logType = 'W';
                         logFlag = 1; // Use a flag for warnings
                         logText = outputText + ` (User: ${userId})`;
                         outputLines.push({ id: `ai-success-fallback-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
                         newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
+                         // Display the AI answer directly as well
+                        outputLines.push({
+                           id: `ai-answer-fallback-${timestamp}`,
+                           text: `AI Answer: ${aiAnswer}`,
+                           type: 'output',
+                           category: 'internal',
+                           timestamp: undefined
+                        });
 
                     } catch (fallbackDbError) {
                         // If fallback also fails
-                        outputText = `AI generated a response, but failed to store it in variable 'ai_answer' or fallback 'variables2': ${fallbackDbError instanceof Error ? fallbackDbError.message : 'Unknown DB error'}`;
+                        outputText = `AI generated a response, but failed to store it in variable 'ai_answer' (primary 'variables' table missing, and fallback 'variables2' also failed): ${fallbackDbError instanceof Error ? fallbackDbError.message : 'Unknown DB error'}`;
                         outputType = 'error';
                         logType = 'E';
                         logFlag = 1; // Error flag
@@ -230,7 +236,7 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         logType = 'E';
         logFlag = 1; // Error flag
         logText = outputText;
-        outputLines.push({ id: `ai-err-db-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag });
+        outputLines.push({ id: `ai-err-call-${timestamp}`, text: outputText, type: outputType, category: 'internal', timestamp, flag: logFlag }); // Changed id slightly
         newLogEntries.push({ timestamp, type: logType, flag: logFlag, text: logText });
     }
 
@@ -250,4 +256,3 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
 function getFilename(): string {
     return 'handle-ai-command.ts';
 }
-

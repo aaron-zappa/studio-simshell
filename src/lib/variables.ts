@@ -5,10 +5,11 @@
 import { runSql } from './database';
 
 /**
- * Stores or updates a variable in the 'variables' table.
+ * Stores or updates a variable in the specified table (defaults to 'variables').
  * @param name - The name of the variable.
  * @param value - The value of the variable (as a string).
  * @param datatype - The inferred data type of the variable.
+ * @param tableName - Optional. The name of the table to store the variable in. Defaults to 'variables'.
  * @param min - Optional minimum value.
  * @param max - Optional maximum value.
  * @param defaultValue - Optional default value.
@@ -17,12 +18,14 @@ export async function storeVariableInDb(
     name: string,
     value: string,
     datatype: string,
+    tableName: string = 'variables', // Added tableName parameter with default
     min?: number | null,
     max?: number | null,
     defaultValue?: string | null
 ): Promise<void> {
+    // Dynamically use the tableName in the SQL query
     const sql = `
-        INSERT INTO variables (name, datatype, value, min, max, default_value)
+        INSERT INTO ${tableName} (name, datatype, value, min, max, default_value)
         VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(name) DO UPDATE SET
             datatype = excluded.datatype,
@@ -43,9 +46,9 @@ export async function storeVariableInDb(
 
     try {
         await runSql(sql, params);
-        console.log(`Stored/Updated variable '${name}' with value '${value}' and type '${datatype}'`);
+        console.log(`Stored/Updated variable '${name}' in table '${tableName}' with value '${value}' and type '${datatype}'`);
     } catch (error) {
-        console.error(`Error storing variable '${name}' in database:`, error);
+        console.error(`Error storing variable '${name}' in table '${tableName}':`, error);
         throw error; // Re-throw the error to be handled by the caller
     }
 }
@@ -63,6 +66,10 @@ export async function getVariableFromDb(name: string): Promise<{
     max: number | null;
     default_value: string | null;
 } | null> {
+    // For now, this function still primarily targets the 'variables' table.
+    // If 'ai_answer' or other specific variables might be in 'variables2',
+    // this function (or the calling logic) would need to be aware of that.
+    // The current request focuses on *storing* to 'variables2' as a fallback.
     const sql = 'SELECT name, datatype, value, min, max, default_value FROM variables WHERE name = ?';
     try {
         const { results } = await runSql(sql, [name]);
