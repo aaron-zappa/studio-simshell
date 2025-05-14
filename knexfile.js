@@ -4,7 +4,7 @@ module.exports = {
   development: {
     client: 'sqlite3',
     connection: {
-      filename: './data/simushell_export.db'
+      filename: './data/sim_shell.db' // Updated filename
     },
     migrations: {
       directory: './migrations'

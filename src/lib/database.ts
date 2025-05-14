@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const dataDir = path.join(process.cwd(), 'data');
-const DEFAULT_PERSISTENT_DB_FILENAME = 'simushell_export.db'; // Default persistent DB
+const DEFAULT_PERSISTENT_DB_FILENAME = 'sim_shell.db'; // Updated default persistent DB
 
 let dbInstance: DB | null = null;
 let loadedDbPath: string | null = null;
@@ -167,13 +167,9 @@ function getDb(): DB {
 
     if (envDbFile && isValidFilename(envDbFile)) {
         const potentialPath = path.join(dataDir, envDbFile);
-        if (fs.existsSync(potentialPath)) {
-            dbPathToUse = potentialPath;
-            console.log(`Using database from SIMSHELL_DB_FILE: ${dbPathToUse}`);
-        } else {
-            console.warn(`SIMSHELL_DB_FILE (${potentialPath}) not found. Defaulting to ${DEFAULT_PERSISTENT_DB_FILENAME}.`);
-            dbPathToUse = path.join(dataDir, DEFAULT_PERSISTENT_DB_FILENAME);
-        }
+        // No fs.existsSync check here as per previous logic, better-sqlite3 creates if not exists.
+        dbPathToUse = potentialPath;
+        console.log(`Using database from SIMSHELL_DB_FILE: ${dbPathToUse}`);
     } else {
         if (envDbFile) { // Env var was set but invalid
             console.warn(`Invalid filename in SIMSHELL_DB_FILE: "${envDbFile}". Defaulting to ${DEFAULT_PERSISTENT_DB_FILENAME}.`);
@@ -349,3 +345,4 @@ export async function getDbStatusAction(): Promise<string> {
 function getFilename(): string {
     return 'database.ts';
 }
+
