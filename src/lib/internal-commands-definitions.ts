@@ -108,7 +108,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
   },
   {
     name: 'export_db',
-    description: 'Persists the current in-memory database to a predefined file named "simshell_export.db" in the server\'s data directory.',
+    description: 'Persists the current in-memory database to the default file named "sim_shell.db" in the server\'s data directory.',
     requiredPermission: 'execute_sql_modify',
   },
   {
@@ -145,10 +145,10 @@ export const internalCommandDefinitions: CommandDefinition[] = [
   },
   {
     name: 'persist_memory_db_to',
-    description: 'Persists the current in-memory database to a specified file on the server, within the "data" directory.',
-    argsFormat: '<filename.db>',
+    description: 'Persists the current in-memory database to a specified file on the server, within the "data" directory. If no filename is provided, it defaults to "sim_shell.db".',
+    argsFormat: '[filename.db]',
     argsDetails: [
-        { name: 'filename.db', description: 'The name of the file (e.g., "my_backup.db") to save the database to. Must end with .db.' },
+        { name: 'filename.db', description: 'Optional. The name of the file (e.g., "my_backup.db") to save the database to. Must end with .db. Defaults to "sim_shell.db" if not provided.', optional: true },
     ],
     exampleUsage: 'persist memory db to backup.db',
     requiredPermission: 'execute_sql_modify',

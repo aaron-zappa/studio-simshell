@@ -20,11 +20,11 @@ interface HandlerParams {
 }
 
 // Default filename for export db command
-const DEFAULT_EXPORT_FILENAME = 'simushell_export.db'; // Updated default name
+const DEFAULT_EXPORT_FILENAME = 'sim_shell.db'; // Updated default name
 
 /**
  * Handles the 'export db' internal command.
- * Persists the current database state to a default file name ('simushell_export.db') in the 'data' directory.
+ * Persists the current database state to 'sim_shell.db' in the 'data' directory.
  * Requires 'execute_sql_modify' permission.
  */
 export const handleExportDb = async ({ timestamp, currentLogEntries, userId, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
@@ -87,4 +87,3 @@ export const handleExportDb = async ({ timestamp, currentLogEntries, userId, use
 function getFilename(): string {
     return 'handle-export-db.ts';
 }
-
