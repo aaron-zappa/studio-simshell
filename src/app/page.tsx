@@ -11,21 +11,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCustomCommands } from '@/hooks/use-custom-commands';
 import { useSuggestions } from '@/hooks/use-suggestions';
 import { executeCommand, type ExecuteCommandResult } from '@/lib/command-executor';
 import { CommandMode, ALL_COMMAND_MODES } from '@/types/command-types';
 import { exportLogFile } from '@/lib/logging';
-import { type LogEntry } from '@/types/log-types';
+import type { LogEntry } from '@/types/log-types';
 import { classifyCommand, type CommandCategory } from '@/ai/flows/classify-command-flow';
 import { useToast } from "@/hooks/use-toast";
-import { cn, readClipboard } from '@/lib/utils'; // Import readClipboard from utils
+import { cn, readClipboard } from '@/lib/utils';
 import { getDbStatusAction } from '@/lib/database';
 import { executeSqlScript } from '@/lib/sql-script-runner';
 import { listAllTablesQuery } from '@/ai/flows/list-all-tables-flow';
 import { getSqlScriptFiles } from '@/lib/file-actions';
-import { Cpu } from 'lucide-react';
-import { getUserDetailsById } from '@/lib/users'; // Import user details fetching
+import { Cpu, FlaskConical } from 'lucide-react'; // Added FlaskConical
+import { getUserDetailsById } from '@/lib/users';
 
 const SIMULATED_USER_ID = 1;
 
@@ -33,6 +34,7 @@ export default function Home() {
   const [history, setHistory] = React.useState<OutputLine[]>([]);
   const [logEntries, setLogEntries] = React.useState<LogEntry[]>([]);
   const [isRunning, setIsRunning] = React.useState<boolean>(false);
+  const [isTesting, setIsTesting] = React.useState<boolean>(false); // New state for test button
   const { toast } = useToast();
 
   const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal']);
@@ -47,13 +49,22 @@ export default function Home() {
 
   React.useEffect(() => {
     const fetchInitialData = async () => {
-      // Fetch DB Status
       try {
         const status = await getDbStatusAction();
         const timestamp = new Date().toISOString();
         let statusType: OutputLine['type'] = 'info';
         let logType: LogEntry['type'] = 'I';
         let logFlag: 0 | 1 = status.includes('nok') ? 1 : 0;
+
+        if (status.includes("Database loaded with status ok (file: data/sim_shell.db, tables NOT ok (run 'init db'))")) {
+          logFlag = 1; // Treat "tables NOT ok" as a warning condition for the flag
+          statusType = 'warning';
+          logType = 'W';
+        } else if (status.includes('nok')) {
+           statusType = 'error';
+           logType = 'E';
+        }
+
 
         const statusLine: OutputLine = {
           id: `db-status-${timestamp}`,
@@ -80,7 +91,6 @@ export default function Home() {
         setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: errorLine.text }]);
       }
 
-      // Fetch SQL Files
       try {
         const files = await getSqlScriptFiles();
         setSqlScriptFiles(files);
@@ -96,14 +106,12 @@ export default function Home() {
         });
       }
 
-      // Fetch Current User Details
       try {
         const userDetails = await getUserDetailsById(SIMULATED_USER_ID);
         if (userDetails) {
           setCurrentUser(userDetails);
         } else {
           console.warn(`Could not fetch details for user ID: ${SIMULATED_USER_ID}. Display prefix might be affected.`);
-          // Optionally set a default/fallback user display if needed
           setCurrentUser({ username: `User${SIMULATED_USER_ID}`, role: 'Unknown' });
         }
       } catch (error) {
@@ -136,11 +144,11 @@ export default function Home() {
         const scriptFilename = scriptMatch[1];
         const commandLogOutput: OutputLine = {
             id: `cmd-sql-script-${timestamp}`,
-            text: commandTrimmed, 
+            text: commandTrimmed,
             type: 'command',
             category: 'sql',
             timestamp: timestamp,
-            issuer: currentUser // Add issuer
+            issuer: currentUser
         };
         setHistory(prev => [...prev, commandLogOutput]);
         setLogEntries(prev => [...prev, { timestamp, type: 'I', flag: 0, text: `Executing SQL script file: ${scriptFilename}` }]);
@@ -151,7 +159,7 @@ export default function Home() {
             if (scriptResult.outputLines) {
                 const outputToDisplay = scriptResult.outputLines.map(line => ({
                     ...line,
-                    flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : undefined)
+                    flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : 0)
                 }));
                  setHistory((prev) => [...prev, ...outputToDisplay]);
             }
@@ -199,7 +207,7 @@ export default function Home() {
             type: 'command',
             category: 'sql',
             timestamp: timestamp,
-            issuer: currentUser // Add issuer
+            issuer: currentUser
         };
 
         setHistory(prev => [...prev, commandLogOutput]);
@@ -213,7 +221,7 @@ export default function Home() {
                 currentLogEntries: logEntries,
                 initialSuggestions,
                 getCustomCommandAction,
-                overridePermissionChecks: true, 
+                overridePermissionChecks: true,
             });
 
             if (executionResult && executionResult.outputLines) {
@@ -221,7 +229,7 @@ export default function Home() {
                     .filter(line => line.id !== commandLogOutput?.id)
                     .map(line => ({
                         ...line,
-                        flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : undefined)
+                        flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : 0)
                     }));
                 
                 setHistory((prev) => [...prev, ...outputToDisplay]);
@@ -286,7 +294,7 @@ export default function Home() {
             id: `list-tables-error-${timestamp}`,
             text: errorMsg,
             type: 'error',
-            category: 'internal', 
+            category: 'internal',
             timestamp: timestamp,
             flag: 1,
         };
@@ -307,12 +315,11 @@ export default function Home() {
     }
   };
 
-
   const handleCommandSubmit = async (originalCommand: string) => {
     const commandTrimmed = originalCommand.trim();
     const timestamp = new Date().toISOString();
     let commandLogOutput: OutputLine | null = null;
-    let finalCommandLower = ''; 
+    let finalCommandLower = '';
     setIsRunning(true);
 
     let finalCommand = commandTrimmed;
@@ -322,16 +329,16 @@ export default function Home() {
     if (clipboardGetRegex.test(commandTrimmed)) {
        try {
          const clipboardContent = await readClipboard();
-         const escapedContent = clipboardContent.replace(/"/g, '\\"'); 
+         const escapedContent = clipboardContent.replace(/"/g, '\\"');
          finalCommand = `clipboard = "${escapedContent}"`;
        } catch (error) {
          console.error("Clipboard read error:", error);
          clipboardReadError = error instanceof Error ? error.message : 'Unknown clipboard error';
-         finalCommand = ''; 
+         finalCommand = '';
        }
     }
     
-    finalCommandLower = finalCommand.toLowerCase(); 
+    finalCommandLower = finalCommand.toLowerCase();
 
 
     let classificationResult: { category: CommandCategory; reasoning?: string | undefined } | null = null;
@@ -342,14 +349,14 @@ export default function Home() {
       if (clipboardReadError) {
         throw new Error(clipboardReadError);
       }
-      if (!finalCommand && clipboardGetRegex.test(commandTrimmed)) { 
+      if (!finalCommand && clipboardGetRegex.test(commandTrimmed)) {
          commandLogOutput = {
              id: `cmd-clipboard-skip-${timestamp}`,
-             text: originalCommand, 
+             text: originalCommand,
              type: 'command',
-             category: 'python', 
+             category: 'python',
              timestamp: timestamp,
-             issuer: currentUser // Add issuer
+             issuer: currentUser
          };
          setHistory((prev) => [...prev, commandLogOutput]);
          setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: "Command execution skipped: Clipboard operation failed." }]);
@@ -360,22 +367,22 @@ export default function Home() {
              id: `cmd-empty-final-${timestamp}`,
              text: originalCommand,
              type: 'command',
-             category: 'internal', 
+             category: 'internal',
              timestamp: timestamp,
-             issuer: currentUser // Add issuer
+             issuer: currentUser
            };
            setHistory((prev) => [...prev, commandLogOutput]);
            setLogEntries(prev => [...prev, { timestamp, type: 'E', flag: 1, text: "Command execution skipped: Processed command is empty." }]);
            throw new Error("Command execution skipped: Processed command is empty.");
        }
-       if (!finalCommand && commandTrimmed.length === 0) { 
+       if (!finalCommand && commandTrimmed.length === 0) {
             setIsRunning(false);
             return;
        }
 
 
       classificationResult = await classifyCommand({
-          command: finalCommand, 
+          command: finalCommand,
           activeCategories: selectedCategories
       });
       const category: CommandCategory = classificationResult.category;
@@ -383,11 +390,11 @@ export default function Home() {
 
       commandLogOutput = {
          id: `cmd-${timestamp}`,
-         text: finalCommand, // Use finalCommand as text for the command log output
+         text: finalCommand,
          type: 'command',
          category: (category === 'ambiguous' || category === 'unknown') ? 'internal' : category,
          timestamp: timestamp,
-         issuer: currentUser // Add issuer
+         issuer: currentUser
       };
 
       if (category === 'ambiguous' || category === 'unknown') {
@@ -404,8 +411,8 @@ export default function Home() {
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         const classificationLog: LogEntry = {
             timestamp,
-            type: 'W', 
-            flag: 1,   
+            type: 'W',
+            flag: 1,
             text: `Command classification: ${category}. Reasoning: ${classificationReasoning || 'N/A'}. Original: '${originalCommand}', Processed: '${finalCommand}', Active: ${selectedCategories.join(', ')}`
         };
         setLogEntries(prev => [...prev, classificationLog]);
@@ -422,16 +429,16 @@ export default function Home() {
           clientHandled = true;
          }
          else if (finalCommandLower === 'export log') {
-          const exportResultLine = exportLogFile(logEntries); 
+          const exportResultLine = exportLogFile(logEntries);
            const logText = exportResultLine ? exportResultLine.text : "Log export action attempted.";
            const logType: LogEntry['type'] = exportResultLine?.type === 'error' ? 'E' : 'I';
-           const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 1 : 0; 
+           const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 1 : 0;
            const exportLog: LogEntry = { timestamp, type: logType, flag: logFlagVal, text: logText };
            setLogEntries(prev => [...prev, exportLog]);
 
           if(commandLogOutput && exportResultLine){
-             exportResultLine.timestamp = timestamp; 
-             exportResultLine.flag = logFlagVal;    
+             exportResultLine.timestamp = timestamp;
+             exportResultLine.flag = logFlagVal;
              setHistory((prev) => [...prev, commandLogOutput, exportResultLine]);
           } else if (commandLogOutput) {
              setHistory((prev) => [...prev, commandLogOutput]);
@@ -441,42 +448,42 @@ export default function Home() {
          else if (finalCommandLower === 'pause') {
            const pauseOutput: OutputLine = {
              id: `pause-${timestamp}`,
-             text: 'task stopped', 
+             text: 'task stopped',
              type: 'info',
              category: 'internal',
-             timestamp: timestamp, 
-             flag: 0, 
+             timestamp: timestamp,
+             flag: 0,
            };
             if(commandLogOutput){
                setHistory((prev) => [...prev, commandLogOutput, pauseOutput]);
             }
-            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." }; 
+            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." };
             setLogEntries(prev => [...prev, pauseLog]);
-           clientHandled = true; 
+           clientHandled = true;
          }
       }
 
       if (clientHandled) {
-         if (finalCommandLower !== 'pause') setIsRunning(false); 
+         if (finalCommandLower !== 'pause') setIsRunning(false);
          return;
       }
 
       executionResult = await executeCommand({
         userId: SIMULATED_USER_ID,
-        command: finalCommand, 
+        command: finalCommand,
         mode: category as CommandMode,
-        currentLogEntries: logEntries, 
+        currentLogEntries: logEntries,
         initialSuggestions,
         getCustomCommandAction,
-        overridePermissionChecks: true, 
+        overridePermissionChecks: true,
       });
       
       if (executionResult && executionResult.outputLines) {
           const outputToDisplay = executionResult.outputLines
-              .filter(line => line.id !== commandLogOutput?.id) 
+              .filter(line => line.id !== commandLogOutput?.id)
               .map(line => ({
                  ...line,
-                 flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : undefined)
+                 flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : 0)
                }));
 
            if(commandLogOutput){
@@ -523,7 +530,7 @@ export default function Home() {
 
 
     } catch (error) {
-        errorOccurred = true; 
+        errorOccurred = true;
         console.error("Error during command handling:", error);
         const errorMsg = `Failed to process command: ${error instanceof Error ? error.message : 'Unknown error'}`;
         toast({
@@ -536,7 +543,7 @@ export default function Home() {
             text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
             type: 'error',
             category: 'internal',
-            timestamp: timestamp, 
+            timestamp: timestamp,
             flag: 1,
         };
          const errorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
@@ -552,7 +559,7 @@ export default function Home() {
       if (finalCommandLower === 'pause' && !errorOccurred) {
         // Do nothing special, setIsRunning(false) is handled by the client-side nature of 'pause' effectively
       } else {
-          setIsRunning(false); 
+          setIsRunning(false);
       }
     }
   };
@@ -572,49 +579,154 @@ export default function Home() {
    }, [selectedCategories, suggestions, customCommands]);
 
 
+  const handleRunCategoryTests = async () => {
+    if (isRunning || isTesting) return;
+
+    setIsTesting(true);
+    setIsRunning(true); // Use general isRunning to disable other inputs
+
+    const testQueue: { command: string, category: CommandMode | 'sql' }[] = [];
+
+    selectedCategories.forEach(category => {
+      const testOutputStart: OutputLine = {
+        id: `test-start-${category}-${Date.now()}`,
+        text: `--- Starting tests for category: ${category} ---`,
+        type: 'info',
+        category: 'internal',
+        timestamp: new Date().toISOString(),
+        flag: 0,
+      };
+      setHistory(prev => [...prev, testOutputStart]);
+      setLogEntries(prev => [...prev, { timestamp: new Date().toISOString(), type: 'I', flag: 0, text: `Starting tests for category: ${category}` }]);
+
+      switch (category) {
+        case 'internal':
+          testQueue.push({ command: 'help', category });
+          testQueue.push({ command: 'list py vars', category });
+          testQueue.push({ command: 'show requirements', category });
+          testQueue.push({ command: 'ai SimShell test', category });
+          break;
+        case 'python':
+          testQueue.push({ command: 'print("SimShell Python test")', category });
+          break;
+        case 'unix':
+          testQueue.push({ command: 'echo "SimShell Unix test"', category });
+          break;
+        case 'windows':
+          testQueue.push({ command: 'echo "SimShell Windows test"', category });
+          break;
+        case 'sql':
+          testQueue.push({ command: 'SELECT 1+1 AS test_calculation;', category: 'sql' });
+          testQueue.push({ command: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';", category: 'sql' });
+          break;
+        case 'excel':
+          testQueue.push({ command: 'SUM(10,20,30)', category });
+          break;
+        case 'typescript':
+          testQueue.push({ command: 'console.log("SimShell TypeScript test");', category });
+          break;
+      }
+    });
+
+    for (const testItem of testQueue) {
+      const testCommandOutput: OutputLine = {
+        id: `test-cmd-${testItem.category}-${testItem.command.replace(/\s/g, '_')}-${Date.now()}`,
+        text: `Testing command: ${testItem.command}`,
+        type: 'info',
+        category: 'internal',
+        timestamp: new Date().toISOString(),
+        flag: 0
+      };
+      setHistory(prev => [...prev, testCommandOutput]);
+      await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for UX
+
+      if (testItem.category === 'sql') {
+        await handleDirectSqlSubmit(testItem.command);
+      } else {
+        await handleCommandSubmit(testItem.command);
+      }
+      await new Promise(resolve => setTimeout(resolve, 300)); // Wait for command to likely finish
+    }
+    
+    const testOutputEnd: OutputLine = {
+        id: `test-end-all-${Date.now()}`,
+        text: `--- All category tests finished ---`,
+        type: 'info',
+        category: 'internal',
+        timestamp: new Date().toISOString(),
+        flag: 0,
+      };
+    setHistory(prev => [...prev, testOutputEnd]);
+    setLogEntries(prev => [...prev, { timestamp: new Date().toISOString(), type: 'I', flag: 0, text: `All category tests finished.` }]);
+
+    setIsTesting(false);
+    setIsRunning(false);
+  };
+
+
   return (
     <div className="flex flex-col h-screen max-h-screen p-4 bg-background">
-       <header className="flex items-center justify-between mb-2 flex-wrap gap-4">
-        <div className="flex items-center gap-2">
-          <Cpu className="h-7 w-7 text-primary" data-ai-hint="chip circuit" />
-          <h1 className="text-lg font-semibold">SimShell</h1>
-        </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="text-sm font-medium mr-2">Active Categories:</span>
-              {ALL_COMMAND_MODES.map(category => (
-                  <div key={category} className="flex items-center space-x-2">
-                      <Checkbox
-                          id={`category-${category}`}
-                          checked={selectedCategories.includes(category)}
-                          onCheckedChange={(checked) => handleCategoryChange(category, checked)}
-                          aria-label={`Toggle category ${category}`}
-                      />
-                      <Label htmlFor={`category-${category}`} className="text-sm font-normal capitalize">
-                          {category}
-                      </Label>
-                  </div>
-              ))}
+      <TooltipProvider>
+        <header className="flex items-center justify-between mb-2 flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <Cpu className="h-7 w-7 text-primary" data-ai-hint="chip circuit" />
+            <h1 className="text-lg font-semibold">SimShell</h1>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRunCategoryTests}
+                  disabled={isRunning || isTesting || selectedCategories.length === 0}
+                  className="h-7 w-7"
+                >
+                  <FlaskConical className="h-4 w-4" data-ai-hint="science experiment" />
+                  <span className="sr-only">Run Tests</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Run predefined tests for active categories</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
-      </header>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="text-sm font-medium mr-2">Active Categories:</span>
+            {ALL_COMMAND_MODES.map(category => (
+              <div key={category} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`category-${category}`}
+                  checked={selectedCategories.includes(category)}
+                  onCheckedChange={(checked) => handleCategoryChange(category, checked)}
+                  aria-label={`Toggle category ${category}`}
+                  disabled={isRunning || isTesting}
+                />
+                <Label htmlFor={`category-${category}`} className="text-sm font-normal capitalize">
+                  {category}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </header>
+      </TooltipProvider>
 
       <Accordion type="single" collapsible className="w-full mb-2">
         <AccordionItem value="sql-panel">
           <AccordionTrigger className="text-sm font-medium hover:no-underline">SQL Direct Execution Panel</AccordionTrigger>
           <AccordionContent className="pt-2">
             <div className="flex flex-col space-y-2">
-              <SqlInputPanel onSubmit={handleDirectSqlSubmit} disabled={isRunning} />
+              <SqlInputPanel onSubmit={handleDirectSqlSubmit} disabled={isRunning || isTesting} />
               <div className="flex items-center space-x-2 flex-wrap gap-y-2">
-                <Button 
-                  onClick={handleListAllTablesClick} 
-                  disabled={isRunning}
+                <Button
+                  onClick={handleListAllTablesClick}
+                  disabled={isRunning || isTesting}
                   variant="outline"
                   size="sm"
                 >
                   List All Tables
                 </Button>
                 <div className="flex items-center space-x-2">
-                  <Select value={selectedSqlScript} onValueChange={setSelectedSqlScript} disabled={isRunning || sqlScriptFiles.length === 0}>
-                    <SelectTrigger className="w-[200px] h-9 text-sm" disabled={isRunning || sqlScriptFiles.length === 0}>
+                  <Select value={selectedSqlScript} onValueChange={setSelectedSqlScript} disabled={isRunning || isTesting || sqlScriptFiles.length === 0}>
+                    <SelectTrigger className="w-[200px] h-9 text-sm" disabled={isRunning || isTesting || sqlScriptFiles.length === 0}>
                       <SelectValue placeholder="Select script" />
                     </SelectTrigger>
                     <SelectContent>
@@ -626,9 +738,9 @@ export default function Home() {
                       {sqlScriptFiles.length === 0 && <SelectItem value="no-scripts" disabled>No scripts found</SelectItem>}
                     </SelectContent>
                   </Select>
-                  <Button 
-                    onClick={handleRunSelectedScript} 
-                    disabled={isRunning || !selectedSqlScript}
+                  <Button
+                    onClick={handleRunSelectedScript}
+                    disabled={isRunning || isTesting || !selectedSqlScript}
                     variant="outline"
                     size="sm"
                   >
@@ -641,7 +753,7 @@ export default function Home() {
         </AccordionItem>
       </Accordion>
 
-       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2"> 
+       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2">
         <OutputDisplay history={history} className="h-full" />
       </main>
 
@@ -649,7 +761,7 @@ export default function Home() {
         <CommandInput
             onSubmit={handleCommandSubmit}
             suggestions={filteredSuggestionsForInput}
-            disabled={isRunning}
+            disabled={isRunning || isTesting}
          />
       </footer>
     </div>
@@ -664,3 +776,4 @@ export default function Home() {
 function getFilename(): string {
     return 'page.tsx';
 }
+
