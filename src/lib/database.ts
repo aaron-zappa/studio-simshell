@@ -4,23 +4,23 @@
 
 import Database from 'better-sqlite3';
 import type { Database as DB } from 'better-sqlite3';
-import * as fs from 'fs'; // Import fs for file system operations
-import * as path from 'path'; // Import path for secure path joining
+import * as fs from 'fs';
+import * as path from 'path';
 
-// Module-level variable to hold the database instance and loaded path.
+const dataDir = path.join(process.cwd(), 'data');
+const DEFAULT_PERSISTENT_DB_FILENAME = 'simushell_export.db'; // Default persistent DB
+
 let dbInstance: DB | null = null;
-let loadedDbPath: string | null = null; // Store the path if loaded from file
-const dataDir = path.join(process.cwd(), 'data'); // Define data directory path
+let loadedDbPath: string | null = null;
 
 /**
  * Validates a SQLite filename.
  * Allows alphanumeric, underscores, hyphens, and periods. Must end with .db.
  * Prevents path traversal.
- * @param filename - The filename to validate.
- * @returns True if valid, false otherwise.
  */
 function isValidFilename(filename: string): boolean {
-    return /^[a-zA-Z0-9_\-\.]+\.db$/.test(filename) && !filename.includes('/') && !filename.includes('..');
+    if (!filename) return false;
+    return /^[a-zA-Z0-9_.-]+\.db$/.test(filename) && !filename.includes('/') && !filename.includes('..');
 }
 
 /**
@@ -39,52 +39,178 @@ function ensureDataDirectory(): void {
 }
 
 /**
+ * Creates essential tables if they don't already exist in the database.
+ * This is called after a file-based DB connection is established.
+ */
+async function ensureTablesExist(db: DB): Promise<void> {
+    console.log("Ensuring essential tables exist...");
+    const coreTableCheckSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='users';";
+    let tablesExist = false;
+    try {
+        const coreTable = db.prepare(coreTableCheckSql).get();
+        if (coreTable) {
+            tablesExist = true;
+            console.log("Core tables appear to exist.");
+        }
+    } catch (error) {
+        // This catch might not be strictly necessary if get() returns undefined for no rows
+        console.warn("Could not verify core table existence, assuming tables need creation:", error);
+    }
+
+    if (!tablesExist) {
+        console.log("Core tables not found. Creating essential tables...");
+        const createTableStatements = [
+            `CREATE TABLE IF NOT EXISTS variables (
+                name VARCHAR(255) NOT NULL PRIMARY KEY,
+                datatype VARCHAR(50) NOT NULL,
+                value TEXT,
+                max REAL,
+                min REAL,
+                default_value TEXT
+            );`,
+            `CREATE TABLE IF NOT EXISTS variables2 (
+                name VARCHAR(255) NOT NULL PRIMARY KEY,
+                datatype VARCHAR(50) NOT NULL,
+                value TEXT,
+                max REAL,
+                min REAL,
+                default_value TEXT
+            );`,
+            `CREATE TABLE IF NOT EXISTS ai_tools (
+                name VARCHAR(255) NOT NULL PRIMARY KEY,
+                description TEXT NOT NULL,
+                args_description TEXT NOT NULL,
+                isactive BOOLEAN NOT NULL DEFAULT 1
+            );`,
+            `CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(100) NOT NULL UNIQUE,
+                password_hash TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`,
+            `CREATE TABLE IF NOT EXISTS roles (
+                role_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                role_name VARCHAR(50) NOT NULL UNIQUE
+            );`,
+            `CREATE TABLE IF NOT EXISTS permissions (
+                permission_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                permission_name VARCHAR(100) NOT NULL UNIQUE
+            );`,
+            `CREATE TABLE IF NOT EXISTS user_roles (
+                user_id INTEGER NOT NULL,
+                role_id INTEGER NOT NULL,
+                PRIMARY KEY (user_id, role_id),
+                FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+                FOREIGN KEY (role_id) REFERENCES roles (role_id) ON DELETE CASCADE
+            );`,
+            `CREATE TABLE IF NOT EXISTS role_permissions (
+                role_id INTEGER NOT NULL,
+                permission_id INTEGER NOT NULL,
+                PRIMARY KEY (role_id, permission_id),
+                FOREIGN KEY (role_id) REFERENCES roles (role_id) ON DELETE CASCADE,
+                FOREIGN KEY (permission_id) REFERENCES permissions (permission_id) ON DELETE CASCADE
+            );`,
+            `CREATE TABLE IF NOT EXISTS command_metadata (
+                command_name TEXT NOT NULL PRIMARY KEY,
+                command_description TEXT,
+                result_description TEXT,
+                result_type TEXT,
+                result_min REAL,
+                result_max REAL,
+                result_length INTEGER
+            );`,
+            `CREATE TABLE IF NOT EXISTS command_input_arguments (
+                argument_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                command_name TEXT NOT NULL,
+                argument_name TEXT NOT NULL,
+                argument_type TEXT NOT NULL,
+                argument_purpose TEXT,
+                argument_default_value TEXT,
+                argument_min REAL,
+                argument_max REAL,
+                argument_length INTEGER,
+                is_required BOOLEAN DEFAULT 1,
+                position INTEGER,
+                FOREIGN KEY (command_name) REFERENCES command_metadata (command_name) ON DELETE CASCADE,
+                UNIQUE (command_name, argument_name),
+                UNIQUE (command_name, position)
+            );`
+        ];
+
+        try {
+            db.transaction(() => {
+                for (const sql of createTableStatements) {
+                    db.prepare(sql).run();
+                }
+            })();
+            console.log("Successfully created essential tables.");
+        } catch (error) {
+            console.error("Error creating essential tables:", error);
+            throw new Error(`Failed to create essential tables: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+}
+
+
+/**
  * Gets the singleton SQLite database instance.
- * If SIMSHELL_DB_FILE env var is set and the file exists in ./data, it loads from the file.
- * Otherwise, it creates/uses an in-memory database.
- * @returns The better-sqlite3 Database instance.
+ * Prioritizes SIMSHELL_DB_FILE env var, then DEFAULT_PERSISTENT_DB_FILENAME.
+ * Creates the DB file if it doesn't exist and ensures tables are present.
  */
 function getDb(): DB {
   if (!dbInstance) {
-    ensureDataDirectory(); // Ensure ./data exists
-    const dbFilename = process.env.SIMSHELL_DB_FILE; // Updated Env Var Name
-    let dbPath: string | null = null;
-    let mode: 'file' | 'memory' = 'memory';
+    ensureDataDirectory();
+    let dbPathToUse: string;
+    let mode: 'file' | 'memory' = 'file'; // Default to file mode
 
-    if (dbFilename && isValidFilename(dbFilename)) {
-        const potentialPath = path.join(dataDir, dbFilename);
+    const envDbFile = process.env.SIMSHELL_DB_FILE;
+
+    if (envDbFile && isValidFilename(envDbFile)) {
+        const potentialPath = path.join(dataDir, envDbFile);
         if (fs.existsSync(potentialPath)) {
-            // console.log(`Attempting to load database from file: ${potentialPath}`); // Log removed, handled by getDbStatusAction
-            dbPath = potentialPath;
-            mode = 'file';
+            dbPathToUse = potentialPath;
+            console.log(`Using database from SIMSHELL_DB_FILE: ${dbPathToUse}`);
         } else {
-            console.warn(`Database file specified by SIMSHELL_DB_FILE (${potentialPath}) not found. Falling back to in-memory database.`);
-            dbPath = null; // Reset to null to force in-memory
+            console.warn(`SIMSHELL_DB_FILE (${potentialPath}) not found. Defaulting to ${DEFAULT_PERSISTENT_DB_FILENAME}.`);
+            dbPathToUse = path.join(dataDir, DEFAULT_PERSISTENT_DB_FILENAME);
         }
-    } else if (dbFilename) {
-         console.warn(`Invalid filename specified in SIMSHELL_DB_FILE: "${dbFilename}". Falling back to in-memory database.`);
+    } else {
+        if (envDbFile) { // Env var was set but invalid
+            console.warn(`Invalid filename in SIMSHELL_DB_FILE: "${envDbFile}". Defaulting to ${DEFAULT_PERSISTENT_DB_FILENAME}.`);
+        }
+        dbPathToUse = path.join(dataDir, DEFAULT_PERSISTENT_DB_FILENAME);
+        // console.log(`Using default persistent database: ${dbPathToUse}`); // Logged by getDbStatusAction or ensureTables
     }
 
     try {
-      // Use the file path if mode is 'file', otherwise ':memory:'
-      const connectionString = mode === 'file' && dbPath ? dbPath : ':memory:';
-      dbInstance = new Database(connectionString);
-      // Enable WAL mode for potentially better performance
+      dbInstance = new Database(dbPathToUse); // This creates the file if it doesn't exist
       dbInstance.pragma('journal_mode = WAL');
-
-      if (mode === 'file' && dbPath) {
-          loadedDbPath = dbPath; // Store the path if loaded from file
-          // console.log(`Successfully loaded database from file: ${loadedDbPath}`); // Log removed, handled by getDbStatusAction
-      } else {
-          loadedDbPath = ':memory:';
-          // console.log(`SQLite database initialized (in-memory).`); // Log removed, handled by getDbStatusAction
-      }
+      loadedDbPath = dbPathToUse;
+      
+      // Ensure tables exist for the file-based DB
+      ensureTablesExist(dbInstance).catch(err => {
+          console.error("Failed to ensure tables exist on DB load, this might lead to issues:", err);
+          // Depending on severity, could throw here or try to close/nullify dbInstance
+      });
+      // Status logged by getDbStatusAction or ensureTablesExist
 
     } catch (error) {
-        console.error(`Failed to initialize SQLite database (${mode === 'file' ? `file: ${dbPath}` : 'in-memory'}):`, error);
-        loadedDbPath = null; // Ensure path is null on failure
-        // If initialization fails, subsequent calls might also fail.
-        throw error; // Re-throw to indicate failure
+        console.error(`Failed to initialize SQLite database (file: ${dbPathToUse}):`, error);
+        loadedDbPath = null;
+        // Fallback to in-memory if file DB fails catastrophically (e.g., disk permissions)
+        try {
+            console.warn("Falling back to in-memory database due to file DB initialization failure.");
+            dbInstance = new Database(':memory:');
+            dbInstance.pragma('journal_mode = WAL');
+            loadedDbPath = ':memory:';
+            // We might want to run ensureTablesExist for in-memory too if it's a fallback
+            ensureTablesExist(dbInstance).catch(err => {
+                 console.error("Failed to ensure tables for fallback in-memory DB:", err);
+            });
+        } catch (memError) {
+            console.error("Catastrophic failure: Could not initialize file-based or in-memory database.", memError);
+            throw memError; // Re-throw critical failure
+        }
     }
   }
   return dbInstance;
@@ -93,36 +219,23 @@ function getDb(): DB {
 
 /**
  * Returns the path of the currently loaded database file, or ':memory:' or null.
- * This function is NOT exported as a Server Action itself but can be called by one.
- * @returns The loaded database path string or null.
  */
 function getLoadedDbPathInternal(): string | null {
-    // Ensure the DB is initialized if it hasn't been yet
     if (!dbInstance) {
         try {
-            getDb();
+            getDb(); // Attempt to initialize if not already
         } catch (e) {
-            // If getDb fails, loadedDbPath should be null
-            console.error("DB initialization failed while checking loaded path.");
+            console.error("DB initialization failed while checking loaded path via getLoadedDbPathInternal.");
         }
     }
     return loadedDbPath;
 }
 
 
-/**
- * Executes a SQL query against the database.
- * Marked async as it's used within Server Actions, although better-sqlite3 is synchronous.
- * @param sql The SQL query string to execute.
- * @param params Optional parameters for the SQL query.
- * @returns An object containing the results (for SELECT) or changes info (for others).
- * @throws Throws an error if the SQL execution fails.
- */
 export async function runSql(sql: string, params: any[] = []): Promise<{ results: any[] | null, changes: number | null, lastInsertRowid: bigint | number | null }> {
-  const db = getDb(); // Ensure DB is initialized (loads from file or memory)
+  const db = getDb();
   try {
     const stmt = db.prepare(sql);
-
     if (stmt.reader) {
         const results = stmt.all(params);
         return { results, changes: null, lastInsertRowid: null };
@@ -143,32 +256,32 @@ export async function runSql(sql: string, params: any[] = []): Promise<{ results
   }
 }
 
-/**
- * Persists the current database (in-memory or file-based) to a target file.
- * If the current DB is file-based, it effectively copies/overwrites the target.
- * WARNING: Allows writing to the server's file system. Use with caution.
- * @param targetFilename The desired filename (e.g., 'mybackup.db'). Basic validation is performed.
- * @returns A boolean indicating success or failure.
- * @throws Throws an error if the operation fails or the DB isn't initialized.
- */
 export async function persistDbToFile(targetFilename: string): Promise<boolean> {
-    const currentDb = getDb(); // Get the current DB instance (could be memory or file)
-    // No need to check if null, getDb always returns an instance or throws
-
-    // Validate target filename
+    const currentDb = getDb();
     if (!isValidFilename(targetFilename)) {
         throw new Error('Invalid target filename. Use only alphanumeric, underscores, hyphens, and periods, ending with .db.');
     }
-
-    ensureDataDirectory(); // Ensure ./data exists
-
+    ensureDataDirectory();
     const targetPath = path.join(dataDir, targetFilename);
     console.log(`Attempting to persist current DB to: ${targetPath}`);
 
     try {
-        // Use the backup API to write the current DB state to the target file
+        // If current DB is in-memory and we want to persist to targetPath
+        // or if current DB is file-based and targetPath is different, use backup.
+        // If current DB is file-based and targetPath is the same, this is redundant but harmless.
         await currentDb.backup(targetPath);
         console.log(`Successfully persisted database to ${targetPath}`);
+        if (loadedDbPath === ':memory:' || loadedDbPath !== targetPath) {
+            // If we just persisted an in-memory DB, or copied to a new file,
+            // we might want to switch the active instance to this new file.
+            // For now, the active instance remains as it was.
+            // To switch:
+            // if (dbInstance) dbInstance.close();
+            // dbInstance = new Database(targetPath);
+            // dbInstance.pragma('journal_mode = WAL');
+            // loadedDbPath = targetPath;
+            // console.log(`Switched active DB instance to ${targetPath}`);
+        }
         return true;
     } catch (error) {
         console.error(`Error persisting database to ${targetPath}:`, error);
@@ -176,48 +289,57 @@ export async function persistDbToFile(targetFilename: string): Promise<boolean> 
     }
 }
 
-/**
- * Checks if the database is initialized by attempting a simple query on a core table.
- * This function is NOT exported as a Server Action itself but can be called by one.
- * @returns True if the database seems initialized, false otherwise.
- */
 export async function isDatabaseInitialized(): Promise<boolean> {
     try {
-        const db = getDb(); // Attempt to get DB instance (may throw if initialization fails)
-        // Attempt a simple query on a core table expected to exist after initialization (e.g., 'users')
- if (db) { // Check if db instance was successfully obtained
-            db.prepare('SELECT 1 FROM users LIMIT 1').get(); // This will throw 'no such table' if the table doesn't exist
- return true; // Query succeeded, table exists
- }
- return false; // If getDb didn't throw but returned null (shouldn't happen with current getDb logic, but for safety)
-    } catch (error) {
-        if (error instanceof Error && error.message.includes('no such table')) {
-            return false; // Database tables not initialized
+        const db = getDb();
+        if (db) {
+            // Check against 'users' as it's a fundamental table for RBAC
+            const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users';").get();
+            return !!table;
         }
- throw error; // Re-throw other errors
+        return false;
+    } catch (error) {
+        // This might catch errors if getDb() itself fails before table check
+        console.error("Error checking if database is initialized:", error);
+        return false;
     }
 }
 
-// --- Server Action to get DB status ---
-/**
- * Server Action to get the status of the loaded database.
- * @returns A string indicating the loaded database path or if it's in-memory, with status.
- */
 export async function getDbStatusAction(): Promise<string> {
-    const path = getLoadedDbPathInternal();
+    const path = getLoadedDbPathInternal(); // This will trigger getDb if dbInstance is null
+    let dbIsInitialized = false;
+    let tableStatus = "unknown";
+
+    if (dbInstance && path !== ':memory:') { // Only check table status for file DBs after instance is confirmed
+        try {
+            const table = dbInstance.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users';").get();
+            dbIsInitialized = !!table;
+            tableStatus = dbIsInitialized ? "tables ok" : "tables NOT ok (run 'init db')";
+        } catch (e) {
+             // This might happen if ensureTablesExist failed silently or was interrupted
+            tableStatus = `error checking tables (${e instanceof Error ? e.message.substring(0,30) : 'unknown err'})`;
+        }
+    } else if (dbInstance && path === ':memory:') {
+        // For in-memory, we can assume tables are created by ensureTablesExist if it ran.
+        // A more robust check would be similar to file DB.
+        try {
+            const table = dbInstance.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users';").get();
+            dbIsInitialized = !!table;
+            tableStatus = dbIsInitialized ? "tables ok" : "tables NOT ok (run 'init db' if this is unexpected for memory DB)";
+        } catch (e) {
+            tableStatus = "tables NOT ok for memory DB";
+        }
+    }
+
+
     if (path === ':memory:') {
-        return "Database loaded with status ok (in-memory)";
+        return `Database loaded with status ok (in-memory, ${tableStatus})`;
     } else if (path) {
-        // Assuming if path is set and not ':memory:', it loaded successfully.
-        // Error during loading would have thrown in getDb().
-        return `Database loaded with status ok (file: ${path})`;
+        return `Database loaded with status ok (file: ${path}, ${tableStatus})`;
     } else {
-        // If path is null, it means getDb() potentially failed or wasn't called.
-        return "Database loaded with status nok (not initialized or error)";
+        return "Database status: nok (not initialized or error during load)";
     }
 }
-// --- End Server Action ---
-
 
 /**
  * Returns the name of the current file.
