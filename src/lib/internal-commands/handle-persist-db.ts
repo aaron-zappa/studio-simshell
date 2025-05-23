@@ -92,12 +92,3 @@ export const handlePersistDb = async ({ args, timestamp, currentLogEntries, user
         newLogEntries
     };
 };
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'handle-persist-db.ts';
-}

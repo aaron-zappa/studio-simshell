@@ -45,12 +45,3 @@ export async function formatResultsAsTable(results: any[]): Promise<string | nul
 
     return [headerLine, separatorLine, ...dataLines, `(${results.length} row${results.length === 1 ? '' : 's'})`].join('\n');
 }
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'formatting.ts';
-}

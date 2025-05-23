@@ -135,13 +135,3 @@ const simpleTextGenFlow = ai.defineFlow<
 
 // Export the flow directly
 export { simpleTextGenFlow };
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'simple-text-gen-flow.ts';
-}
-

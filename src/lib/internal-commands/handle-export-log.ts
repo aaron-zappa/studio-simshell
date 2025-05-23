@@ -29,12 +29,3 @@ export const handleExportLog = async ({ timestamp, userId }: HandlerParams): Pro
     // The client-side part in page.tsx logs the attempt/result.
     return { outputLines: outputLines };
 };
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'handle-export-log.ts';
-}

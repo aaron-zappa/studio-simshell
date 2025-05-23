@@ -17,7 +17,7 @@ export type OutputLine = {
   timestamp?: string;
   flag?: 0 | 1;
   issuer?: { // New field for command issuer details
-    name: string;
+    username: string; // Changed from name to username
     role: string;
   };
 };
@@ -74,8 +74,8 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
 
                 let commandDisplayPrefix = "";
                 if (line.type === 'command' && !showLogFormat) { // Only apply custom prefix if not in log format
-                    if (line.issuer && line.issuer.name && line.issuer.role) {
-                        commandDisplayPrefix = `partner in role ${line.issuer.role}: ${line.issuer.name}$ `;
+                    if (line.issuer && line.issuer.username && line.issuer.role) { // Changed to line.issuer.username
+                        commandDisplayPrefix = `partner in role ${line.issuer.role}: ${line.issuer.username}$ `;
                     } else {
                         commandDisplayPrefix = "$ "; // Fallback prefix for commands
                     }
@@ -104,13 +104,4 @@ export function OutputDisplay({ history, className }: OutputDisplayProps) {
       </CardContent>
     </Card>
   );
-}
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'output-display.tsx';
 }

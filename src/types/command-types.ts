@@ -13,12 +13,3 @@ export const ALL_COMMAND_MODES: CommandMode[] = ['internal', 'python', 'unix', '
 // Note: The CommandCategory type from the classification flow also includes 'ambiguous' and 'unknown'.
 // We are keeping CommandMode simpler for now, representing only the executable categories.
 // The UI/executor handles 'ambiguous'/'unknown' before calling executeCommand.
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'command-types.ts';
-}

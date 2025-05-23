@@ -23,12 +23,3 @@ export async function readClipboard(): Promise<string> {
     throw new Error("Failed to read clipboard. Check browser permissions.");
   }
 };
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'utils.ts';
-}

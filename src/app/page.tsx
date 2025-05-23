@@ -37,7 +37,7 @@ export default function Home() {
   const [isTesting, setIsTesting] = React.useState<boolean>(false);
   const { toast } = useToast();
 
-  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal', 'python']);
+  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal']);
   const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
   const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
 
@@ -435,10 +435,10 @@ export default function Home() {
           const exportResultLine = exportLogFile(logEntries); // This function is client-side
            // Log the attempt (success/failure is logged by exportLogFile itself if it returns an OutputLine)
            const logText = exportResultLine ? exportResultLine.text : "Log export action attempted.";
-           const logType: LogEntry['type'] = exportResultLine?.type === 'error' ? 'E' : 'I';
+           const logTypeEntry: LogEntry['type'] = exportResultLine?.type === 'error' ? 'E' : 'I';
            const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 1 : 0;
 
-           const exportLog: LogEntry = { timestamp, type: logType, flag: logFlagVal, text: logText };
+           const exportLog: LogEntry = { timestamp, type: logTypeEntry, flag: logFlagVal, text: logText };
            setLogEntries(prev => [...prev, exportLog]);
 
           if(commandLogOutput && exportResultLine){
@@ -816,13 +816,3 @@ export default function Home() {
     </div>
   );
 }
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'page.tsx';
-}
-

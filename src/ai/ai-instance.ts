@@ -12,12 +12,3 @@ export const ai = genkit({
   ],
   model: 'googleai/gemini-2.0-flash',
 });
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'ai-instance.ts';
-}

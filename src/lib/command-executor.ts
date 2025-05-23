@@ -248,13 +248,3 @@ export async function executeCommand ({
     toastInfo: toastInfoResult,
   };
 }
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'command-executor.ts';
-}
-

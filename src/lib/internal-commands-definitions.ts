@@ -115,7 +115,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
   },
   {
     name: 'export_db',
-    description: 'Persists the current database to the default file "sim_shell.db" in the server\'s data directory.',
+    description: 'Persists the current database to the default file "sim_shell_exp.db" in the server\'s data directory.',
     requiredPermission: 'execute_sql_modify',
     exampleUsage: 'export db',
   },
@@ -163,12 +163,3 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     requiredPermission: 'use_ai_tools',
   },
 ];
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'internal-commands-definitions.ts';
-}

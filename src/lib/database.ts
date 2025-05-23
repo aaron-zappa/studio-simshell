@@ -336,13 +336,3 @@ export async function getDbStatusAction(): Promise<string> {
         return "Database status: nok (not initialized or error during load)";
     }
 }
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'database.ts';
-}
-

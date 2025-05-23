@@ -66,17 +66,8 @@ export const exportLogFile = (logEntries: LogEntry[]): OutputLine | null => {
 };
 
 
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'logging.ts';
-}
 
 // --- Removed old LogEntry structure and related functions (requiArr, getRequiArr, addLogEntry) ---
 // The 'show requirements' command logic is now in its own handler file.
 // Logging should now happen within command handlers by creating LogEntry objects
 // and returning them in the HandlerResult.
-

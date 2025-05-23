@@ -246,13 +246,3 @@ export const handleAiCommand = async ({ userId, userPermissions, args, timestamp
         toastInfo // Include toastInfo in the return
     };
 };
-
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'handle-ai-command.ts';
-}
