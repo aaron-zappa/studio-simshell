@@ -139,12 +139,12 @@ export const internalCommandDefinitions: CommandDefinition[] = [
   },
   {
     name: 'ai',
-    description: 'Sends the input text to an AI model for processing. Supports variable substitution using {varname} syntax, where "varname" is a variable stored in the internal database. The AI\'s response is stored in the "ai_answer" variable. The AI can also be instructed to use defined AI tools.',
+    description: 'Sends the input text to an AI model for processing. The AI\'s response is stored in the "ai_answer" variable, which can be used in subsequent commands (e.g., `ai Tell me more about {ai_answer}`). Supports variable substitution using {varname} and can be instructed to use defined AI tools via @toolname.',
     argsFormat: '<input_text_with_optional_{varname}_and_@toolname>',
     argsDetails: [
         { name: 'input_text...', description: 'The text prompt for the AI. Can include {variable_name} for substitution and @tool_name to suggest tool usage.' },
     ],
-    exampleUsage: 'ai Tell me about {model_name} or ai @getWeather for London',
+    exampleUsage: 'ai What is the capital of France? (then) ai Tell me more about {ai_answer}. (or) ai @getWeather for London',
     requiredPermission: 'use_ai_tools',
   },
 ];
