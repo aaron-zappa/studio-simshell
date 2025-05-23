@@ -28,6 +28,7 @@ import { handleListPyVars } from './handle-list-py-vars';
 import { handleAiCommand } from './handle-ai-command';
 import { handleSetAiToolActive } from './handle-set-ai-tool-active';
 import { handleSetSimMode } from './handle-set-sim-mode';
+import { handleAddRole } from './handle-add-role'; // Import new handler
 import { handleCustomCommand } from './handle-custom-command';
 import { handleNotFound } from './handle-not-found';
 
@@ -70,9 +71,14 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         };
     };
 
-    if (commandName !== 'help' && commandDef && commandDef.requiredPermission && !overridePermissionChecks && !userPermissions.includes(commandDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
-        return permissionDenied(commandDef.requiredPermission);
+    // Centralized permission check for defined internal commands
+    if (commandDef && commandDef.requiredPermission && !overridePermissionChecks && !userPermissions.includes(commandDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
+        // Allow 'help' to bypass this specific check if its definition doesn't require a perm or if it's a special case
+        if (commandName !== 'help') {
+             return permissionDenied(commandDef.requiredPermission);
+        }
     }
+
 
     if (commandName.startsWith('@bat:')) {
         console.warn("Experimental @bat command received, but execution is not yet implemented.");
@@ -106,6 +112,11 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         case 'add_ai_tool':
              if (commandLower.startsWith('add_ai_tool ')) {
                  return handleAddAiTool(params);
+             }
+             break;
+        case 'add_role': // New command case
+             if (commandLower.startsWith('add_role ')) {
+                 return handleAddRole(params);
              }
              break;
         case 'set':

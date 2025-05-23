@@ -58,7 +58,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
       { name: 'action_to_perform', description: 'The text that will be output when the command is run (must be in quotes).' },
     ],
     exampleUsage: 'add_int_cmd mycmd greet "Greets the user" "Hello from my custom command!"',
-    requiredPermission: 'manage_ai_tools',
+    requiredPermission: 'manage_ai_tools', // Example permission
   },
   {
     name: 'add_ai_tool',
@@ -71,6 +71,16 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     ],
     exampleUsage: 'add_ai_tool getWeather "<location:string>" "Fetches the current weather for a given location."',
     requiredPermission: 'manage_ai_tools',
+  },
+  {
+    name: 'add_role',
+    description: 'Adds a new role to the system roles table.',
+    argsFormat: '<role_name>',
+    argsDetails: [
+      { name: 'role_name', description: 'The unique name for the new role (e.g., "editor", "viewer").' },
+    ],
+    exampleUsage: 'add role editor',
+    requiredPermission: 'manage_roles_permissions',
   },
   {
     name: 'set_ai_tool', // This is the base command name for setting AI tool properties
