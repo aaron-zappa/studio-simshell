@@ -1,5 +1,6 @@
 // src/lib/formatting.ts
 // src/lib/formatting.ts
+'use server';
 
 /**
  * Formats database results (array of objects) into a simple text table.

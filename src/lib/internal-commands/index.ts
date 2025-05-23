@@ -95,7 +95,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
         case 'help':
             return handleHelp(params);
         case 'clear':
-            return { outputLines: [], newSuggestions: undefined, newCustomCommands: undefined, toastInfo: undefined };
+            return { outputLines: [], newSuggestions: undefined, newCustomCommands: undefined, toastInfo: undefined, newLogEntries: params.currentLogEntries };
         // case 'mode': // Removed
         //     return handleMode(params);
         case 'history':

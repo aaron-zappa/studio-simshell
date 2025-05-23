@@ -15,7 +15,7 @@ interface HandlerParams {
 
 export const handleNotFound = async ({ commandName, timestamp, currentLogEntries, userId }: HandlerParams): Promise<HandlerResult> => {
     const outputText = `Internal command not found: ${commandName}`;
-    const outputLines: OutputLine[] = [{ id: `out-${timestamp}`, text: outputText, type: 'error', category: 'internal', timestamp, flag: 0 }];
+    const outputLines: OutputLine[] = [{ id: `out-${timestamp}`, text: outputText, type: 'error', category: 'internal', timestamp, flag: 1 }];
 
     const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `Attempted unknown internal command: ${commandName} (User: ${userId})` };
     const newLogEntries = [...currentLogEntries, logEntry];

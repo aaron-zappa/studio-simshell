@@ -23,7 +23,7 @@ export const handleDefine = async ({ args, timestamp, currentLogEntries, userId,
     // Permission check moved to central handler
     // TODO: Implement define functionality
     const outputText = `Define command placeholder for: ${args.join(' ')}`;
-    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp, flag: 0 }];
 
     // Create log entry with flag=1 for warning
     const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `Define command not yet implemented. Args: ${args.join(' ')} (User: ${userId})` };

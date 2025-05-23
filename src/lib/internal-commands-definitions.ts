@@ -1,4 +1,4 @@
-// src/lib/internal-commands-definitions.ts
+/src/lib/internal-commands-definitions.ts
 // src/lib/internal-commands-definitions.ts
 /**
  * @fileOverview Centralized definitions for all internal SimShell commands.
@@ -18,7 +18,12 @@ export interface CommandDefinition {
 export const internalCommandDefinitions: CommandDefinition[] = [
   {
     name: 'help',
-    description: 'Displays this help message, listing available command categories and commands. Filters command visibility based on user permissions.',
+    description: 'Displays help information. Can show general help or help for a specific command category. Filters command visibility based on user permissions.',
+    argsFormat: '[category_name]',
+    argsDetails: [
+      { name: 'category_name', description: 'Optional. The command category to display help for (e.g., internal, sql, python).', optional: true },
+    ],
+    exampleUsage: 'help sql',
   },
   {
     name: 'clear',

@@ -22,7 +22,7 @@ export const handleHistory = async ({ timestamp, currentLogEntries, userId }: Ha
     // Permission check moved to central handler (if needed)
     // TODO: Implement fetching history from SQLite database if needed
     const outputText = 'History command placeholder (currently only shows command history in output).';
-    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp }];
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'output', category: 'internal', timestamp, flag: 0 }];
 
     // Create log entry with flag=1 for warning
     const logEntry: LogEntry = { timestamp, type: 'W', flag: 1, text: `History command not fully implemented. (User: ${userId})` };

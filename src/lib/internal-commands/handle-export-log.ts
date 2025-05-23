@@ -23,7 +23,7 @@ export const handleExportLog = async ({ timestamp, userId }: HandlerParams): Pro
     // Actual export is handled client-side due to browser APIs.
     // This server-side handler provides informational feedback.
     const outputText = 'Log export is handled client-side. Check your downloads if you ran it there.';
-    const outputLines = [{ id: `log-export-info-${timestamp}`, text: outputText, type: 'info', category: 'internal', timestamp }];
+    const outputLines = [{ id: `log-export-info-${timestamp}`, text: outputText, type: 'info', category: 'internal', timestamp, flag: 0 }];
 
     // No server-side log generated here, as the action is client-side.
     // The client-side part in page.tsx logs the attempt/result.

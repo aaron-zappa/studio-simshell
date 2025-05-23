@@ -23,7 +23,7 @@ export const handlePause = async ({ timestamp, currentLogEntries, userId }: Hand
     // 'pause' logic is primarily client-side to interact with the running state.
     // This server-side handler might provide confirmation if needed, but the core stop logic is client-side.
     const outputText = `'pause' command acknowledged server-side (actual stop is client-side).`;
-    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'info', category: 'internal', timestamp }];
+    const outputLines = [{ id: `out-${timestamp}`, text: outputText, type: 'info', category: 'internal', timestamp, flag: 0 }];
 
     // No server-side log generated here, client handles logging 'Task paused.'
     // const logEntry: LogEntry = { timestamp, type: 'I', text: outputText };

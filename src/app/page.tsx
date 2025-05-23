@@ -37,7 +37,7 @@ export default function Home() {
   const [isTesting, setIsTesting] = React.useState<boolean>(false);
   const { toast } = useToast();
 
-  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal']);
+  const [selectedCategories, setSelectedCategories] = React.useState<CommandMode[]>(['internal', 'python']);
   const { suggestions, addSuggestion, initialSuggestions } = useSuggestions();
   const { customCommands, addCustomCommand, getCustomCommandAction } = useCustomCommands();
 
@@ -354,7 +354,7 @@ export default function Home() {
              id: `cmd-clipboard-skip-${timestamp}`,
              text: originalCommand,
              type: 'command',
-             category: 'python',
+             category: 'python', // Assuming clipboard = get() would be python if not internal
              timestamp: timestamp,
              issuer: currentUser
          };
@@ -367,7 +367,7 @@ export default function Home() {
              id: `cmd-empty-final-${timestamp}`,
              text: originalCommand,
              type: 'command',
-             category: 'internal',
+             category: 'internal', // Default to internal if processed command is empty for other reasons
              timestamp: timestamp,
              issuer: currentUser
            };
@@ -376,6 +376,7 @@ export default function Home() {
            throw new Error("Command execution skipped: Processed command is empty.");
        }
        if (!finalCommand && commandTrimmed.length === 0) {
+            // If the original command was empty, just do nothing and return
             setIsRunning(false);
             return;
        }
@@ -390,7 +391,7 @@ export default function Home() {
 
       commandLogOutput = {
          id: `cmd-${timestamp}`,
-         text: finalCommand,
+         text: finalCommand, // Log the potentially modified command (e.g., clipboard assignment)
          type: 'command',
          category: (category === 'ambiguous' || category === 'unknown') ? 'internal' : category,
          timestamp: timestamp,
@@ -411,7 +412,7 @@ export default function Home() {
         setHistory((prev) => [...prev, commandLogOutput, ambiguousOutput]);
         const classificationLog: LogEntry = {
             timestamp,
-            type: 'W',
+            type: 'W', // Warning for classification issues
             flag: 1,
             text: `Command classification: ${category}. Reasoning: ${classificationReasoning || 'N/A'}. Original: '${originalCommand}', Processed: '${finalCommand}', Active: ${selectedCategories.join(', ')}`
         };
@@ -420,84 +421,103 @@ export default function Home() {
         return;
       }
 
+      // Client-side handling for specific internal commands
       let clientHandled = false;
       if (category === 'internal') {
          if (finalCommandLower === 'clear') {
-          setHistory([]);
+          setHistory([]); // Clears the UI history
           const clearLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "History cleared." };
-          setLogEntries(prev => [...prev, clearLog]);
+          setLogEntries(prev => [...prev, clearLog]); // Log the clear action
           clientHandled = true;
          }
+         // 'export log' is primarily client-side due to file download
          else if (finalCommandLower === 'export log') {
-          const exportResultLine = exportLogFile(logEntries);
+          const exportResultLine = exportLogFile(logEntries); // This function is client-side
+           // Log the attempt (success/failure is logged by exportLogFile itself if it returns an OutputLine)
            const logText = exportResultLine ? exportResultLine.text : "Log export action attempted.";
            const logType: LogEntry['type'] = exportResultLine?.type === 'error' ? 'E' : 'I';
            const logFlagVal: 0 | 1 = exportResultLine?.type === 'error' ? 1 : 0;
+
            const exportLog: LogEntry = { timestamp, type: logType, flag: logFlagVal, text: logText };
            setLogEntries(prev => [...prev, exportLog]);
 
           if(commandLogOutput && exportResultLine){
-             exportResultLine.timestamp = timestamp;
+             // Make sure the displayed line also gets a timestamp and flag if it's an error/info
+             exportResultLine.timestamp = timestamp; // Use consistent timestamp for the event
              exportResultLine.flag = logFlagVal;
              setHistory((prev) => [...prev, commandLogOutput, exportResultLine]);
           } else if (commandLogOutput) {
+             // If exportLogFile returns null or undefined (shouldn't happen with current impl)
              setHistory((prev) => [...prev, commandLogOutput]);
           }
           clientHandled = true;
          }
          else if (finalCommandLower === 'pause') {
+           // 'pause' is largely a UI concept of stopping further processing
            const pauseOutput: OutputLine = {
              id: `pause-${timestamp}`,
-             text: 'task stopped',
+             text: 'task stopped', // Changed from "Task paused."
              type: 'info',
              category: 'internal',
-             timestamp: timestamp,
+             timestamp: timestamp, // This makes it look like a log line
              flag: 0,
            };
             if(commandLogOutput){
                setHistory((prev) => [...prev, commandLogOutput, pauseOutput]);
             }
-            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." };
+            const pauseLog: LogEntry = { timestamp, type: 'I', flag: 0, text: "Task paused." }; // Log the action
             setLogEntries(prev => [...prev, pauseLog]);
            clientHandled = true;
          }
       }
 
       if (clientHandled) {
+         // For 'pause', we don't want to immediately set isRunning to false
+         // because the 'finally' block will handle it.
+         // For other client-handled commands, we can stop here.
          if (finalCommandLower !== 'pause') setIsRunning(false);
          return;
       }
 
+      // If not client-handled, proceed to server-side execution
       executionResult = await executeCommand({
         userId: SIMULATED_USER_ID,
         command: finalCommand,
-        mode: category as CommandMode,
-        currentLogEntries: logEntries,
+        mode: category as CommandMode, // Pass the classified category
+        currentLogEntries: logEntries, // Pass current log entries
         initialSuggestions,
         customCommands: customCommands, // Pass the customCommands object
-        overridePermissionChecks: true,
+        overridePermissionChecks: true, // Passing the override flag
       });
       
+      // Process results from server-side execution
       if (executionResult && executionResult.outputLines) {
+          // Filter out the command echo if the server already included it (it shouldn't anymore)
           const outputToDisplay = executionResult.outputLines
-              .filter(line => line.id !== commandLogOutput?.id)
+              .filter(line => line.id !== commandLogOutput?.id) // Avoid duplicate command display
               .map(line => ({
                  ...line,
+                 // Ensure flag is set, defaulting based on type if missing from server
                  flag: line.flag ?? ((line.type === 'info' || line.type === 'warning' || line.type === 'error') ? (line.type === 'error' ? 1 : (line.type === 'warning' ? 1 : 0)) : 0)
                }));
 
+           // Add the original command log output, then the results
            if(commandLogOutput){
              setHistory((prev) => [...prev, commandLogOutput, ...outputToDisplay]);
            } else {
+             // This case should ideally not happen if commandLogOutput is always created
              setHistory((prev) => [...prev, ...outputToDisplay]);
            }
 
+           // Update log entries from server result
            if (executionResult.newLogEntries) {
+              // Filter out duplicates if any (though server should ideally handle this)
               const uniqueNewLogs = executionResult.newLogEntries.filter(
                   newLog => !logEntries.some(existing => existing.timestamp === newLog.timestamp && existing.text === newLog.text)
               );
               setLogEntries(prev => [...prev, ...uniqueNewLogs]);
            }
+           // Handle toast notifications requested by the server
            if (executionResult.toastInfo) {
                 toast({
                     title: "AI Notification",
@@ -505,22 +525,33 @@ export default function Home() {
                     variant: executionResult.toastInfo.variant || 'default',
                 });
            }
+           // Handle new suggestions/commands if the server sent them
+            if (executionResult.newSuggestions) {
+                executionResult.newSuggestions.forEach(s => addSuggestion(s.mode, s.command));
+            }
+            if (executionResult.newCustomCommands) {
+                executionResult.newCustomCommands.forEach(cc => addCustomCommand(cc.name, cc.action));
+            }
+
       } else {
+          // Handle the case where executionResult or executionResult.outputLines is not as expected
           errorOccurred = true;
           console.error("executeCommand did not return the expected result object or outputLines:", executionResult);
           const errorMsg = "Command execution failed to produce a valid result.";
-          const errTimestamp = new Date().toISOString();
+          const errTimestamp = new Date().toISOString(); // Use a new timestamp for this specific error
           const errorOutputLine: OutputLine = {
               id: `exec-result-err-${errTimestamp}`,
               text: errorMsg,
               type: 'error',
-              category: 'internal',
+              category: 'internal', // Default to internal for this type of error
               timestamp: errTimestamp,
               flag: 1,
           };
+          // Ensure commandLogOutput is added if it exists
           if (commandLogOutput) {
             setHistory((prev) => [...prev, commandLogOutput, errorOutputLine]);
           } else {
+             // Fallback if commandLogOutput wasn't created (should be rare)
              const cmdFallbackLog: OutputLine = { id: `cmd-fallback-${errTimestamp}`, text: originalCommand || "[unknown command]", type: 'command', category: 'internal', timestamp: errTimestamp, issuer: currentUser };
              setHistory((prev) => [...prev, cmdFallbackLog, errorOutputLine]);
           }
@@ -542,24 +573,31 @@ export default function Home() {
             id: `error-${timestamp}`,
             text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
             type: 'error',
-            category: 'internal',
+            category: 'internal', // Default for unhandled errors
             timestamp: timestamp,
             flag: 1,
         };
+         // Log the error
          const errorLog: LogEntry = { timestamp, type: 'E', flag: 1, text: errorMsg };
+         // If executionResult has logs (e.g., from partial server execution before error), include them
          if (executionResult && executionResult.newLogEntries) {
              setLogEntries([...executionResult.newLogEntries, errorLog]);
          } else {
              setLogEntries(prev => [...prev, errorLog]);
          }
+         // Ensure the command that caused the error is shown
          const cmdLog = commandLogOutput || { id: `cmd-err-${timestamp}`, text: originalCommand, type: 'command', category: 'internal', timestamp: timestamp, issuer: currentUser };
          setHistory((prev) => [...prev, cmdLog, errorOutput]);
 
     } finally {
+      // Use finalCommandLower for pause check
       if (finalCommandLower === 'pause' && !errorOccurred) {
-        // Do nothing special, setIsRunning(false) is handled by the client-side nature of 'pause' effectively
+        // For 'pause', the 'task stopped' message is shown, and isRunning is kept true
+        // effectively waiting for the user to enter another command or for a timeout if implemented.
+        // The UI itself doesn't "stop" in a way that requires setIsRunning(false) immediately.
+        // If 'pause' was to truly halt background tasks, that logic would be elsewhere.
       } else {
-          setIsRunning(false);
+          setIsRunning(false); // Set to false for other commands or if an error occurred
       }
     }
   };
@@ -568,9 +606,11 @@ export default function Home() {
        const combinedSuggestions = new Set<string>();
         selectedCategories.forEach(cat => {
            (suggestions[cat] || []).forEach(sug => combinedSuggestions.add(sug));
+           // Add custom internal commands to suggestions if 'internal' is active
            if (cat === 'internal') {
                 Object.keys(customCommands).forEach(cmdName => combinedSuggestions.add(cmdName));
            }
+           // Add "clipboard = get()" for python if active
            if (cat === 'python') {
                combinedSuggestions.add('clipboard = get()');
            }
@@ -585,7 +625,7 @@ export default function Home() {
     setIsTesting(true);
     setIsRunning(true);
 
-    const testQueue: { command: string, category: CommandMode | 'sql' }[] = [];
+    const testQueue: { command: string, category: CommandMode | 'sql' }[] = []; // Allow 'sql' specifically for direct submission
 
     selectedCategories.forEach(category => {
       const testOutputStart: OutputLine = {
@@ -616,6 +656,7 @@ export default function Home() {
           testQueue.push({ command: 'echo "SimShell Windows test"', category });
           break;
         case 'sql':
+          // SQL commands will be handled by handleDirectSqlSubmit
           testQueue.push({ command: 'SELECT 1+1 AS test_calculation;', category: 'sql' });
           testQueue.push({ command: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';", category: 'sql' });
           break;
@@ -629,25 +670,27 @@ export default function Home() {
     });
 
     for (const testItem of testQueue) {
+      // Display which command is being tested
       const testCommandOutput: OutputLine = {
         id: `test-cmd-${testItem.category}-${testItem.command.replace(/\s/g, '_')}-${Date.now()}`,
         text: `Testing command: ${testItem.command}`,
-        type: 'info',
-        category: 'internal',
+        type: 'info', // Use 'info' to distinguish from actual command output style
+        category: 'internal', // Logged as an internal action
         timestamp: new Date().toISOString(),
-        flag: 0
+        flag: 0 // Or another appropriate flag
       };
       setHistory(prev => [...prev, testCommandOutput]);
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for readability
 
       if (testItem.category === 'sql') {
         await handleDirectSqlSubmit(testItem.command);
       } else {
         await handleCommandSubmit(testItem.command);
       }
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 300)); // Delay after command execution
     }
     
+    // Final message
     const testOutputEnd: OutputLine = {
         id: `test-end-all-${Date.now()}`,
         text: `--- All category tests finished ---`,
@@ -669,8 +712,10 @@ export default function Home() {
       <TooltipProvider>
         <header className="flex items-center justify-between mb-2 flex-wrap gap-4">
           <div className="flex items-center gap-2">
+            {/* Updated SimShell logo and title display */}
             <Cpu className="h-7 w-7 text-primary" data-ai-hint="chip circuit" />
-            <h1 className="text-lg font-semibold">SimShell</h1>
+            <h1 className="text-lg font-semibold">SimShell</h1> {/* text-lg instead of text-xl */}
+            {/* Test Button */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -678,7 +723,7 @@ export default function Home() {
                   size="icon"
                   onClick={handleRunCategoryTests}
                   disabled={isRunning || isTesting || selectedCategories.length === 0}
-                  className="h-7 w-7"
+                  className="h-7 w-7" // Smaller icon button
                 >
                   <FlaskConical className="h-4 w-4" data-ai-hint="science experiment" />
                   <span className="sr-only">Run Tests</span>
@@ -698,7 +743,7 @@ export default function Home() {
                   checked={selectedCategories.includes(category)}
                   onCheckedChange={(checked) => handleCategoryChange(category, checked)}
                   aria-label={`Toggle category ${category}`}
-                  disabled={isRunning || isTesting}
+                  disabled={isRunning || isTesting} // Disable if tests or command is running
                 />
                 <Label htmlFor={`category-${category}`} className="text-sm font-normal capitalize">
                   {category}
@@ -709,10 +754,11 @@ export default function Home() {
         </header>
       </TooltipProvider>
 
+      {/* Accordion for SQL Input Panel */}
       <Accordion type="single" collapsible className="w-full mb-2">
         <AccordionItem value="sql-panel">
           <AccordionTrigger className="text-sm font-medium hover:no-underline">SQL Direct Execution Panel</AccordionTrigger>
-          <AccordionContent className="pt-2">
+          <AccordionContent className="pt-2"> {/* Added padding-top to content */}
             <div className="flex flex-col space-y-2">
               <SqlInputPanel onSubmit={handleDirectSqlSubmit} disabled={isRunning || isTesting} />
               <div className="flex items-center space-x-2 flex-wrap gap-y-2">
@@ -724,6 +770,7 @@ export default function Home() {
                 >
                   List All Tables
                 </Button>
+                {/* SQL Script File Selector and Runner */}
                 <div className="flex items-center space-x-2">
                   <Select value={selectedSqlScript} onValueChange={setSelectedSqlScript} disabled={isRunning || isTesting || sqlScriptFiles.length === 0}>
                     <SelectTrigger className="w-[200px] h-9 text-sm" disabled={isRunning || isTesting || sqlScriptFiles.length === 0}>
@@ -753,15 +800,17 @@ export default function Home() {
         </AccordionItem>
       </Accordion>
 
-       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2">
+      {/* Output Display - Adjusted flex properties for sizing */}
+       <main className="flex-grow-[0.6] flex-shrink overflow-hidden mb-2"> {/* Adjusted flex-grow */}
         <OutputDisplay history={history} className="h-full" />
       </main>
 
+      {/* Command Input Footer - Remains the same */}
        <footer className="shrink-0">
         <CommandInput
             onSubmit={handleCommandSubmit}
             suggestions={filteredSuggestionsForInput}
-            disabled={isRunning || isTesting}
+            disabled={isRunning || isTesting} // Disable if tests or command is running
          />
       </footer>
     </div>
