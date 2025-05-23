@@ -220,7 +220,7 @@ export default function Home() {
                 mode: 'sql',
                 currentLogEntries: logEntries,
                 initialSuggestions,
-                customCommands, // Pass the customCommands object
+                customCommands: customCommands, // Pass the customCommands object
                 overridePermissionChecks: true,
             });
 
@@ -474,7 +474,7 @@ export default function Home() {
         mode: category as CommandMode,
         currentLogEntries: logEntries,
         initialSuggestions,
-        customCommands, // Pass the customCommands object
+        customCommands: customCommands, // Pass the customCommands object
         overridePermissionChecks: true,
       });
       

@@ -39,8 +39,7 @@ interface InternalCommandHandlerParams {
     commandName: string;
     args: string[];
     timestamp: string;
-    addSuggestion: (mode: CommandMode, command: string) => void;
-    addCustomCommand: (name: string, action: CustomCommandAction) => void;
+    // addSuggestion and addCustomCommand removed as they are client-side
     customCommands: CustomCommands; // Expect customCommands object
     currentLogEntries: LogEntry[];
     initialSuggestions: Record<string, string[]>;
@@ -165,7 +164,8 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleAiCommand(params);
     }
 
-    const customAction = customCommands[params.commandName.toLowerCase()]; // Use customCommands object
+    // Use the passed customCommands object directly
+    const customAction = customCommands[params.commandName.toLowerCase()];
     if (customAction !== undefined) {
         return handleCustomCommand(params, customAction);
     }

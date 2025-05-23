@@ -109,8 +109,7 @@ export async function executeCommand ({
             commandName: commandLower.split(' ')[0],
             args: commandTrimmed.split(' ').slice(1),
             timestamp,
-            addSuggestion: () => {},
-            addCustomCommand: () => {},
+            // addSuggestion and addCustomCommand are not passed as they are client-side
             customCommands, // Pass customCommands object
             currentLogEntries: potentiallyUpdatedLogs || currentLogEntries,
             initialSuggestions,
