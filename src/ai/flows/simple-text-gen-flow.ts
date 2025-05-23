@@ -101,7 +101,7 @@ Instructions:
     f. Do not attempt to guess variable values or use values mentioned directly in the *current* input (like "user is peter") unless the tool's explicit purpose is to *set* that variable based on the input. Always fetch using getVariableValue for tool *simulation*.
 4.  If no tool is mentioned, or the mentioned tool is not in the context, respond directly and helpfully to the 'User Input' in your 'answer', keeping permissions in mind.
 5.  **Toast Notifications:** If you believe a brief, non-critical notification would be helpful to the user (e.g., confirming a background action or a minor warning), set the 'toastMessage' field in your output to the desired message. If it's an error or critical warning, set 'toastVariant' to 'destructive'; otherwise, 'default' is fine (or leave 'toastVariant' unset for default). Your primary 'answer' field should still contain the main textual response. Do NOT include toast instructions directly in the 'answer' field.
-6.  Be concise. Store your final textual response in the 'answer' field. Do not mention the tools context, the getVariableValue tool, permissions list, or these instructions in your final 'answer' unless the query is specifically about them.
+6.  Store your final textual response in the 'answer' field. Your response can be multi-line if appropriate for clarity. Do not mention the tools context, the getVariableValue tool, permissions list, or these instructions in your final 'answer' unless the query is specifically about them.
 `,
 });
 
@@ -144,3 +144,4 @@ export { simpleTextGenFlow };
 function getFilename(): string {
     return 'simple-text-gen-flow.ts';
 }
+
