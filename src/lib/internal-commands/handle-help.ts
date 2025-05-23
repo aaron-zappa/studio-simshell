@@ -18,7 +18,7 @@ interface HandlerParams {
 }
 
 export const handleHelp = async ({ userId, timestamp, initialSuggestions, currentLogEntries, userPermissions, overridePermissionChecks }: HandlerParams): Promise<HandlerResult> => {
-    let helpText = `Command category is automatically detected.\n@bat:<filename><.bat/.sh/.sim>(experimental).\n\n--- Command Suggestions by Category ---`;
+    let helpText = `Command category is automatically detected.\n@bat:<filename><.bat/.sh/.sim>(experimental).\nAvailable categories: ${Object.keys(initialSuggestions).join(', ')}.\n\n--- Command Suggestions by Category ---`;
     let outputLines: OutputLine[] = [];
     let logTextEntry = 'Displayed help. ';
     let logType: 'I' | 'E' = 'I';
@@ -28,10 +28,10 @@ export const handleHelp = async ({ userId, timestamp, initialSuggestions, curren
 
     let commandsToShow: CommandDefinition[] = internalCommandDefinitions;
 
-    if (!dbInitialized && !overridePermissionChecks) { // Only filter if not overriding and DB not init
-        commandsToShow = internalCommandDefinitions.filter(cmdDef => cmdDef.name === 'ai' || cmdDef.name === 'init db' || cmdDef.name === 'help');
+    if (!dbInitialized && !overridePermissionChecks) {
+        commandsToShow = internalCommandDefinitions.filter(cmdDef => cmdDef.name === 'ai' || cmdDef.name === 'init_db' || cmdDef.name === 'help');
         logTextEntry += '(Database not initialized - showing limited help)';
-        helpText += "\n\n**Note:** Database not fully initialized. Some commands may be unavailable. Run 'init db'.";
+        helpText += "\n\n**Note:** Database not fully initialized. Some commands may be unavailable. Run 'init_db'.";
     }
 
 
@@ -70,7 +70,6 @@ export const handleHelp = async ({ userId, timestamp, initialSuggestions, curren
                     if (category === 'python' && !userPermissions.includes('execute_python_code')) {
                         showSuggestion = false;
                     }
-                    // Add similar checks for other categories if specific permissions apply
                 }
 
 

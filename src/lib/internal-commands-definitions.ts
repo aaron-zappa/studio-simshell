@@ -25,17 +25,9 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     description: 'Clears the command output history from the display.',
   },
   {
-    name: 'mode',
-    description: 'Informational. Command category is automatically detected. Shows available categories.',
-    argsFormat: '[category_name]',
-    argsDetails: [
-        { name: 'category_name', description: 'Optional. If provided, shows info about that category.', optional: true },
-    ],
-  },
-  {
     name: 'history',
     description: 'Placeholder command. Intended to show command history (currently only shows in output area).',
-    requiredPermission: 'view_history', 
+    requiredPermission: 'view_history',
   },
   {
     name: 'define',
@@ -44,7 +36,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     argsDetails: [
       { name: 'term_to_define', description: 'The term or concept you want a definition for.' },
     ],
-    requiredPermission: 'use_ai_tools', 
+    requiredPermission: 'use_ai_tools',
   },
   {
     name: 'refine',
@@ -53,7 +45,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     argsDetails: [
       { name: 'text_to_refine', description: 'The text or concept to refine.' },
     ],
-    requiredPermission: 'use_ai_tools', 
+    requiredPermission: 'use_ai_tools',
   },
   {
     name: 'add_int_cmd',
@@ -66,7 +58,7 @@ export const internalCommandDefinitions: CommandDefinition[] = [
       { name: 'action_to_perform', description: 'The text that will be output when the command is run (must be in quotes).' },
     ],
     exampleUsage: 'add_int_cmd mycmd greet "Greets the user" "Hello from my custom command!"',
-    requiredPermission: 'manage_ai_tools', 
+    requiredPermission: 'manage_ai_tools',
   },
   {
     name: 'add_ai_tool',
@@ -117,15 +109,6 @@ export const internalCommandDefinitions: CommandDefinition[] = [
     description: 'Client-side command. Signals the UI to attempt to stop any ongoing command execution. Server acknowledges the command.',
   },
   {
-    name: 'create_sqlite',
-    description: 'Initializes the internal SQLite in-memory database, making it ready for SQL commands. The filename argument is currently ignored.',
-    argsFormat: '[filename.db]',
-    argsDetails: [
-        { name: 'filename.db', description: 'Optional. This argument is currently ignored as the database is always in-memory.', optional: true },
-    ],
-    requiredPermission: 'manage_users', 
-  },
-  {
     name: 'init',
     description: 'Initializes the system. Creates the "variables" table in the database if it doesn\'t exist and sets some default Python variables (max_iterations, learning_rate, model_name, is_training_enabled). Also creates a placeholder for the "clipboard" variable.',
     requiredPermission: 'manage_roles_permissions',
@@ -174,4 +157,3 @@ export const internalCommandDefinitions: CommandDefinition[] = [
 function getFilename(): string {
     return 'internal-commands-definitions.ts';
 }
-

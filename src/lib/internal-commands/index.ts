@@ -10,7 +10,7 @@ import { internalCommandDefinitions } from '@/lib/internal-commands-definitions'
 
 // Import individual command handlers
 import { handleHelp } from './handle-help';
-import { handleMode } from './handle-mode';
+// import { handleMode } from './handle-mode'; // Removed
 import { handleHistory } from './handle-history';
 import { handleDefine } from './handle-define';
 import { handleRefine } from './handle-refine';
@@ -19,7 +19,7 @@ import { handleAddAiTool } from './handle-add-ai-tool';
 import { handleExportLog } from './handle-export-log';
 import { handleExportDb } from './handle-export-db';
 import { handlePause } from './handle-pause';
-import { handleCreateSqlite } from './handle-create-sqlite';
+// import { handleCreateSqlite } from './handle-create-sqlite'; // Removed
 import { handleShowRequirements } from './handle-show-requirements';
 import { handlePersistDb } from './handle-persist-db';
 import { handleInitDb } from './handle-init-db';
@@ -39,8 +39,7 @@ interface InternalCommandHandlerParams {
     commandName: string;
     args: string[];
     timestamp: string;
-    // addSuggestion and addCustomCommand removed as they are client-side
-    customCommands: CustomCommands; // Expect customCommands object
+    customCommands: CustomCommands;
     currentLogEntries: LogEntry[];
     initialSuggestions: Record<string, string[]>;
     overridePermissionChecks?: boolean;
@@ -74,7 +73,7 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
     if (commandName !== 'help' && commandDef && commandDef.requiredPermission && !overridePermissionChecks && !userPermissions.includes(commandDef.requiredPermission) && !userPermissions.includes('override_all_permissions')) {
         return permissionDenied(commandDef.requiredPermission);
     }
-    
+
     if (commandName.startsWith('@bat:')) {
         console.warn("Experimental @bat command received, but execution is not yet implemented.");
         return {
@@ -91,8 +90,8 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleHelp(params);
         case 'clear':
             return { outputLines: [], newSuggestions: undefined, newCustomCommands: undefined, toastInfo: undefined };
-        case 'mode':
-            return handleMode(params);
+        // case 'mode': // Removed
+        //     return handleMode(params);
         case 'history':
             return handleHistory(params);
         case 'define':
@@ -137,8 +136,8 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
              break;
         case 'pause':
             return handlePause(params);
-        case 'create_sqlite':
-            return handleCreateSqlite(params);
+        // case 'create_sqlite': // Removed
+        //     return handleCreateSqlite(params);
         case 'show_requirements':
             return handleShowRequirements(params);
         case 'persist_memory_db_to':
@@ -164,7 +163,6 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
             return handleAiCommand(params);
     }
 
-    // Use the passed customCommands object directly
     const customAction = customCommands[params.commandName.toLowerCase()];
     if (customAction !== undefined) {
         return handleCustomCommand(params, customAction);
@@ -181,4 +179,3 @@ export const handleInternalCommand = async (params: InternalCommandHandlerParams
 function getFilename(): string {
     return 'index.ts';
 }
-
