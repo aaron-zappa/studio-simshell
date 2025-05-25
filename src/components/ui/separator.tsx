@@ -1,4 +1,4 @@
-// src/components/ui/separator.tsx
+/src/components/ui/separator.tsx
 "use client"
 
 import * as React from "react"
@@ -28,14 +28,5 @@ const Separator = React.forwardRef<
   )
 )
 Separator.displayName = SeparatorPrimitive.Root.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'separator.tsx';
-}
 
 export { Separator }

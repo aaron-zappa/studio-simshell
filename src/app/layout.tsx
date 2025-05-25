@@ -1,4 +1,4 @@
-// src/app/layout.tsx
+/src/app/layout.tsx
 // src/app/layout.tsx
 import type {Metadata} from 'next';
 import { Inter } from "next/font/google"; // Using Inter as a fallback example if needed, but Geist is primary

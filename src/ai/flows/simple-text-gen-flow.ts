@@ -1,6 +1,6 @@
-// src/ai/flows/simple-text-gen-flow.ts
-// src/ai/flows/simple-text-gen-flow.ts
 'use server';
+// /src/ai/flows/simple-text-gen-flow.ts
+// src/ai/flows/simple-text-gen-flow.ts
 /**
  * @fileOverview A simple Genkit flow for generating text based on input,
  * simulating the use of defined AI tools by fetching variable values via a tool.

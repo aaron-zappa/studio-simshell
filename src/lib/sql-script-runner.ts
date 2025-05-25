@@ -1,4 +1,4 @@
-// src/lib/sql-script-runner.ts
+/src/lib/sql-script-runner.ts
 // src/lib/sql-script-runner.ts
 'use server';
 

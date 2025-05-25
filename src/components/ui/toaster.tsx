@@ -1,4 +1,4 @@
-// src/components/ui/toaster.tsx
+/src/components/ui/toaster.tsx
 "use client"
 
 import { useToast } from "@/hooks/use-toast"
@@ -33,13 +33,4 @@ export function Toaster() {
       <ToastViewport />
     </ToastProvider>
   )
-}
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'toaster.tsx';
 }

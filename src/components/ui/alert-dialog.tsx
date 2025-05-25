@@ -1,4 +1,4 @@
-// src/components/ui/alert-dialog.tsx
+/src/components/ui/alert-dialog.tsx
 "use client"
 
 import * as React from "react"
@@ -126,15 +126,6 @@ const AlertDialogCancel = React.forwardRef<
   />
 ))
 AlertDialogCancel.displayName = AlertDialogPrimitive.Cancel.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'alert-dialog.tsx';
-}
 
 export {
   AlertDialog,

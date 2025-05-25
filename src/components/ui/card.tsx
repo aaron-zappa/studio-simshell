@@ -1,4 +1,4 @@
-// src/components/ui/card.tsx
+/src/components/ui/card.tsx
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -76,14 +76,5 @@ const CardFooter = React.forwardRef<
   />
 ))
 CardFooter.displayName = "CardFooter"
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'card.tsx';
-}
 
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }

@@ -1,4 +1,4 @@
-// src/lib/formatting.ts
+/src/lib/formatting.ts
 // src/lib/formatting.ts
 'use server';
 

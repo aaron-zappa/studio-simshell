@@ -1,4 +1,4 @@
-// src/components/ui/badge.tsx
+/src/components/ui/badge.tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -32,15 +32,6 @@ function Badge({ className, variant, ...props }: BadgeProps) {
   return (
     <div className={cn(badgeVariants({ variant }), className)} {...props} />
   )
-}
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'badge.tsx';
 }
 
 export { Badge, badgeVariants }

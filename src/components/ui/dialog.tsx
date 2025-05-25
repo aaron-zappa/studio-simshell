@@ -1,4 +1,4 @@
-// src/components/ui/dialog.tsx
+/src/components/ui/dialog.tsx
 "use client"
 
 import * as React from "react"
@@ -108,15 +108,6 @@ const DialogDescription = React.forwardRef<
   />
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'dialog.tsx';
-}
 
 export {
   Dialog,

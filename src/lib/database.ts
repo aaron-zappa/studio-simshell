@@ -1,4 +1,4 @@
-// src/lib/database.ts
+/src/lib/database.ts
 // src/lib/database.ts
 'use server';
 

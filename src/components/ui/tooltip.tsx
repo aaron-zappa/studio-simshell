@@ -1,4 +1,4 @@
-// src/components/ui/tooltip.tsx
+/src/components/ui/tooltip.tsx
 "use client"
 
 import * as React from "react"
@@ -27,14 +27,5 @@ const TooltipContent = React.forwardRef<
   />
 ))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'tooltip.tsx';
-}
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }

@@ -1,4 +1,4 @@
-// src/components/ui/textarea.tsx
+/src/components/ui/textarea.tsx
 import * as React from 'react';
 
 import {cn} from '@/lib/utils';
@@ -18,14 +18,5 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<'tex
   }
 );
 Textarea.displayName = 'Textarea';
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'textarea.tsx';
-}
 
 export {Textarea};

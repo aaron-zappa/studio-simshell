@@ -1,4 +1,4 @@
-// src/hooks/use-suggestions.ts
+/src/hooks/use-suggestions.ts
 // src/hooks/use-suggestions.ts
 import * as React from 'react';
 import type { CommandMode } from '@/types/command-types';

@@ -1,4 +1,4 @@
-// src/lib/permissions.ts
+/src/lib/permissions.ts
 // src/lib/permissions.ts
 'use server';
 

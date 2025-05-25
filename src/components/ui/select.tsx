@@ -1,4 +1,4 @@
-// src/components/ui/select.tsx
+/src/components/ui/select.tsx
 "use client"
 
 import * as React from "react"
@@ -146,15 +146,6 @@ const SelectSeparator = React.forwardRef<
   />
 ))
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'select.tsx';
-}
 
 export {
   Select,

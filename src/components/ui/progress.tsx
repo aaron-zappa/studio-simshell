@@ -1,4 +1,4 @@
-// src/components/ui/progress.tsx
+/src/components/ui/progress.tsx
 "use client"
 
 import * as React from "react"
@@ -25,14 +25,5 @@ const Progress = React.forwardRef<
   </ProgressPrimitive.Root>
 ))
 Progress.displayName = ProgressPrimitive.Root.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'progress.tsx';
-}
 
 export { Progress }

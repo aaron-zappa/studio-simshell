@@ -1,4 +1,4 @@
-// src/hooks/use-custom-commands.ts
+/src/hooks/use-custom-commands.ts
 // src/hooks/use-custom-commands.ts
 'use client';
 

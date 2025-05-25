@@ -1,4 +1,4 @@
-// src/components/ui/toast.tsx
+/src/components/ui/toast.tsx
 "use client"
 
 import * as React from "react"
@@ -116,15 +116,6 @@ ToastDescription.displayName = ToastPrimitives.Description.displayName
 type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
 
 type ToastActionElement = React.ReactElement<typeof ToastAction>
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'toast.tsx';
-}
 
 export {
   type ToastProps,

@@ -1,4 +1,4 @@
-// src/lib/variables.ts
+/src/lib/variables.ts
 // src/lib/variables.ts
 'use server';
 

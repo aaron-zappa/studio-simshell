@@ -1,4 +1,4 @@
-// src/types/log-types.ts
+/src/types/log-types.ts
 // src/types/log-types.ts
 
 /**

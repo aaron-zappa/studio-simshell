@@ -1,4 +1,4 @@
-// src/components/ui/popover.tsx
+/src/components/ui/popover.tsx
 "use client"
 
 import * as React from "react"
@@ -30,14 +30,5 @@ const PopoverContent = React.forwardRef<
   </PopoverPrimitive.Portal>
 ))
 PopoverContent.displayName = PopoverPrimitive.Content.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'popover.tsx';
-}
 
 export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } // Export PopoverAnchor

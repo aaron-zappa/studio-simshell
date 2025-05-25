@@ -1,4 +1,4 @@
-// src/lib/logging.ts
+/src/lib/logging.ts
 // src/lib/logging.ts
 'use client';
 

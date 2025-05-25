@@ -1,4 +1,4 @@
-// src/components/ui/checkbox.tsx
+/src/components/ui/checkbox.tsx
 "use client"
 
 import * as React from "react"
@@ -27,14 +27,5 @@ const Checkbox = React.forwardRef<
   </CheckboxPrimitive.Root>
 ))
 Checkbox.displayName = CheckboxPrimitive.Root.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'checkbox.tsx';
-}
 
 export { Checkbox }

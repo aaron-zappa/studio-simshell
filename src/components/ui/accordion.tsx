@@ -1,4 +1,4 @@
-// src/components/ui/accordion.tsx
+/src/components/ui/accordion.tsx
 "use client"
 
 import * as React from "react"
@@ -55,14 +55,5 @@ const AccordionContent = React.forwardRef<
 ))
 
 AccordionContent.displayName = AccordionPrimitive.Content.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'accordion.tsx';
-}
 
 export { Accordion, AccordionItem, AccordionTrigger, AccordionContent }

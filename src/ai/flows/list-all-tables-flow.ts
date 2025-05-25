@@ -1,5 +1,6 @@
-// src/ai/flows/list-all-tables-flow.ts
 'use server';
+// /src/ai/flows/list-all-tables-flow.ts
+// src/ai/flows/list-all-tables-flow.ts
 /**
  * @fileOverview A Genkit flow that provides a SQL query to list all tables.
  *

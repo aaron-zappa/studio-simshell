@@ -1,4 +1,4 @@
-// src/ai/ai-instance.ts
+/src/ai/ai-instance.ts
 // src/ai/ai-instance.ts
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';

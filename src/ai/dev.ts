@@ -1,11 +1,11 @@
-// src/ai/dev.ts
+/src/ai/dev.ts
 // src/ai/dev.ts
 import type {Flow, Tool} from 'genkit';
 
 // Import flows explicitly
 import { classifyCommandFlow } from './flows/classify-command-flow';
 import { simpleTextGenFlow } from './flows/simple-text-gen-flow';
-import { listAllTablesFlow } from './flows/list-all-tables-flow'; // Import the new flow
+import { listAllTablesQuery } from './flows/list-all-tables-flow'; // Corrected import
 
 // Import tools explicitly
 import { getVariableValue } from './tools/get-variable-value-tool'; // Import the tool
@@ -14,7 +14,7 @@ import { getVariableValue } from './tools/get-variable-value-tool'; // Import th
 export const flows: Flow<any, any, any>[] = [
   classifyCommandFlow,
   simpleTextGenFlow,
-  listAllTablesFlow, // Add the new flow here
+  listAllTablesQuery, // Corrected to use the exported function name
   // Add other imported flows here
   // e.g., anotherFlow,
 ];

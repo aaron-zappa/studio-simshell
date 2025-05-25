@@ -1,4 +1,4 @@
-// src/types/command-types.ts
+/src/types/command-types.ts
 // src/types/command-types.ts
 /**
  * Defines the possible modes/categories for the command shell.

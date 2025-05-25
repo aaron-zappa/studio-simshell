@@ -1,6 +1,5 @@
-// src/ai/flows/classify-command-flow.ts
-// src/ai/flows/classify-command-flow.ts
 'use server';
+// src/ai/flows/classify-command-flow.ts
 /**
  * @fileOverview A Genkit flow to classify user commands based on active categories.
  *

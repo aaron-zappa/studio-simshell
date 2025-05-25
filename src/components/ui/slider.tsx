@@ -1,4 +1,4 @@
-// src/components/ui/slider.tsx
+/src/components/ui/slider.tsx
 "use client"
 
 import * as React from "react"
@@ -25,14 +25,5 @@ const Slider = React.forwardRef<
   </SliderPrimitive.Root>
 ))
 Slider.displayName = SliderPrimitive.Root.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'slider.tsx';
-}
 
 export { Slider }

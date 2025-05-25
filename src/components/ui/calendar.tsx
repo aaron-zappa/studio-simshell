@@ -1,4 +1,4 @@
-// src/components/ui/calendar.tsx
+/src/components/ui/calendar.tsx
 "use client"
 
 import * as React from "react"
@@ -67,14 +67,5 @@ function Calendar({
   )
 }
 Calendar.displayName = "Calendar"
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'calendar.tsx';
-}
 
 export { Calendar }

@@ -1,4 +1,4 @@
-// src/components/ui/sheet.tsx
+/src/components/ui/sheet.tsx
 "use client"
 
 import * as React from "react"
@@ -126,15 +126,6 @@ const SheetDescription = React.forwardRef<
   />
 ))
 SheetDescription.displayName = SheetPrimitive.Description.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'sheet.tsx';
-}
 
 export {
   Sheet,

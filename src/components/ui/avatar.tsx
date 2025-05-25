@@ -1,4 +1,4 @@
-// src/components/ui/avatar.tsx
+/src/components/ui/avatar.tsx
 "use client"
 
 import * as React from "react"
@@ -47,14 +47,5 @@ const AvatarFallback = React.forwardRef<
   />
 ))
 AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'avatar.tsx';
-}
 
 export { Avatar, AvatarImage, AvatarFallback }

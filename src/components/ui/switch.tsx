@@ -1,4 +1,4 @@
-// src/components/ui/switch.tsx
+/src/components/ui/switch.tsx
 "use client"
 
 import * as React from "react"
@@ -26,14 +26,5 @@ const Switch = React.forwardRef<
   </SwitchPrimitives.Root>
 ))
 Switch.displayName = SwitchPrimitives.Root.displayName
-
-/**
- * Returns the name of the current file.
- * This function is not exported to avoid being treated as a Server Action.
- * @returns The filename.
- */
-function getFilename(): string {
-    return 'switch.tsx';
-}
 
 export { Switch }
