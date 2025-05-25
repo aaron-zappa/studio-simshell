@@ -1,6 +1,6 @@
-/src/components/ui/label.tsx
-"use client"
 
+"use client"
+// /src/components/ui/label.tsx
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"
 import { cva, type VariantProps } from "class-variance-authority"
