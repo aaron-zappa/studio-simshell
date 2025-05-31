@@ -1,5 +1,5 @@
-/src/components/ui/toast.tsx
 "use client"
+/src/components/ui/toast.tsx
 
 import * as React from "react"
 import * as ToastPrimitives from "@radix-ui/react-toast"

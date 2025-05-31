@@ -1,6 +1,5 @@
-/src/hooks/use-custom-commands.ts
-// src/hooks/use-custom-commands.ts
 'use client';
+// src/hooks/use-custom-commands.ts
 
 import * as React from 'react';
 
