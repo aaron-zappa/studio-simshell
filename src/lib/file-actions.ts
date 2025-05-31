@@ -1,6 +1,6 @@
-/src/lib/file-actions.ts
-// src/lib/file-actions.ts
 'use server';
+// /src/lib/file-actions.ts
+// src/lib/file-actions.ts
 
 import * as fs from 'fs/promises';
 import * as path from 'path';

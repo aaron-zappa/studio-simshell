@@ -1,6 +1,5 @@
-/src/lib/ai-tools.ts
-// src/lib/ai-tools.ts
 'use server';
+// src/lib/ai-tools.ts
 
 import { runSql } from '@/lib/database';
 

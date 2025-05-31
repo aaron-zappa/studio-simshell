@@ -1,6 +1,6 @@
-/src/lib/database.ts
-// src/lib/database.ts
 'use server';
+// /src/lib/database.ts
+// src/lib/database.ts
 
 import Database from 'better-sqlite3';
 import type { Database as DB } from 'better-sqlite3';
